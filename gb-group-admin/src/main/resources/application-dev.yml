@@ -77,9 +77,9 @@ spring:
 # 图片上传配置
 upload-config:
   type: 1 # 1=本地上传, 2=云端上传
-  path: /www/wwwroot/https://test.api.shopgroup.com.cn/image # 本地路径公有文件上传路径
+  path: /www/wwwroot/test.api.shopgroup.com.cn/image # 本地路径公有文件上传路径
   path2: /java/shopgroup/images/private # 本地路径私有文件上传路径
-  domain: https://https://test.api.shopgroup.com.cn/image # 公有文件访问域名
-  domain2: https://https://test.api.shopgroup.com.cn/access # 私有文件访问域名
+  domain: https://test.api.shopgroup.com.cn/image # 公有文件访问域名
+  domain2: https://test.api.shopgroup.com.cn/access # 私有文件访问域名
 
 

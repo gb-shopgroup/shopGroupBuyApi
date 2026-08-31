@@ -7,6 +7,7 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import javax.validation.ConstraintViolation;
 import javax.validation.ConstraintViolationException;
 import java.util.Map;
@@ -56,6 +57,21 @@ public class GlobalExceptionHandler {
     public Map handler(TokenException e) {
 
         return JsonResult.forbid();
+    }
+
+    // 上传文件超过大小限制
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public Map handler(MaxUploadSizeExceededException e) {
+
+        return JsonResult.error("上传文件超过大小限制！");
+    }
+
+    // 兜底异常：捕获所有未处理异常，避免返回 Spring 默认 500 错误页
+    @ExceptionHandler(Exception.class)
+    public Map handler(Exception e) {
+
+        e.printStackTrace();
+        return JsonResult.error("系统繁忙，请稍后重试！");
     }
 
 
