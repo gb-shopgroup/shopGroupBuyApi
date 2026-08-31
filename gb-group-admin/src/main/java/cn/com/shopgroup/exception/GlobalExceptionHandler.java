@@ -1,6 +1,7 @@
 package cn.com.shopgroup.exception;
 
 import cn.com.shopgroup.common.utils.JsonResult;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -14,6 +15,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
+@Slf4j
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(BindException.class)
@@ -42,35 +44,34 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public Map handler(HttpRequestMethodNotSupportedException e){
-
-        return JsonResult.error("请求接口不存在！");
+        log.error("异常发生！",e);
+        return JsonResult.error(e.getMessage());
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public Map handler(HttpMessageNotReadableException e){
-
-        return JsonResult.error("请求体不存在！");
+        log.error("异常发生！",e);
+        return JsonResult.error(e.getMessage());
     }
 
     // 缺少token令牌或者令牌错误
     @ExceptionHandler(TokenException.class)
     public Map handler(TokenException e) {
-
+        log.error("缺少token令牌或者令牌错误", e);
         return JsonResult.forbid();
     }
 
     // 上传文件超过大小限制
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public Map handler(MaxUploadSizeExceededException e) {
-
-        return JsonResult.error("上传文件超过大小限制！");
+        log.error("上传文件超过大小限制", e);
+        return JsonResult.error(e.getMessage());
     }
 
     // 兜底异常：捕获所有未处理异常，避免返回 Spring 默认 500 错误页
     @ExceptionHandler(Exception.class)
     public Map handler(Exception e) {
-
-        e.printStackTrace();
+        log.error("系统异常", e);
         return JsonResult.error("系统繁忙，请稍后重试！");
     }
 

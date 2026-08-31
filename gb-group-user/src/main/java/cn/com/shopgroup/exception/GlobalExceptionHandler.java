@@ -58,21 +58,21 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public JsonResult handler(HttpRequestMethodNotSupportedException e) {
         log.error("请求方法不支持: {}", e.getMethod(), e);
-        return JsonResult.error("请求接口不存在！");
+        return JsonResult.error(e.getMessage());
     }
 
     // 请求体不存在或格式错误
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public JsonResult handler(HttpMessageNotReadableException e) {
         log.error("请求体解析异常", e);
-        return JsonResult.error("请求体不存在或格式错误！");
+        return JsonResult.error(e.getMessage());
     }
 
     // 上传文件超过大小限制
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public JsonResult handler(MaxUploadSizeExceededException e) {
         log.error("上传文件超过大小限制", e);
-        return JsonResult.error("上传文件超过大小限制！");
+        return JsonResult.error(e.getMessage());
     }
 
     // 兜底异常：捕获所有未处理异常，避免返回 Spring 默认 500 错误页
