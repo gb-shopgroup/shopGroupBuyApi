@@ -12,7 +12,9 @@ import cn.com.shopgroup.user.http.response.PointResponse;
 import cn.com.shopgroup.user.model.GbOrgPointInfo;
 import cn.com.shopgroup.user.service.GbOrgPointInfoService;
 import cn.com.shopgroup.user.utils.RequestParamsUtils;
+import com.alibaba.fastjson2.JSON;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.util.CollectionUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -57,6 +59,10 @@ public class LeaderPointController {
         if (redisHelper.hasKey(key) == false) {
             // 查询数据库
             List<GbOrgPointInfo> result = service.getMiniLeaderPointList(leaderId);
+            log.info("查询提货点列表 leaderId:{},rest:{}",leaderId, JSON.toJSONString(result));
+            if(CollectionUtils.isEmpty(result)){
+                return JsonResult.success();
+            }
             List<PointResponse> data = PointResponse.getPointResponseList(result);
             // 缓存到Redis
             redisHelper.setCacheObject(key, data, RedisConstant.RedisPointListExpired, TimeUnit.SECONDS);

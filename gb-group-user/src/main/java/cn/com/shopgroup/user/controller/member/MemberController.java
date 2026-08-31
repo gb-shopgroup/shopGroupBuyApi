@@ -16,8 +16,11 @@ import cn.com.shopgroup.user.service.GbMemberInfoService;
 import cn.com.shopgroup.user.service.GbOrgLeaderInfoService;
 import cn.com.shopgroup.user.service.GbOrgShopInfoService;
 import cn.com.shopgroup.user.service.GbOrgStaffInfoService;
+import com.alibaba.fastjson2.JSON;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.util.CollectionUtils;
+import org.springframework.util.ObjectUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -137,21 +140,31 @@ public class MemberController {
 
             // 团长店铺名称
             GbOrgShopInfo shopInfo = shopService.getMiniLeaderShop(staffInfo.getLeaderId());
-            leader.setShop(shopInfo.getShopName());
+            log.info("是否团长身份接口 leaderId:{},shop:{}", staffInfo.getLeaderId(), JSON.toJSONString(shopInfo));
+            if (ObjectUtils.isEmpty(shopInfo)) {
+                leader.setShop(shopInfo.getShopName());
+            }
 
             // 查询员工负责的提货点
             List<GbOrgPointInfo> lists = staffService.getMiniStaffPointList(staffInfo.getStaffId());
-            if (lists == null) lists = new ArrayList<>();
+            if (CollectionUtils.isEmpty(lists)) {
+                lists = new ArrayList<>();
+            }
             List<Long> pointList = lists.stream().map(GbOrgPointInfo::getPointId).collect(Collectors.toList());
-            if (pointList == null) pointList = new ArrayList<>();
+            if (CollectionUtils.isEmpty(pointList)) {
+                pointList = new ArrayList<>();
+            }
             String pointIds = pointList.stream().map(String::valueOf).collect(Collectors.joining(","));
-            if (pointIds == null) pointIds = "";
+            if (StringUtils.isEmpty(pointIds)) {
+                pointIds = "";
+            }
             leader.setPointIds(pointIds);
         }
 
         // 根据openid查询是否团长
         GbOrgLeaderInfo leaderInfo = leaderService.getMiniLeaderInfo(openid);
-        if (leaderInfo != null && leaderInfo.getLeaderId() > 0) {
+        if (!ObjectUtils.isEmpty(leaderInfo) && leaderInfo.getLeaderId() > 0) {
+            leader.setLid(IntEncryptorUtils.encrypt(leaderInfo.getLeaderId().intValue()));
             leader.setIsSuper(true);
         }
 
