@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.shopgroup.order.mapper.GbOrderInfoMapper">
+
+    <!-- 订单信息表 -->
+    <resultMap id="BaseResultMap" type="cn.com.shopgroup.order.model.GbOrderInfo">
+        <id column="id" property="Id"/>
+        <result column="order_no" property="orderNo"/>
+        <result column="member_id" property="memberId"/>
+        <result column="group_id" property="groupId"/>
+        <result column="leader_id" property="leaderId"/>
+        <result column="isolation_id" property="isolationId"/>
+        <result column="shop_id" property="shopId"/>
+        <result column="shop_name" property="shopName"/>
+        <result column="mobile" property="mobile"/>
+        <result column="nickname" property="nickname"/>
+        <result column="avatar" property="avatar"/>
+        <result column="openid" property="openid"/>
+        <result column="group_name" property="groupName"/>
+        <result column="group_price" property="groupPrice"/>
+        <result column="order_price" property="orderPrice"/>
+        <result column="bus_id" property="busId"/>
+        <result column="merchant_no" property="merchantNo"/>
+        <result column="status" property="status"/>
+        <result column="pay_fee" property="payFee"/>
+        <result column="pay_time" property="payTime"/>
+        <result column="pay_no" property="payNo"/>
+        <result column="refund_fee" property="refundFee"/>
+        <result column="refund_time" property="refundTime"/>
+        <result column="refund_no" property="refundNo"/>
+        <result column="refund_staff" property="refundStaff"/>
+        <result column="refund_reason" property="refundReason"/>
+        <result column="receipt_type" property="receiptType"/>
+        <result column="true_name" property="trueName"/>
+        <result column="telephone" property="telephone"/>
+        <result column="receipt_time" property="receiptTime"/>
+        <result column="verify_time" property="verifyTime"/>
+        <result column="point_id" property="pointId"/>
+        <result column="point_name" property="pointName"/>
+        <result column="point_address" property="pointAddress"/>
+        <result column="receipt_code" property="receiptCode"/>
+        <result column="staff_id" property="staffId"/>
+        <result column="staff_name" property="staffName"/>
+        <result column="point_id2" property="pointId2"/>
+        <result column="point_name2" property="pointName2"/>
+        <result column="remark" property="remark"/>
+        <result column="add_time" property="addTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id
+        , order_no, member_id, group_id, leader_id, isolation_id, shop_id,shop_name, mobile, nickname, avatar, openid, group_name, group_price,
+        order_price, bus_id, merchant_no, status, pay_fee, pay_time, pay_no, refund_fee, refund_time, refund_no, refund_staff,
+        refund_reason, receipt_type, true_name, telephone, receipt_time, verify_time, point_id, point_name, point_address,
+        receipt_code, staff_id, staff_name, point_id2, point_name2, remark, add_time,update_time
+    </sql>
+
+    <select id="getOrderInfoByOrderNo" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM gb_order_info
+        WHERE order_no = #{orderNo}
+    </select>
+
+
+    <select id="existsByOrderNo" resultType="java.lang.Integer">
+        SELECT count(id)
+        FROM gb_order_info
+        WHERE order_no = #{orderNo}
+    </select>
+
+    <select id="getAllByLeaderId" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM gb_order_info
+        WHERE leader_id = #{leaderId} and status != 7
+    </select>
+
+    <select id="getPaidOrderInfoBy" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM gb_order_info
+        WHERE shop_id = #{shopId} and member_id = #{memberId} and status = 1
+    </select>
+
+    <select id="getSumOfGroupActivityOrder" resultType="java.lang.Integer">
+        SELECT count(id)
+        FROM gb_order_info
+        WHERE group_id = #{groupId}
+    </select>
+
+</mapper>

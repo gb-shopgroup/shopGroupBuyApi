@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.shopgroup.goods.mapper.GbGroupCategoryInfoMapper">
+
+    <!-- 团购分类信息表 -->
+    <resultMap id="BaseResultMap" type="cn.com.shopgroup.goods.model.GbGroupCategoryInfo">
+        <id column="cat_id" property="catId"/>
+        <result column="cat_name" property="catName"/>
+        <result column="sort_order" property="sortOrder"/>
+        <result column="is_close" property="isClose"/>
+        <result column="add_time" property="addTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        cat_id, cat_name, sort_order, is_close, add_time
+    </sql>
+
+</mapper>

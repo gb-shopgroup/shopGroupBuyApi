@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.shopgroup.goods.mapper.GbGroupCollectionInfoMapper">
+
+    <!-- 团购合集信息表 -->
+    <resultMap id="BaseResultMap" type="cn.com.shopgroup.goods.model.GbGroupCollectionInfo">
+        <id column="coll_id" property="collId"/>
+        <result column="leader_id" property="leaderId"/>
+        <result column="isolation_id" property="isolationId"/>
+        <result column="coll_name" property="collName"/>
+        <result column="is_close" property="isClose"/>
+        <result column="staff_id" property="staffId"/>
+        <result column="staff_name" property="staffName"/>
+        <result column="add_time" property="addTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        coll_id, leader_id, isolation_id, coll_name, is_close, staff_id, staff_name, add_time
+    </sql>
+
+</mapper>

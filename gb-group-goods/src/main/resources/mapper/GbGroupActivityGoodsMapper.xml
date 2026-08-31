@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.shopgroup.goods.mapper.GbGroupActivityGoodsMapper">
+
+    <!-- 团购活动商品表 -->
+    <resultMap id="BaseResultMap" type="cn.com.shopgroup.goods.model.GbGroupActivityGoods">
+        <id column="group_id" property="groupId"/>
+        <id column="goods_id" property="goodsId"/>
+        <result column="goods_name" property="goodsName"/>
+        <result column="goods_type" property="goodsType"/>
+        <result column="group_img" property="groupImg"/>
+        <result column="group_price" property="groupPrice"/>
+        <result column="market_price" property="marketPrice"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        group_id, goods_id, goods_name, goods_type, group_img, group_price, market_price
+    </sql>
+
+</mapper>

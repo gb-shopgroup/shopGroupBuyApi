@@ -1,0 +1,81 @@
+server:
+  # tomcat 优化配置
+  tomcat:
+    # tomcat的URI编码
+    uri-encoding: UTF-8
+    # 核心工作线程数（默认10）
+    min-spare-threads: 100
+    # 最大工作线程数（默认200）：Tomcat能同时处理的最大请求数
+    max-threads: 500
+    # 线程最大空闲时间（默认60000ms=1分钟）：单位毫秒，空闲线程超过该时间会被销毁，直至核心线程数
+    max-idle-time: 60000
+    # 最大连接数（默认8192）：Tomcat能接受的最大连接数（包含正在处理和等待处理的请求）
+    max-connections: 5000
+    # 等待队列长度（当连接数超过max-connections时，请求进入等待队列）
+    accept-count: 1000
+    # tomcat文件上传限制大小
+    max-swallow-size : 10MB
+
+spring:
+  servlet:
+    multipart:
+      # Spring单个文件上传限制大小
+      max-file-size : 5MB
+      # Spring单个请求限制大小
+      max-request-size : 10MB
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/group_purchase?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    #username: root
+    #password: 12345678
+    username: group_purchase
+    password: zK75tPdzX3fitMrx
+    # Druid 连接池核心配置
+    druid:
+      # 空闲连接检测间隔（毫秒）, 建议小于MySQL wait_timeout, 默认值：60000 毫秒 = 60 秒
+      time-between-eviction-runs-millis: 60000
+      # 空闲连接最小存活时间, 默认值：1800000 毫秒 = 30 分钟, 这里设置的是10分钟
+      # 超过该阈值，Druid 就会校验并丢弃无效连接
+      min-evictable-idle-time-millis: 600000
+      # 检测空闲连接时执行的校验SQL
+      validation-query: SELECT 1
+      # 空闲时是否执行校验SQL, 解决断连警告必须改为 true
+      test-while-idle: true
+      # 获取连接时不校验（影响性能，默认false）
+      test-on-borrow: false
+      # 归还连接时不校验（影响性能，默认false）
+      test-on-return: false
+      # 初始化连接数（默认0）
+      initial-size: 100
+      # 最小空闲连接数（默认5）
+      min-idle: 100
+      # 最大活跃连接数（默认8）
+      max-active: 500
+      # 获取连接的最大等待时间（默认-1，无限制）
+      max-wait: 5000
+      # 关闭Druid监控统计功能
+      stat-view-servlet:
+        enabled: false
+      # 关闭Web应用监控
+      web-stat-filter:
+        enabled: false
+      # 使用过滤器
+      filter:
+        # 关闭慢SQL记录
+        stat:
+          enabled: false
+        # 开启SQL防火墙
+        wall:
+          enabled: true
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    #username: xxxxxxxxxxx
+    ###password: 12345678
+    database: 1
+
+# 易宝支付回调
+pay-config:
+  url: https://test.api.shopgroup.com.cn/order/payment/order/notify
+
+

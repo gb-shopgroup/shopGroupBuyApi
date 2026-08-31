@@ -1,0 +1,283 @@
+package cn.com.shopgroup.controller;
+
+import cn.com.shopgroup.common.utils.JsonResult;
+import cn.com.shopgroup.common.utils.MoneyUtil;
+import cn.com.shopgroup.common.utils.TimeUtils;
+import cn.com.shopgroup.common.wxmini.WxMiniAccessTokenHelper;
+import cn.com.shopgroup.common.wxmini.WxMiniProgramHelper;
+import cn.com.shopgroup.common.yeepay.YeepayUtils;
+import cn.com.shopgroup.goods.service.GbGoodsInfoService;
+import cn.com.shopgroup.order.model.GbOrderBusinessInfo;
+import cn.com.shopgroup.order.model.GbOrderGoodsInfo;
+import cn.com.shopgroup.order.service.GbOrderBusinessInfoService;
+import cn.com.shopgroup.order.service.GbOrderInfoService;
+import cn.com.shopgroup.service.BusinessOrderService;
+import cn.com.shopgroup.service.TaskOrderService;
+import cn.com.shopgroup.user.service.GbArticleInfoService;
+import cn.hutool.core.collection.CollectionUtil;
+import com.alibaba.fastjson2.JSON;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.util.ObjectUtils;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import javax.annotation.Resource;
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@Slf4j
+public class TaskController {
+
+    @Resource
+    private BusinessOrderService service;
+
+    @Resource
+    private GbOrderBusinessInfoService orderBusinessInfoService;
+
+    @Resource
+    private GbOrderInfoService orderInfoService;
+
+    @Resource
+    private WxMiniAccessTokenHelper helper;
+
+    @Resource
+    private TaskOrderService taskOrderService;
+
+    @Resource
+    private GbGoodsInfoService goodsService;
+    @Resource
+    private GbArticleInfoService articleInfoService;
+
+
+    // 微信订单发货
+    @GetMapping("/task/order/send")
+    public String send(@RequestParam("orderNo") String orderNo) {
+
+        // 查询订单
+        GbOrderBusinessInfo orderInfo = service.getOrderBusinessInfo(orderNo);
+        log.info("/task/order/send orderNo:{},orderInfo:{}",orderNo, JSON.toJSONString(orderInfo));
+        if (ObjectUtils.isEmpty(orderInfo)) {
+            return "order is not exist";
+        }
+        // 是否已经发货
+        if (orderInfo.getIsSend() == 1) return "order is already send";
+
+        // 再获取访问令牌
+        String accessToken = helper.getAccessToken(false);
+        log.info("微信订单发货：accessToken = " + accessToken);
+
+        // 订单发货参数
+        String transactionId = orderInfo.getTransactionId();
+        String goodsName = orderInfo.getGroupName();
+        String openid = orderInfo.getOpenid();
+
+        // 请求发货
+        int isSendOK = WxMiniProgramHelper.uploadShippingInfo(accessToken, transactionId, goodsName, openid);
+        if (isSendOK == 1) {
+            // 更新发货标识
+            service.updateBusinessOrderSendStatus(orderNo);
+            return "ok";
+        } else {
+            // 考虑 accessToken 失效问题
+            if (isSendOK == -1) helper.removeAccessToken();
+            return "error";
+        }
+    }
+
+    // 订单分账
+    @GetMapping("/task/order/divide")
+    public String divide(@RequestParam("orderNo") String orderNo) {
+
+        // 先查询订单
+        GbOrderBusinessInfo orderInfo = service.getOrderBusinessInfo(orderNo);
+        log.info("/task/order/divide orderNo:{},orderInfo:{}",orderNo,JSON.toJSONString(orderInfo));
+        if (ObjectUtils.isEmpty(orderInfo)) {
+            return "order is not exist";
+        }
+
+        // 是否已经分账
+        if (orderInfo.getIsDivide() == 1) {
+            return "order is already divide";
+        }
+
+        // 分账商户
+        String merchantNo = orderInfo.getMerchantNo();
+
+        // 平台服务费分账
+        String remark = "平台服务费";
+        double amount = MoneyUtil.centToYuan(orderInfo.getServiceFee());
+
+        // 商户自己分账
+        String remark2 = "用户支付商品订单费用";
+        Double amount2 = MoneyUtil.centToYuan(orderInfo.getBusFee());
+
+        // 开始分账
+        Map<String, String> res = YeepayUtils.divide(orderNo, merchantNo, amount, remark, amount2, remark2);
+
+        // 分账结果
+        if (Integer.parseInt(res.get("success")) == 0) {
+
+            String uniqueDivideNo = res.containsKey("uniqueDivideNo") ? res.get("uniqueDivideNo") : "";
+            log.info("订单分装失败：订单号 = " + orderNo + " , 易宝分账流水号 = " + uniqueDivideNo + " 原因：" + res.get("data"));
+            return "error";
+        } else {
+
+            String status = res.get("data");
+            String uniqueDivideNo = res.get("uniqueDivideNo");
+            service.updateBusinessOrderDivideStatus(orderNo, status, uniqueDivideNo);
+            return "ok";
+        }
+    }
+
+    // 查询订单
+    @GetMapping("/task/order/query")
+    public String query(@RequestParam("orderNo") String orderNo) {
+        // 先查询订单
+        GbOrderBusinessInfo orderInfo = service.getOrderBusinessInfo(orderNo);
+        if (ObjectUtils.isEmpty(orderInfo)) {
+            return "order is not exist";
+        }
+
+        // 查询订单
+        Map<String, String> res = YeepayUtils.query(orderNo, orderInfo.getMerchantNo());
+        if (Integer.parseInt(res.get("success")) == 0) {
+            log.warn("查询订单失败：订单号 = " + orderNo + " , 原因：" + res.get("data"));
+            return "error";
+        } else {
+            // 解冻状态：INIT=处理中；FROZEN=已冻结；UN_FROZEN=已解冻
+            String status = res.get("data");
+            if (status.equalsIgnoreCase("UN_FROZEN")) {
+                service.updateBusinessOrderFreezeStatus(orderNo);
+            }
+            return "ok-" + status;
+        }
+    }
+
+    // 分账前部分退款，存在问题，实际到款金额-退款金额-平台服务费=商户分账金额。
+    // 分账后部分退款的话，没有问题，子商户本来就自己承担平台服务费的差额。
+    // 退款(原始订单金额, 包括易宝手续费)
+    // 同步原始订单表和商户订单表的退款状态
+    @GetMapping("/task/order/refund")
+    public String refund(@RequestParam("orderNo") String orderNo) {
+
+        // 先查询订单
+        GbOrderBusinessInfo orderInfo = service.getOrderBusinessInfo(orderNo);
+        if (orderInfo == null) return "order is not exist";
+
+        // 是否已经退款
+        if (orderInfo.getCommStatus() == 5) return "order is already refund";
+
+        // 已经分账后还能退款嘛？
+        //if(orderInfo.getIsDivide() == 1) return "order is already divide";
+
+        // 申请退款
+        String merchantNo = orderInfo.getMerchantNo();
+        // 分转元
+        double amount = MoneyUtil.centToYuan(orderInfo.getOrderFee());
+        Map<String, String> res = YeepayUtils.refund(merchantNo, orderNo, String.valueOf(amount));
+
+        // 查看是否成功
+        if (Integer.parseInt(res.get("success")) == 0) {
+            return "error - " + res.get("data");
+        } else {
+            // 同步原始订单表和商户订单表的退款状态
+            orderBusinessInfoService.editMiniLeaderOrderBusinessRefundStatus(orderNo);
+            orderInfoService.editMiniLeaderRefundOrder(orderNo);
+            return "ok";
+        }
+    }
+
+    // 提现
+    @GetMapping("/task/order/cash")
+    public String cash(@RequestParam("id") int id, @RequestParam("val") int val) {
+
+        // 提现参数
+        String merchantNo = "";
+        String amount = "";
+        String bankNo = "";
+
+        if (id == 1) {
+            // 商户提现
+            merchantNo = "10093512255";
+            amount = String.valueOf(val);
+            bankNo = "6236680130003919525";
+        } else {
+            // 平台提现
+            merchantNo = "10093508056";
+            amount = String.valueOf(val);
+            bankNo = "696443163";
+        }
+
+        // 申请提现
+        Map<String, String> res = YeepayUtils.cash(merchantNo, amount, bankNo);
+
+        // 结果
+        if (Integer.parseInt(res.get("success")) == 0) {
+
+            return "error - " + res.get("data");
+
+        } else {
+
+            // REQUEST_RECEIVE = 请求已接收
+            // REQUEST_ACCEPT = 请求已受理
+            // FAIL = 失败
+            // REMITING = 银行正在处理中
+            String status = res.get("status");
+            return "ok - " + status;
+        }
+    }
+
+    // 自动收货
+    @GetMapping("/task/order/verify")
+    public String verify() {
+
+        // 当前时间(结束时间)
+        int endTime = TimeUtils.getTimeStamp();
+
+        // 7天时间(开始时间)
+        int startTime = endTime - 600000;
+
+        // 先查询订单
+        List<Map<String, String>> orderNos = taskOrderService.getUnReceiptOrderIds(startTime, endTime);
+        // 在修改订单
+        if (CollectionUtil.isNotEmpty(orderNos)) {
+            for (Map<String, String> item : orderNos) {
+
+                String orderNo = item.get("orderNo");
+                taskOrderService.receiptOrder(orderNo, endTime);
+                log.info("自动完成收货============ orderNo = " + orderNo + ", receiptTime = " + endTime);
+            }
+        }
+
+        // 返回
+        return "ok";
+    }
+
+    // 库存恢复
+    @GetMapping("/task/order/backstock")
+    public String backstock() {
+
+        // 查询半个小时之前下的未支付的订单商品
+        int time = TimeUtils.getTimeStamp() - 30 * 60;
+        List<GbOrderGoodsInfo> resutls = taskOrderService.getUnPayOrderGoodsList(time, 100);
+        for (GbOrderGoodsInfo item : resutls) {
+            String orderNo = item.getOrderNo();
+            Long goodsId = item.getGoodsId();
+            Integer goodsNum = item.getGoodsNum();
+            Integer packNum = item.getPackNum();
+            goodsService.increaseGoodsStock(goodsId, goodsNum * packNum);
+            log.info("恢复订单商品库存：orderNo=" + orderNo + ",goodsId=" + goodsId + ",stock=" + goodsNum * packNum);
+        }
+        return "ok";
+    }
+
+    // 查询文章信息(联调测试接口)
+    @GetMapping("/task/test/user")
+    public JsonResult testUser(@RequestParam("aId") Long aId) {
+        return JsonResult.success(articleInfoService.getMiniArticleInfo(aId));
+    }
+
+
+}

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.shopgroup.user.mapper.GbOrgCashBankInfoMapper">
+
+    <!-- 银行信息表 -->
+    <resultMap id="BaseResultMap" type="cn.com.shopgroup.user.model.GbOrgCashBankInfo">
+        <id column="bank_id" property="bankId"/>
+        <result column="band_name" property="bankName"/>
+        <result column="is_close" property="isClose"/>
+        <result column="add_time" property="addTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        bank_id, band_name, is_close, add_time
+    </sql>
+
+</mapper>

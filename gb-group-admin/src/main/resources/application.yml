@@ -1,0 +1,34 @@
+# 应用名称(任务服务)
+server:
+  port: 9015
+spring:
+  application:
+    name: spring-groupbuy-admin
+  profiles:
+    # 启动时通过 --spring.profiles.active=dev|test|prod 或 SPRING_PROFILES_ACTIVE 环境变量切换环境，默认 dev
+    active: ${spring.profiles.active:dev}
+  http:
+    encoding:
+      force-response: true
+      charset: UTF-8
+      enabled: true
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+logging:
+  level:
+    com.gbshop.group: INFO
+
+# mybatis输出sql日志
+mybatis:
+  configuration:
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl

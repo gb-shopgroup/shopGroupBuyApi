@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.shopgroup.goods.mapper.GbGoodsPackageInfoMapper">
+
+    <!-- 商品包装信息表 -->
+    <resultMap id="BaseResultMap" type="cn.com.shopgroup.goods.model.GbGoodsPackageInfo">
+        <id column="pack_id" property="packId"/>
+        <result column="leader_id" property="leaderId"/>
+        <result column="goods_id" property="goodsId"/>
+        <result column="pack_name" property="packName"/>
+        <result column="sales_price" property="salesPrice"/>
+        <result column="market_price" property="marketPrice"/>
+        <result column="pack_num" property="packNum"/>
+        <result column="goods_unit" property="goodsUnit"/>
+        <result column="is_close" property="isClose"/>
+        <result column="add_time" property="addTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        pack_id, leader_id, goods_id, pack_name, sales_price, market_price, pack_num, goods_unit, is_close, add_time
+    </sql>
+
+</mapper>

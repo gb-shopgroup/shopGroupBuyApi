@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.shopgroup.user.mapper.GbRegionMapInfoMapper">
+
+    <!-- 地图区域信息表 -->
+    <resultMap id="BaseResultMap" type="cn.com.shopgroup.user.model.GbRegionMapInfo">
+        <id column="map_id" property="mapId"/>
+        <result column="map_name" property="mapName"/>
+        <result column="map_address" property="mapAddress"/>
+        <result column="region_id" property="regionId"/>
+        <result column="region_name" property="regionName"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        map_id, map_name, map_address, region_id, region_name
+    </sql>
+
+</mapper>

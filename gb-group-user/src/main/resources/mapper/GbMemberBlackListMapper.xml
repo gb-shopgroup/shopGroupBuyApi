@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.shopgroup.user.mapper.GbMemberBlackListMapper">
+
+    <!-- 用户黑名单 -->
+    <resultMap id="BaseResultMap" type="cn.com.shopgroup.user.model.GbMemberBlackList">
+        <id column="id" property="id"/>
+        <result column="leader_id" property="leaderId"/>
+        <result column="member_id" property="memberId"/>
+        <result column="mobile" property="mobile"/>
+        <result column="nickname" property="nickName"/>
+        <result column="avatar" property="avatar"/>
+        <result column="expire_time" property="expireTime"/>
+        <result column="staff_id" property="staffId"/>
+        <result column="staff_name" property="staffName"/>
+        <result column="add_time" property="addTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+       id, leader_id, member_id, mobile, nickname, avatar, expire_time, staff_id, staff_name, add_time
+    </sql>
+
+</mapper>

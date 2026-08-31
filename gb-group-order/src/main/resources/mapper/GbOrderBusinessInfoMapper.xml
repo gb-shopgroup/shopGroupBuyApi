@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.shopgroup.order.mapper.GbOrderBusinessInfoMapper">
+
+    <!-- 订单收款账户信息表 -->
+    <resultMap id="BaseResultMap" type="cn.com.shopgroup.order.model.GbOrderBusinessInfo">
+        <id column="id" property="orderId"/>
+        <result column="order_no" property="orderNo"/>
+        <result column="bus_id" property="busId"/>
+        <result column="merchant_no" property="merchantNo"/>
+        <result column="leader_id" property="leaderId"/>
+        <result column="group_name" property="groupName"/>
+        <result column="order_sn" property="orderSn"/>
+        <result column="is_send" property="isSend"/>
+        <result column="transaction_id" property="transactionId"/>
+        <result column="openid" property="openid"/>
+        <result column="send_time" property="sendTime"/>
+        <result column="is_unfreeze" property="isUnfreeze"/>
+        <result column="unfreeze_time" property="unfreezeTime"/>
+        <result column="is_divide" property="isDivide"/>
+        <result column="divide_status" property="divideStatus"/>
+        <result column="divide_time" property="divideTime"/>
+        <result column="divide_no" property="divideNo"/>
+        <result column="order_fee" property="orderFee"/>
+        <result column="received_fee" property="receivedFee"/>
+        <result column="bus_fee" property="busFee"/>
+        <result column="service_fee" property="serviceFee"/>
+        <result column="other_fee" property="otherFee"/>
+        <result column="comm_status" property="commStatus"/>
+        <result column="add_time" property="addTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id
+        ,order_no,, bus_id, merchant_no, leader_id, group_name, order_sn, is_send, transaction_id, openid, send_time, is_unfreeze, unfreeze_time, is_divide, divide_status, divide_time, divide_no, order_fee, received_fee, bus_fee, service_fee, other_fee, comm_status, add_time
+    </sql>
+
+</mapper>

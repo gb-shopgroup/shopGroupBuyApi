@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.shopgroup.user.mapper.GbOrgBusinessInfoMapper">
+
+    <!-- 团长分账户信息表 -->
+    <resultMap id="BaseResultMap" type="cn.com.shopgroup.user.model.GbOrgBusinessInfo">
+        <id column="bus_id" property="busId"/>
+        <result column="leader_id" property="leaderId"/>
+        <result column="bus_type" property="busType"/>
+        <result column="bus_name" property="busName"/>
+        <result column="legal_name" property="legalName"/>
+        <result column="cid_no" property="cidNo"/>
+        <result column="cid_front" property="cidFront"/>
+        <result column="cid_back" property="cidBack"/>
+        <result column="license_no" property="licenseNo"/>
+        <result column="license_front" property="licenseFront"/>
+        <result column="license_back" property="licenseBack"/>
+        <result column="bus_balance" property="busBalance"/>
+        <result column="limit_amount" property="limitAmount"/>
+        <result column="tax_limit" property="taxLimit"/>
+        <result column="is_close" property="isClose"/>
+        <result column="is_check" property="isCheck"/>
+        <result column="check_remark" property="checkRemark"/>
+        <result column="check_cust_id" property="checkCustId"/>
+        <result column="add_time" property="addTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        bus_id
+        , leader_id, bus_type, bus_name, legal_name, cid_no, cid_front, cid_back, license_no, license_front, license_back, bus_balance, limit_amount,tax_limit, is_close, is_check, check_remark, check_cust_id, add_time
+    </sql>
+
+</mapper>

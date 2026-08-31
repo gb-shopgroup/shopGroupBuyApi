@@ -1,0 +1,52 @@
+# 网关服务
+server:
+  port: 8080
+spring:
+  application:
+    name: spring-groupbuy-gateway
+  profiles:
+    # 启动时通过 --spring.profiles.active=dev|test|prod 或 SPRING_PROFILES_ACTIVE 环境变量切换环境，默认 dev
+    active: ${spring.profiles.active:dev}
+  cloud:
+    gateway:
+      # 跨域配置
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            #allowedOrigins: "*"
+            allowed-origin-patterns: "*"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+            allowCredentials: true
+      # 路由配置
+      routes:
+        - id: spring-groupbuy-admin
+          uri: http://127.0.0.1:9015
+          predicates:
+            - Path=/admin/**
+          #filters:
+          #  - StripPrefix=1
+        - id: spring-groupbuy-user
+          uri: http://127.0.0.1:9011
+          predicates:
+            - Path=/user/**
+          #filters:
+          #  - StripPrefix=1
+        - id: spring-groupbuy-order
+          uri: http://127.0.0.1:9013
+          predicates:
+            - Path=/order/**
+          #filters:
+          #  - StripPrefix=1
+        - id: spring-groupbuy-goods
+          uri: http://127.0.0.1:9012
+          predicates:
+            - Path=/goods/**
+          #filters:
+          #  - StripPrefix=1
+        - id: spring-groupbuy-task
+          uri: http://127.0.0.1:9014
+          predicates:
+            - Path=/task/**
+          #filters:
+          #  - StripPrefix=1

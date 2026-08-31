@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.shopgroup.user.mapper.GbMemberMessageInfoMapper">
+
+    <!-- 用户/会员消息表 -->
+    <resultMap id="BaseResultMap" type="cn.com.shopgroup.user.model.GbMemberMessageInfo">
+        <id column="msg_id" property="msgId"/>
+        <result column="member_id" property="memberId"/>
+        <result column="msg_type" property="msgType"/>
+        <result column="msg_content" property="msgContent"/>
+        <result column="is_read" property="isRead"/>
+        <result column="add_time" property="addTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        msg_id, member_id, msg_type, msg_content, is_read, add_time
+    </sql>
+
+</mapper>

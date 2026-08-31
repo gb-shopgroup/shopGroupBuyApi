@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.shopgroup.user.mapper.GbOrgCashInfoMapper">
+
+    <!-- 团长提现信息表 -->
+    <resultMap id="BaseResultMap" type="cn.com.shopgroup.user.model.GbOrgCashInfo">
+        <id column="cash_id" property="cashId"/>
+        <result column="bus_id" property="busId"/>
+        <result column="leader_id" property="leaderId"/>
+        <result column="cash_fee" property="cashFee"/>
+        <result column="cash_bank" property="cashBank"/>
+        <result column="cash_bank_no" property="cashBankNo"/>
+        <result column="true_name" property="trueName"/>
+        <result column="cash_status" property="cashStatus"/>
+        <result column="cash_no" property="cashNo"/>
+        <result column="cash_time" property="cashTime"/>
+        <result column="add_time" property="addTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        cash_id, bus_id, leader_id, cash_fee, cash_bank, cash_bank_no, true_name, cash_status, cash_no, cash_time, add_time
+    </sql>
+
+</mapper>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.shopgroup.order.mapper.OrderTransactionLogMapper">
+
+    <!-- 订单交易流水表 -->
+    <resultMap id="BaseResultMap" type="cn.com.shopgroup.order.model.OrderTransactionLog">
+        <id column="id" property="id"/>
+        <result column="order_no" property="orderNo"/>
+        <result column="transaction_no" property="transactionNo"/>
+        <result column="pre_order_amount" property="preOrderAmount"/>
+        <result column="pay_amount" property="payAmount"/>
+        <result column="refund_amount" property="refundAmount"/>
+        <result column="pay_status" property="payStatus"/>
+        <result column="pay_method" property="payMethod"/>
+        <result column="operator_id" property="operatorId"/>
+        <result column="operator_name" property="operatorName"/>
+        <result column="add_time" property="addTime"/>
+        <result column="remark" property="remark"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, order_no, transaction_no, pre_order_amount, pay_amount, refund_amount, pay_status, pay_method, operator_id, operator_name, add_time, remark
+    </sql>
+
+</mapper>

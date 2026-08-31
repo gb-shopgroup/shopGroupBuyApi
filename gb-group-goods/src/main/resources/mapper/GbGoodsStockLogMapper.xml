@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.shopgroup.goods.mapper.GbGoodsStockLogMapper">
+
+    <!-- 商品库存日志表 -->
+    <resultMap id="BaseResultMap" type="cn.com.shopgroup.goods.model.GbGoodsStockLog">
+        <id column="log_id" property="logId"/>
+        <result column="leader_id" property="leaderId"/>
+        <result column="goods_id" property="goodsId"/>
+        <result column="sku_id" property="skuId"/>
+        <result column="log_type" property="logType"/>
+        <result column="goods_num" property="goodsNum"/>
+        <result column="goods_unit" property="goodsUnit"/>
+        <result column="data_type" property="dataType"/>
+        <result column="data_id" property="dataId"/>
+        <result column="add_time" property="addTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        log_id, leader_id, goods_id, sku_id, log_type, goods_num, goods_unit, data_type, data_id, add_time
+    </sql>
+
+</mapper>

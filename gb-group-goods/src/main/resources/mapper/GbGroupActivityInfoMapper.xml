@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.shopgroup.goods.mapper.GbGroupActivityInfoMapper">
+
+    <!-- 团购活动信息表 -->
+    <resultMap id="BaseResultMap" type="cn.com.shopgroup.goods.model.GbGroupActivityInfo">
+        <id column="group_id" property="groupId"/>
+        <result column="cat_id" property="catId"/>
+        <result column="leader_id" property="leaderId"/>
+        <result column="isolation_id" property="isolationId"/>
+        <result column="pickup_style" property="pickupStyle"/>
+        <result column="group_name" property="groupName"/>
+        <result column="group_img" property="groupImg"/>
+        <result column="group_img2" property="groupImg2"/>
+        <result column="group_img3" property="groupImg3"/>
+        <result column="group_price" property="groupPrice"/>
+        <result column="group_price2" property="groupPrice2"/>
+        <result column="market_price" property="marketPrice"/>
+        <result column="start_time" property="startTime"/>
+        <result column="end_time" property="endTime"/>
+        <result column="group_info" property="groupInfo"/>
+        <result column="order_total" property="orderTotal"/>
+        <result column="virtual_order" property="virtualOrder"/>
+        <result column="is_close" property="isClose"/>
+        <result column="sort_order" property="sortOrder"/>
+        <result column="staff_id" property="staffId"/>
+        <result column="staff_name" property="staffName"/>
+        <result column="is_check" property="isCheck"/>
+        <result column="check_remark" property="checkRemark"/>
+        <result column="add_time" property="addTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        group_id, cat_id, leader_id, isolation_id, pickup_style, group_name, group_img, group_img2, group_img3, group_price, group_price2, market_price, start_time, end_time, group_info, order_total, virtual_order, is_close, sort_order, staff_id, staff_name, is_check, check_remark, add_time
+    </sql>
+
+</mapper>

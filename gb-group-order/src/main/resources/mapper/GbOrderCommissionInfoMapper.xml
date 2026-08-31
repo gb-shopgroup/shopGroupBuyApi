@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.shopgroup.order.mapper.GbOrderCommissionInfoMapper">
+
+    <!-- 订单分账/佣金信息表 -->
+    <resultMap id="BaseResultMap" type="cn.com.shopgroup.order.model.GbOrderCommissionInfo">
+        <id column="comm_id" property="commId"/>
+        <result column="order_no" property="orderNo"/>
+        <result column="comm_type" property="commType"/>
+        <result column="comm_user" property="commUser"/>
+        <result column="comm_name" property="commName"/>
+        <result column="order_fee" property="orderFee"/>
+        <result column="comm_fee" property="commFee"/>
+        <result column="comm_status" property="commStatus"/>
+        <result column="comm_time" property="commTime"/>
+        <result column="comm_no" property="commNo"/>
+        <result column="comm_remark" property="commRemark"/>
+        <result column="add_time" property="addTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        comm_id
+        , order_no, comm_type, comm_user, comm_name, order_fee, comm_fee, comm_status, comm_time, comm_no, comm_remark, add_time
+    </sql>
+
+</mapper>

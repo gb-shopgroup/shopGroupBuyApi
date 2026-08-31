@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.shopgroup.user.mapper.GbFocusInfoMapper">
+
+    <!-- 轮播图信息表 -->
+    <resultMap id="BaseResultMap" type="cn.com.shopgroup.user.model.GbFocusInfo">
+        <id column="focus_id" property="focusId"/>
+        <result column="focus_title" property="focusTitle"/>
+        <result column="focus_img" property="focusImg"/>
+        <result column="focus_link" property="focusLink"/>
+        <result column="sort_order" property="sortOrder"/>
+        <result column="is_close" property="isClose"/>
+        <result column="add_time" property="addTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        focus_id, focus_title, focus_img, focus_link, sort_order, is_close, add_time
+    </sql>
+
+</mapper>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.shopgroup.user.mapper.GbOrgPointStaffMapper">
+
+    <!-- 自提点员工信息表 -->
+    <resultMap id="BaseResultMap" type="cn.com.shopgroup.user.model.GbOrgPointStaff">
+        <id column="point_id" property="pointId"/>
+        <id column="staff_id" property="staffId"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        point_id, staff_id
+    </sql>
+
+</mapper>

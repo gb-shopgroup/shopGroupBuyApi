@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.shopgroup.user.mapper.GbArticleInfoMapper">
+
+    <!-- 文章信息表 -->
+    <resultMap id="BaseResultMap" type="cn.com.shopgroup.user.model.GbArticleInfo">
+        <id column="article_id" property="articleId"/>
+        <result column="article_cat" property="articleCat"/>
+        <result column="article_type" property="articleType"/>
+        <result column="article_title" property="articleTitle"/>
+        <result column="article_img" property="articleImg"/>
+        <result column="article_content" property="articleContent"/>
+        <result column="sort_order" property="sortOrder"/>
+        <result column="is_home" property="isHome"/>
+        <result column="is_close" property="isClose"/>
+        <result column="add_time" property="addTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        article_id, article_cat, article_type, article_title, article_img, article_content, sort_order, is_home, is_close, add_time
+    </sql>
+
+</mapper>

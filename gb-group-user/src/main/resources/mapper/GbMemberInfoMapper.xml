@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.shopgroup.user.mapper.GbMemberInfoMapper">
+
+    <!-- 用户/会员信息表 -->
+    <resultMap id="BaseResultMap" type="cn.com.shopgroup.user.model.GbMemberInfo">
+        <id column="member_id" property="memberId"/>
+        <result column="mobile" property="mobile"/>
+        <result column="nickname" property="nickname"/>
+        <result column="avatar" property="avatar"/>
+        <result column="openid" property="openid"/>
+        <result column="map_id" property="mapId"/>
+        <result column="map_name" property="mapName"/>
+        <result column="leader_id" property="leaderId"/>
+        <result column="isolation_id" property="isolationId"/>
+        <result column="ercode" property="ercode"/>
+        <result column="is_close" property="isClose"/>
+        <result column="add_time" property="addTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        member_id, mobile, nickname, avatar, openid, map_id, map_name, leader_id, isolation_id, ercode, is_close, add_time
+    </sql>
+
+</mapper>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.shopgroup.order.mapper.GbOrderGoodsRefundRecordMapper">
+
+    <!-- 订单退款记录信息表 -->
+    <resultMap id="BaseResultMap" type="cn.com.shopgroup.order.model.GbOrderGoodsRefundRecord">
+        <id column="id" property="Id"/>
+        <result column="order_no" property="orderNo"/>
+        <result column="operate_id" property="operateId"/>
+        <result column="operate_name" property="operateName"/>
+        <result column="operate_name" property="operateName"/>
+        <result column="refund_goods_msg" property="refundGoodsMsg"/>
+        <result column="is_agree" property="isAgree"/>
+        <result column="action_reason" property="actionReason"/>
+        <result column="extra_reason" property="extraReason"/>
+        <result column="add_time" property="addTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id
+        ,order_no, operate_id，operate_name,refund_goods_msg, is_agree,action_reason, extra_reason, add_time
+    </sql>
+
+</mapper>

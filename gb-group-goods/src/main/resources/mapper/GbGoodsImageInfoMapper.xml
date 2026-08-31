@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.shopgroup.goods.mapper.GbGoodsImageInfoMapper">
+
+    <!-- 商品图片表 -->
+    <resultMap id="BaseResultMap" type="cn.com.shopgroup.goods.model.GbGoodsImageInfo">
+        <id column="img_id" property="imgId"/>
+        <result column="goods_id" property="goodsId"/>
+        <result column="goods_type" property="goodsType"/>
+        <result column="goods_img" property="goodsImg"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        img_id, goods_id, goods_type, goods_img
+    </sql>
+
+</mapper>

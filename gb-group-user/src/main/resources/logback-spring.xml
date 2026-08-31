@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!-- 从Spring环境获取应用名称 -->
+    <springProperty name="APP_NAME" source="spring.application.name" defaultValue="shopgroupuser" />
+    <!-- 定义日志文件名称 -->
+    <property name="LOG_NAME" value="application" />
+    <!-- 定义日志输出路径 -->
+    <property name="LOG_PATH" value="logs/${APP_NAME}" />
+    <!-- 定义日志输出格式 -->
+    <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} --- [%method,%line] --- %msg%n" />
+
+    <!-- 定义控制台输出策略 Console -->
+    <appender name="Console" class="ch.qos.logback.core.ConsoleAppender">
+        <!-- 直接使用我们上面定义的“日志输出格式” -->
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- 定义文件输出策略 RollingFile -->
+    <appender name="RollingFile" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <!-- 日志文件保存路径和名称 -->
+        <file>${LOG_PATH}/${LOG_NAME}.log</file>
+        <!-- 直接使用我们上面定义的“日志输出格式” -->
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <!-- 定义文件滚动策略：按照时间和大小进行滚动 -->
+        <!-- 随着应用程序运行时间越来越长，日志也会增长的越来越大，我们需要切分日志文件。-->
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <!-- 按照日期和切分重新定义日志文件 -->
+            <fileNamePattern>${LOG_PATH}/${LOG_NAME}.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <!-- 单个日志文件的大小 -->
+            <maxFileSize>10MB</maxFileSize>
+            <!-- 控制日志文件总大小 -->
+            <totalSizeCap>30GB</totalSizeCap>
+            <!-- 只保留最近90天的日志 -->
+            <maxHistory>90</maxHistory>
+        </rollingPolicy>
+    </appender>
+
+    <!-- 开发环境配置(TRACE < DEBUG < INFO < WARN < ERROR) -->
+    <springProfile name="dev">
+        <!-- SpringBoot的Root日志级别为 INFO 级别 -->
+        <root level="INFO">
+            <appender-ref ref="Console" />
+        </root>
+        <!-- 定义"cn.com.shopgroup"包下日志级别为 DEBUG 级别 -->
+        <!-- additivity="false": 阻止日志向上传递，避免重复记录 -->
+        <logger name="cn.com.shopgroup" level="DEBUG" additivity="false">
+            <appender-ref ref="Console" />
+        </logger>
+        <!-- 定义 mybatis mapper 日志输出级别为 DEBUG 级别 -->
+        <!-- additivity="false": 阻止日志向上传递，避免重复记录 -->
+        <logger name="cn.com.shopgroup.mapper" level="DEBUG" additivity="false">
+            <appender-ref ref="Console" />
+        </logger>
+    </springProfile>
+
+    <!-- 测试环境配置(推荐INFO级别) -->
+    <springProfile name="test">
+        <root level="INFO">
+            <appender-ref ref="RollingFile" />
+        </root>
+        <logger name="cn.com.shopgroup" level="INFO" additivity="false">
+            <appender-ref ref="RollingFile" />
+        </logger>
+        <logger name="cn.com.shopgroup.mapper" level="INFO" additivity="false">
+            <appender-ref ref="RollingFile" />
+        </logger>
+    </springProfile>
+
+    <!-- 生产环境配置(推荐WARN级别) -->
+    <springProfile name="prod">
+        <root level="INFO">
+            <appender-ref ref="RollingFile" />
+        </root>
+        <logger name="cn.com.shopgroup" level="WARN" additivity="false">
+            <appender-ref ref="RollingFile" />
+        </logger>
+        <logger name="cn.com.shopgroup.mapper" level="WARN" additivity="false">
+            <appender-ref ref="RollingFile" />
+        </logger>
+    </springProfile>
+
+</configuration>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.shopgroup.user.mapper.GbMemberAddressInfoMapper">
+
+    <!-- 用户/会员地址表 -->
+    <resultMap id="BaseResultMap" type="cn.com.shopgroup.user.model.GbMemberAddressInfo">
+        <id column="address_id" property="addressId"/>
+        <result column="member_id" property="memberId"/>
+        <result column="true_name" property="trueName"/>
+        <result column="telephone" property="telephone"/>
+        <result column="province" property="province"/>
+        <result column="city" property="city"/>
+        <result column="district" property="district"/>
+        <result column="address" property="address"/>
+        <result column="is_default" property="isDefault"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        address_id, member_id, true_name, telephone, province, city, district, address, is_default
+    </sql>
+
+</mapper>

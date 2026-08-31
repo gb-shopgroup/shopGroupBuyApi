@@ -1,0 +1,265 @@
+package cn.com.shopgroup.order.mapper;
+
+import cn.com.shopgroup.order.model.GbOrderGoodsInfo;
+import cn.com.shopgroup.order.model.GbOrderInfo;
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Map;
+
+@Mapper
+@Repository
+public interface GbOrderInfoMapper extends BaseMapper<GbOrderInfo> {
+
+    // (团长)汇总订单数量, 已支付(pay_time>0), 未退款(refund_time=0), 区分已核销(verify_time>0)/未核销的数量
+    @Select({
+            "SELECT (CASE WHEN `verify_time` > 0 THEN 1 ELSE 0 END) AS is_receipt, COUNT(*) AS num_total",
+            "FROM `gb_order_info`",
+            "WHERE `leader_id` = #{leaderId}",
+            "  AND `add_time` BETWEEN #{startTime} AND #{endTime}",
+            "  AND `pay_time` > 0",
+            "  AND `refund_time` = 0",
+            "GROUP BY is_receipt",
+            "ORDER BY is_receipt ASC"
+    })
+    List<Map<String, Object>> getSummaryOrderList(Long leaderId, int startTime, int endTime);
+
+
+    // (团长)汇总订单商品数量, 已支付(pay_time>0), 未退款(refund_time=0), 区分已核销(verify_time>0)/未核销的数量
+    @Select({
+            "SELECT g.`goods_id`, (CASE WHEN o.`verify_time` > 0 THEN 1 ELSE 0 END) AS is_receipt,",
+            "       SUM(g.`goods_num` * g.`pack_num`) AS num_total",
+            "FROM `gb_order_goods_info` AS g",
+            "JOIN `gb_order_info` AS o ON g.`order_no` = o.`order_no`",
+            "WHERE o.`leader_id` = #{leaderId}",
+            "  AND o.`add_time` BETWEEN #{startTime} AND #{endTime}",
+            "  AND o.`pay_time` > 0",
+            "  AND o.`refund_time` = 0",
+            "GROUP BY g.`goods_id`, is_receipt",
+            "ORDER BY g.`goods_id` ASC, is_receipt ASC"
+    })
+    List<Map<String, Object>> getSummaryOrderGoodsList(Long leaderId, int startTime, int endTime);
+
+
+    // (团长)汇总订单商品数量, 已支付(pay_time>0), 未退款(refund_time=0), 区分已核销/未核销的数量, 增加提货点分组
+    @Select({
+            "SELECT o.`point_id`, g.`goods_id`, (CASE WHEN o.`verify_time` > 0 THEN 1 ELSE 0 END) AS is_receipt,",
+            "       SUM(g.`goods_num` * g.`pack_num`) AS num_total",
+            "FROM `gb_order_goods_info` AS g",
+            "JOIN `gb_order_info` AS o ON g.`order_no` = o.`order_no`",
+            "WHERE o.`leader_id` = #{leaderId}",
+            "  AND o.`add_time` BETWEEN #{startTime} AND #{endTime}",
+            "  AND o.`pay_time` > 0",
+            "  AND o.`refund_time` = 0",
+            "GROUP BY o.`point_id`, g.`goods_id`, is_receipt",
+            "ORDER BY o.`point_id` ASC, g.`goods_id` ASC, is_receipt ASC"
+    })
+    List<Map<String, Object>> getSummaryOrderGoodsListByPoint(Long leaderId, int startTime, int endTime);
+
+
+    // (团长)根据商品id汇总订单商品"sku"数量, 已支付(pay_time>0), 未退款(refund_time=0), 不区分是否核销
+    @Select({
+            "SELECT g.`sku_ids`, g.`sku_names`, SUM(g.`goods_num` * g.`pack_num`) AS num_total",
+            "FROM `gb_order_goods_info` AS g",
+            "JOIN `gb_order_info` AS o ON g.`order_no` = o.`order_no`",
+            "WHERE o.`leader_id` = #{leaderId}",
+            "  AND o.`add_time` BETWEEN #{startTime} AND #{endTime}",
+            "  AND o.`pay_time` > 0",
+            "  AND o.`refund_time` = 0",
+            "  AND g.`goods_id` = #{goodsId}",
+            "GROUP BY g.`sku_ids`, g.`sku_names`",
+            "ORDER BY g.`sku_ids` ASC"
+    })
+    List<Map<String, Object>> getSummaryOrderGoodsSkuList(Long leaderId, Long goodsId, int startTime, int endTime);
+
+
+    // (团长)根据商品id汇总订单商品"包装"数量, 已支付(pay_time>0), 未退款(refund_time=0), 不区分是否核销
+    @Select({
+            "SELECT g.`pack_id`, g.`pack_name`, SUM(g.`goods_num` * g.`pack_num`) AS num_total",
+            "FROM `gb_order_goods_info` AS g",
+            "JOIN `gb_order_info` AS o ON g.`order_no` = o.`order_no`",
+            "WHERE o.`leader_id` = #{leaderId}",
+            "  AND o.`add_time` BETWEEN #{startTime} AND #{endTime}",
+            "  AND o.`pay_time` > 0",
+            "  AND o.`refund_time` = 0",
+            "  AND g.`goods_id` = #{goodsId}",
+            "GROUP BY g.`pack_id`, g.`pack_name`",
+            "ORDER BY g.`pack_id` ASC"
+    })
+    List<Map<String, Object>> getSummaryOrderGoodsPackList(Long leaderId, Long goodsId, int startTime, int endTime);
+
+
+    // (团长)根据商品id汇总订单商品"sku"数量, 已支付(pay_time>0), 未退款(refund_time=0), 不区分是否核销, 增加提货点分组
+    @Select({
+            "SELECT o.`point_id`, g.`sku_ids`, g.`sku_names`, SUM(g.`goods_num` * g.`pack_num`) AS num_total",
+            "FROM `gb_order_goods_info` AS g",
+            "JOIN `gb_order_info` AS o ON g.`order_no` = o.`order_no`",
+            "WHERE o.`leader_id` = #{leaderId}",
+            "  AND o.`add_time` BETWEEN #{startTime} AND #{endTime}",
+            "  AND o.`pay_time` > 0",
+            "  AND o.`refund_time` = 0",
+            "  AND g.`goods_id` = #{goodsId}",
+            "GROUP BY o.`point_id`, g.`sku_ids`, g.`sku_names`",
+            "ORDER BY o.`point_id` ASC, g.`sku_ids` ASC"
+    })
+    List<Map<String, Object>> getSummaryOrderGoodsSkuListByPoint(Long leaderId, Long goodsId, int startTime, int endTime);
+
+
+    // (团长)根据商品id汇总订单商品"包装"数量, 已支付(pay_time>0), 未退款(refund_time=0), 不区分是否核销, 增加提货点分组
+    @Select({
+            "SELECT o.`point_id`, g.`pack_id`, g.`pack_name`, SUM(g.`goods_num` * g.`pack_num`) AS num_total",
+            "FROM `gb_order_goods_info` AS g",
+            "JOIN `gb_order_info` AS o ON g.`order_no` = o.`order_no`",
+            "WHERE o.`leader_id` = #{leaderId}",
+            "  AND o.`add_time` BETWEEN #{startTime} AND #{endTime}",
+            "  AND o.`pay_time` > 0",
+            "  AND o.`refund_time` = 0",
+            "  AND g.`goods_id` = #{goodsId}",
+            "GROUP BY o.`point_id`, g.`pack_id`, g.`pack_name`",
+            "ORDER BY o.`point_id` ASC, g.`pack_id` ASC"
+    })
+    List<Map<String, Object>> getSummaryOrderGoodsPackListByPoint(Long leaderId, Long goodsId, int startTime, int endTime);
+
+
+    // (店员)指定 提货点id 汇总订单商品数量, 已支付(pay_time>0), 未退款(refund_time=0), 区分已核销/未核销的数量
+    @Select({
+            "SELECT g.`goods_id`, (CASE WHEN o.`verify_time` > 0 THEN 1 ELSE 0 END) AS is_receipt,",
+            "       SUM(g.`goods_num` * g.`pack_num`) AS num_total",
+            "FROM `gb_order_goods_info` AS g",
+            "JOIN `gb_order_info` AS o ON g.`order_no` = o.`order_no`",
+            "WHERE o.`leader_id` = #{leaderId}",
+            "  AND o.`point_id` = #{pointId}",
+            "  AND o.`add_time` BETWEEN #{startTime} AND #{endTime}",
+            "  AND o.`pay_time` > 0",
+            "  AND o.`refund_time` = 0",
+            "GROUP BY g.`goods_id`, is_receipt",
+            "ORDER BY g.`goods_id` ASC, is_receipt ASC"
+    })
+    List<Map<String, Object>> getSummaryPointOrderGoodsList(Long leaderId, Long pointId, int startTime, int endTime);
+
+
+    // (店员)指定 提货点id 和 商品id 汇总订单商品"sku"数量, 已支付(pay_time>0), 未退款(refund_time=0), 不区分是否核销
+    @Select({
+            "SELECT g.`sku_ids`, g.`sku_names`, SUM(g.`goods_num` * g.`pack_num`) AS num_total",
+            "FROM `gb_order_goods_info` AS g",
+            "JOIN `gb_order_info` AS o ON g.`order_no` = o.`order_no`",
+            "WHERE o.`leader_id` = #{leaderId}",
+            "  AND o.`point_id` = #{pointId}",
+            "  AND o.`add_time` BETWEEN #{startTime} AND #{endTime}",
+            "  AND o.`pay_time` > 0",
+            "  AND o.`refund_time` = 0",
+            "  AND g.`goods_id` = #{goodsId}",
+            "GROUP BY g.`sku_ids`, g.`sku_names`",
+            "ORDER BY g.`sku_ids` ASC"
+    })
+    List<Map<String, Object>> getSummaryPointOrderGoodsSkuList(Long leaderId, Long pointId, Long goodsId, int startTime, int endTime);
+
+
+    // (店员)指定 提货点id 和 商品id 汇总订单商品"包装"数量, 已支付(pay_time>0), 未退款(refund_time=0), 不区分是否核销
+    @Select({
+            "SELECT g.`pack_id`, g.`pack_name`, SUM(g.`goods_num` * g.`pack_num`) AS num_total",
+            "FROM `gb_order_goods_info` AS g",
+            "JOIN `gb_order_info` AS o ON g.`order_no` = o.`order_no`",
+            "WHERE o.`leader_id` = #{leaderId}",
+            "  AND o.`point_id` = #{pointId}",
+            "  AND o.`add_time` BETWEEN #{startTime} AND #{endTime}",
+            "  AND o.`pay_time` > 0",
+            "  AND o.`refund_time` = 0",
+            "  AND g.`goods_id` = #{goodsId}",
+            "GROUP BY g.`pack_id`, g.`pack_name`",
+            "ORDER BY g.`pack_id` ASC"
+    })
+    List<Map<String, Object>> getSummaryPointOrderGoodsPackList(Long leaderId, Long pointId, Long goodsId, int startTime, int endTime);
+
+
+    // (定时任务)查询已分账核销(verify_time>0)但未记录收货时间的订单, 用于系统自动收货
+    @Select({
+            "SELECT o.`order_no` AS orderNo",
+            "FROM `gb_order_info` AS o",
+            "JOIN `gb_order_business_info` AS b ON o.`id` = b.`order_id`",
+            "WHERE b.`is_divide` = 1",
+            "  AND o.`verify_time` > 0",
+            "  AND o.`receipt_time` = 0",
+            "  AND o.`add_time` BETWEEN #{startTime} AND #{endTime}",
+            "ORDER BY o.`id` ASC"
+    })
+    List<Map<String, String>> getUnReceiptOrderIds(int startTime, int endTime);
+
+
+    // (定时任务)查询超时未支付(pay_time=0)且需要回滚库存的订单商品
+    @Select({
+            "SELECT g.`order_no`, g.`goods_id`, g.`goods_num`, g.`pack_num`",
+            "FROM `gb_order_goods_info` AS g",
+            "JOIN `gb_order_info` AS o ON g.`order_no` = o.`order_no`",
+            "JOIN `gb_goods_info` AS i ON g.`goods_id` = i.`goods_id`",
+            "WHERE o.`pay_time` = 0",
+            "  AND o.`add_time` < #{time}",
+            "  AND i.`is_stock` = 1",
+            "ORDER BY g.`id` ASC, g.`goods_id` ASC",
+            "LIMIT 0, #{limit}"
+    })
+    List<GbOrderGoodsInfo> getUnPayOrderGoodsList(int time, int limit);
+
+
+    // (用户)查询指定时间段内某商品的购买数量, 用于限购判断
+    @Select({
+            "SELECT g.`goods_id`, SUM(g.`goods_num` * g.`pack_num`) AS num_total",
+            "FROM `gb_order_goods_info` AS g",
+            "JOIN `gb_order_info` AS o ON g.`order_no` = o.`order_no`",
+            "WHERE o.`member_id` = #{memberId}",
+            "  AND o.`add_time` BETWEEN #{startTime} AND #{endTime}",
+            "  AND g.`goods_id` = #{goodsId}"
+    })
+    List<Map<String, Object>> getOrderGoodsLimit(Long memberId, Long goodsId, int startTime, int endTime);
+
+
+    /**
+     * 根据ID查询
+     */
+    GbOrderInfo selectById(Integer orderId);
+
+    /**
+     * 根据订单号查询
+     */
+    GbOrderInfo getOrderInfoByOrderNo(String orderNo);
+
+    /**
+     * 根据用户ID查询订单列表
+     */
+    List<GbOrderInfo> selectByMemberId(Long memberId);
+
+    /**
+     * 插入订单
+     */
+    int insert(GbOrderInfo order);
+
+    /**
+     * 更新订单状态
+     */
+    int updateStatus(@Param("orderNo") String orderNo, @Param("status") Integer status);
+
+    /**
+     * 更新支付时间
+     */
+    int updatePayTime(@Param("orderNo") String orderNo, @Param("payTime") Integer payTime);
+
+    /**
+     * 更新收货时间
+     */
+    int updateReceiptTime(@Param("orderNo") String orderNo, @Param("receiptTime") Integer receiptTime);
+
+    /**
+     * 检查订单号是否存在
+     */
+    int existsByOrderNo(String orderNo);
+
+    List<GbOrderInfo> getAllByLeaderId(@Param("leaderId") Long leaderId);
+
+    List<GbOrderInfo> getPaidOrderInfoBy(@Param("memberId") Long memberId, @Param("shopId") Long shopId);
+
+    Integer getSumOfGroupActivityOrder(@Param("groupId") Long groupId);
+}

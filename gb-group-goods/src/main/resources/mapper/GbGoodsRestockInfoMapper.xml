@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.shopgroup.goods.mapper.GbGoodsRestockInfoMapper">
+
+    <!-- 商品库存补货表 -->
+    <resultMap id="BaseResultMap" type="cn.com.shopgroup.goods.model.GbGoodsRestockInfo">
+        <id column="restock_id" property="restockId"/>
+        <result column="leader_id" property="leaderId"/>
+        <result column="goods_id" property="goodsId"/>
+        <result column="sku_id" property="skuId"/>
+        <result column="restock_type" property="restockType"/>
+        <result column="goods_num" property="goodsNum"/>
+        <result column="goods_unit" property="goodsUnit"/>
+        <result column="restock_status" property="restockStatus"/>
+        <result column="staff_id" property="staffId"/>
+        <result column="staff_name" property="staffName"/>
+        <result column="add_time" property="addTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        restock_id, leader_id, goods_id, sku_id, restock_type, goods_num, goods_unit, restock_status, staff_id, staff_name, add_time
+    </sql>
+
+</mapper>

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.shopgroup.user.mapper.GbOrgShopInfoMapper">
+
+    <!-- 团长店铺信息表 -->
+    <resultMap id="BaseResultMap" type="cn.com.shopgroup.user.model.GbOrgShopInfo">
+        <id column="id" property="id"/>
+        <result column="leader_id" property="leaderId"/>
+        <result column="shop_name" property="shopName"/>
+        <result column="shop_logo" property="shopLogo"/>
+        <result column="shop_banner" property="shopBanner"/>
+        <result column="shop_mobile" property="shopMobile"/>
+        <result column="shop_code_url" property="shopCodeUrl"/>
+        <result column="shop_info" property="shopInfo"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        leader_id
+        , shop_name, shop_logo, shop_banner, shop_mobile, shop_code_url,shop_info
+    </sql>
+
+    <select id="getMiniLeaderShop" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM gb_org_shop_info
+        WHERE leader_id = #{leaderId} order by id desc
+    </select>
+
+</mapper>
