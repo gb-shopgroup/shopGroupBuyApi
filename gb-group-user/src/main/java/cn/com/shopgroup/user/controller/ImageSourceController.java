@@ -107,7 +107,9 @@ public class ImageSourceController {
         // 生成日期路径
         String datePath = TimeUtils.getTodayStr();
         File fileFolder = new File(rootPath + File.separator + datePath);
-        if (!fileFolder.exists()) fileFolder.mkdirs();
+        if (!fileFolder.exists() && !fileFolder.mkdirs()) {
+            throw new RuntimeException("图片上传目录创建失败");
+        }
 
         // 保存图片文件
         try {
@@ -115,6 +117,7 @@ public class ImageSourceController {
             file.transferTo(uploadedFile);
         } catch (IOException e) {
             e.printStackTrace();
+            throw new RuntimeException("图片保存失败", e);
         }
 
         // 返回数据
@@ -289,7 +292,7 @@ public class ImageSourceController {
             imageBytes = Files.readAllBytes(img.toPath());
         }catch (IOException e){
             e.printStackTrace();
-            message = "查询失败：" + e.getMessage();
+            return JsonResult.fail("图片不存在或读取失败");
         }
 
         // 将图片字节数组进行 Base64 编码
