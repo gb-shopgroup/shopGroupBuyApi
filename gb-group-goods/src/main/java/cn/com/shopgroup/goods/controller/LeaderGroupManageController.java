@@ -304,7 +304,7 @@ public class LeaderGroupManageController {
     // 修改团购活动, 团购进行中, 不允许修改
     @PostMapping("/groupActivity/edit")
     public JsonResult editGroup(@Validated @RequestBody GroupActRequest request) {
-
+        log.info("编辑团购活动请求reques:{}", JSON.toJSONString(request));
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
@@ -313,12 +313,18 @@ public class LeaderGroupManageController {
 
         // 从请求头中获取员工id
         Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
-        if (staffId == 0) {
-            return JsonResult.fail("sid不存在");
-        }
-        GbOrgStaffInfo staffInfo = staffService.getStaffInfo(staffId);
-        if (ObjectUtils.isEmpty(staffInfo)) {
-            return JsonResult.fail("未查询到员工信息");
+        log.info("编辑团购活动时，员工id:{}", staffId);
+        GbOrgStaffInfo staffInfo = new GbOrgStaffInfo();
+        // 重构数据
+        GbGroupActivityInfo data = new GbGroupActivityInfo();
+        if (staffId != 0) {
+            staffInfo = staffService.getStaffInfo(staffId);
+            log.info("添加团购活动时，stfInfo:{}", JSON.toJSONString(staffInfo));
+            if (ObjectUtils.isEmpty(staffInfo)) {
+                return JsonResult.fail("未查询到员工信息");
+            }
+            // 修改人员姓名
+            data.setStaffName(staffInfo.getStaffName());
         }
         // 团购进行中, 不允许修改
         GbGroupActivityInfo groupInfo = activityInfoService.getGroupInfo(request.getId());
@@ -335,8 +341,6 @@ public class LeaderGroupManageController {
         // 团购商品信息兜底: 价格/名称/图片/类型未传时, 取商品表数据(一次批量查询, 避免循环内 N+1)
         fillGroupActGoodsInfo(request.getGoods());
 
-        // 重构数据
-        GbGroupActivityInfo data = new GbGroupActivityInfo();
         // 团购id
         data.setGroupId(request.getId());
         // 团购分类id
@@ -408,9 +412,6 @@ public class LeaderGroupManageController {
         data.setStartTime(request.getStartTime());
         data.setEndTime(request.getEndTime());
 
-        // 修改人员姓名
-        data.setStaffName(staffInfo.getStaffName());
-
         // 重新构建商品列表
         List<GbGroupActivityGoods> lists = new ArrayList<>();
         for (GroupActGoodsRequest item : request.getGoods()) {
@@ -457,13 +458,20 @@ public class LeaderGroupManageController {
 
         // 从请求头中获取员工id
         Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
-        if (staffId == 0) {
-            return JsonResult.fail("sid不存在");
-        }
-        // 员工信息
-        GbOrgStaffInfo staffInfo = staffService.getStaffInfo(staffId);
-        if (ObjectUtils.isEmpty(staffInfo)) {
-            return JsonResult.fail("未查询到员工信息");
+        GbOrgStaffInfo staffInfo = new GbOrgStaffInfo();
+        Long updateId = 0L;
+        String updateName = "";
+        if (staffId != 0) {
+            // 员工信息
+            staffInfo = staffService.getStaffInfo(staffId);
+            if (ObjectUtils.isEmpty(staffInfo)) {
+                return JsonResult.fail("未查询到员工信息");
+            }
+            updateId = staffId;
+            updateName = staffInfo.getStaffName();
+        } else {
+            updateId = leaderId;
+            updateName = "团长自己";
         }
 
         // 查询旧状态
@@ -473,14 +481,14 @@ public class LeaderGroupManageController {
         }
         if (groupInfo.getIsClose() == 0) {
             // 关闭
-            activityInfoService.closeMiniLeaderGroupInfo(leaderId, groupId, 1, staffInfo.getStaffId(), staffInfo.getStaffName(), groupInfo.getGroupName());
+            activityInfoService.closeMiniLeaderGroupInfo(leaderId, groupId, 1, updateId, updateName, groupInfo.getGroupName());
         } else {
             // 平台审核未通过, 不允许打开上线
             if (groupInfo.getIsCheck() == 0) {
                 return JsonResult.fail("平台未审核, 不允许打开上线");
             }
             // 打开
-            activityInfoService.closeMiniLeaderGroupInfo(leaderId, groupId, 0, staffInfo.getStaffId(), staffInfo.getStaffName(), groupInfo.getGroupName());
+            activityInfoService.closeMiniLeaderGroupInfo(leaderId, groupId, 0, updateId, updateName, groupInfo.getGroupName());
         }
 
         // 清空团购缓存数据

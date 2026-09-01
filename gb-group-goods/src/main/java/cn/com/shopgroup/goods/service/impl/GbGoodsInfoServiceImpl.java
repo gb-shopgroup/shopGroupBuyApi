@@ -10,6 +10,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
@@ -32,6 +33,7 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
 
         LambdaQueryWrapper<GbGoodsInfo> queryWrapper = Wrappers.lambdaQuery();
         queryWrapper.orderByDesc(GbGoodsInfo::getGoodsId);
+        queryWrapper.eq(GbGoodsInfo::getIsClose, (byte)0);
         queryWrapper.last("limit " + (page - 1) * pageSize + "," + pageSize);
         List<GbGoodsInfo> result = mapper.selectList(queryWrapper);
         return result == null ? new ArrayList<>() : result;
@@ -41,6 +43,7 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
     public Long getAdminGoodsCount() {
 
         LambdaQueryWrapper<GbGoodsInfo> queryWrapper = Wrappers.lambdaQuery();
+        queryWrapper.eq(GbGoodsInfo::getIsClose, (byte)0);
         return mapper.selectCount(queryWrapper);
     }
 
@@ -53,7 +56,7 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
 
     public List<GbGoodsInfo> getGoodsInfoList(List<Long> goodsIds) {
 
-        if (goodsIds == null || goodsIds.isEmpty()) {
+        if (CollectionUtils.isEmpty(goodsIds)) {
             return new ArrayList<>();
         }
         LambdaQueryWrapper<GbGoodsInfo> queryWrapper = Wrappers.lambdaQuery();
@@ -122,6 +125,7 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
             queryWrapper.eq(GbGoodsInfo::getCatId, catId);
         }
         queryWrapper.eq(GbGoodsInfo::getLeaderId, leaderId);
+        queryWrapper.eq(GbGoodsInfo::getIsClose, (byte)0);
         queryWrapper.orderByDesc(GbGoodsInfo::getGoodsId);
         queryWrapper.last("limit " + (page - 1) * pageSize + "," + pageSize);
         List<GbGoodsInfo> result = mapper.selectList(queryWrapper);
@@ -136,6 +140,7 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
             queryWrapper.eq(GbGoodsInfo::getCatId, catId);
         }
         queryWrapper.eq(GbGoodsInfo::getLeaderId, leaderId);
+        queryWrapper.eq(GbGoodsInfo::getIsClose, (byte)0);
         return mapper.selectCount(queryWrapper);
     }
 
@@ -150,6 +155,7 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
             queryWrapper.like(GbGoodsInfo::getGoodsName, keyword.trim());
         }
         queryWrapper.eq(GbGoodsInfo::getLeaderId, leaderId);
+        queryWrapper.eq(GbGoodsInfo::getIsClose, (byte)0);
         queryWrapper.orderByDesc(GbGoodsInfo::getGoodsId);
         queryWrapper.last("limit " + (page - 1) * pageSize + "," + pageSize);
         List<GbGoodsInfo> result = mapper.selectList(queryWrapper);
@@ -163,6 +169,7 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
         if (catId != null && catId > 0) {
             queryWrapper.eq(GbGoodsInfo::getCatId, catId);
         }
+        queryWrapper.eq(GbGoodsInfo::getIsClose, (byte)0);
         if (keyword != null && keyword.trim().length() > 0) {
             queryWrapper.like(GbGoodsInfo::getGoodsName, keyword.trim());
         }
