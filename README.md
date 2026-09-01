@@ -131,7 +131,7 @@ Maven 依赖仓库使用阿里云镜像（`https://maven.aliyun.com/repository/p
 
 ### 4.4 gb-group-goods — 商品 / 团购服务
 
-覆盖：商品（分类、图片、包装、规格、规格值、SKU、库存）、团长商品管理、团购活动查询等。**33 个接口**。
+覆盖：商品（分类、图片、包装、规格、规格值、SKU、库存）、团长商品管理、团购活动查询等。**21 个接口**。
 
 ### 4.5 gb-group-order — 订单 / 支付 / 分账服务
 
@@ -303,21 +303,12 @@ mvn -pl gb-group-task spring-boot:run
 | `page` / `pageSize` | 页码（从 1 开始）/ 每页条数 |
 | `start` / `end` | 开始时间 / 结束时间（如 yyyy-MM-dd） |
 
-- **接口数量统计**：user 43 个、order 44 个、goods 33 个、admin 25 个、task 8 个，合计 **153 个**。
+- **接口数量统计**：user 43 个、order 44 个、goods 21 个、admin 25 个、task 8 个，合计 **141 个**。
 - **详细版接口文档**（含每个接口的完整入参 / 出参字段说明，参数含义、必填、嵌套字段均已细化）见根目录 **`API接口文档.md`**，可通过 `python3 generate_api_doc.py` 扫描各模块 `*Controller.java` 重新生成。下方为接口总览清单。
 
 ### 8.2 接口清单
 
 #### 8.2.1 gb-group-user（用户/团长/员工）— 43 个接口
-
-**BusinessController**（`cn.com.shopgroup.user.controller`）
-
-| 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
-| --- | --- | --- | --- | --- |
-| 1 | GET | `/user/business/list` | 分页查询团长收款账户列表(含Redis累计额度) | **id** (Long); **page** (int); **pageSize** (int) |
-| 2 | GET | `/user/business/count` | 查询收款账户总数 | 无 |
-| 3 | GET | `/user/business/info` | 查询收款账户详情 | **id** (Long) |
-| 4 | POST | `/user/business/add` | 添加团长收款商户(校验商户编号唯一) | Body: **request** (LeaderBusinessRequest, JSON) |
 
 **ImageSourceController**（`cn.com.shopgroup.user.controller`）
 
@@ -357,6 +348,15 @@ mvn -pl gb-group-task spring-boot:run
 | 4 | POST | `/user/leader/member/black/remove` | 解除黑名单 | **memberId** (Long) |
 | 5 | GET | `/user/leader/black/list` | 黑名单列表 | **page** (int); **pageSize** (int) |
 | 6 | GET | `/user/leader/black/count` | 黑名单总数 | 无 |
+
+**LeaderBusinessController**（`cn.com.shopgroup.user.controller.leader`）
+
+| 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
+| --- | --- | --- | --- | --- |
+| 1 | GET | `/user/leader/business/list` | 查询当前团长收款账户列表（含Redis累计额度） | 无 |
+| 2 | POST | `/user/leader/business/add` | 添加团长收款账户（校验证件号码唯一，返回新增账户ID） | Body: **request** (BusinessRequest, JSON) |
+| 3 | POST | `/user/leader/business/edit` | 修改收款账户（已审核通过的账户不允许修改） | Body: **request** (BusinessRequest, JSON) |
+| 4 | POST | `/user/leader/business/close` | 关闭/启用收款账户（禁用或启用商户收款） | Body: **request** (OCBusinessRequest, JSON) |
 
 **LeaderPointController**（`cn.com.shopgroup.user.controller.leader`）
 
@@ -426,8 +426,8 @@ mvn -pl gb-group-task spring-boot:run
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/order/report/list` | 分页查询订单列表 | **page** (int); **pageSize** (int) |
-| 2 | GET | `/order/report/count` | 查询订单总数 | 无 |
+| 1 | GET | `/order/leader/report/business/list` | 分账汇总列表 | **page** (int); **pageSize** (int) |
+| 2 | GET | `/order/leader/report/business/count` | 分账汇总数量 | 无 |
 
 **GroupOrderController**（`cn.com.shopgroup.order.controller.group`）
 
@@ -440,13 +440,12 @@ mvn -pl gb-group-task spring-boot:run
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
 | 1 | GET | `/order/group/groupActivity/cat` | 团购分类列表（首页） | 无 |
-| 2 | GET | `/order/group/groupActivity/list` | — | **leaderId** (Long); **catId** (Long); **page** (int); **pageSize** (int) |
-| 3 | POST | `/order/group/get/groupActivity/list` | 用户首页-查询所有团购活动列表 | Body: **request** (MemberGroupListRequest, JSON) |
-| 4 | GET | `/order/group/groupActivity/count` | 团购数量（首页） | **leaderId** (Long); **catId** (Long) |
-| 5 | GET | `/order/group/groupActivity/info` | 团购详情(团长分享页面) | **groupId** (Long) |
-| 6 | GET | `/order/group/groupActivity/shop` | 团长店铺详情 | **leaderId** (Long) |
-| 7 | GET | `/order/group/groupActivity/logs` | 晚上时间只生成固定跟团记录（锁定在19:00-20:00生成的订单）。 | **groupId** (Long) |
-| 8 | GET | `/order/group/groupActivity/logs2` | 团购记录(跟团记录), 滚动部分 | **id** (Long) |
+| 2 | POST | `/order/group/get/groupActivity/list` | 用户首页-查询所有团购活动列表 | Body: **request** (MemberGroupListRequest, JSON) |
+| 3 | GET | `/order/group/groupActivity/count` | 团购数量（首页） | **leaderId** (Long); **catId** (Long) |
+| 4 | GET | `/order/group/groupActivity/info` | 团购详情(团长分享页面)---用户首页：团长更多好货也用 | **groupId** (Long) |
+| 5 | GET | `/order/group/groupActivity/shop` | 团长店铺详情 | **leaderId** (Long) |
+| 6 | GET | `/order/group/groupActivity/logs` | 晚上时间只生成固定跟团记录（锁定在19:00-20:00生成的订单）。 | **groupId** (Long) |
+| 7 | GET | `/order/group/groupActivity/logs2` | 团购记录(跟团记录), 滚动部分 | **id** (Long) |
 
 **MemberOrderController**（`cn.com.shopgroup.order.controller.group`）
 
@@ -506,6 +505,7 @@ mvn -pl gb-group-task spring-boot:run
 | 5 | GET | `/order/leader/summary/pointsku` | (团长)汇总订单商品"sku"/"包装"数量, 已支付, 未退款, 不区分是否核销, 增加提货点分组 | **gid** (Long); **start** (String); **end** (String) |
 | 6 | GET | `/order/leader/summary/pointgoods` | (店员)指定 提货点id 汇总订单商品数量, 已支付, 未退款, 区分已核销/未核销的数量 | **pid** (Long); **start** (String); **end** (String) |
 | 7 | GET | `/order/leader/summary/pointgoodssku` | (店员)指定提货点, 进行汇总订单商品"sku"/"包装"数量, 已支付, 未退款, 不区分是否核销 | **pid** (Long); **gid** (Long); **start** (String); **end** (String) |
+| 8 | POST | `/order/get/groupActivity/totalOrder` | 根据团购活动id统计订单数（实时，团长段=端有需求时使用） | **groupId** (Long) |
 
 **OrderPaymentController**（`cn.com.shopgroup.order.controller.payment`）
 
@@ -514,7 +514,7 @@ mvn -pl gb-group-task spring-boot:run
 | 1 | GET | `/order/payment/order/pay` | 发起支付 | **orderNo** (String); **openid** (String) |
 | 2 | POST | `/order/payment/order/notify` | 支付回调 | 无 |
 
-#### 8.2.3 gb-group-goods（商品/团购）— 33 个接口
+#### 8.2.3 gb-group-goods（商品/团购）— 21 个接口
 
 **GroupGoodsController**（`cn.com.shopgroup.goods.controller`）
 
@@ -523,41 +523,29 @@ mvn -pl gb-group-task spring-boot:run
 | 1 | GET | `/goods/group/goods/list` | 团购商品列表(包装, 规格, sku) | **lid** (Long); **groupId** (Long) |
 | 2 | GET | `/goods/group/goods/stock` | 查询商品库存, 后期增加缓存 | **gid** (String) |
 
-**LeaderGoodsController**（`cn.com.shopgroup.goods.controller`）
+**LeaderGoodsManageController**（`cn.com.shopgroup.goods.controller`）
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/goods/leader/goods/online` | 查询所有审核通过的商品, 且没有关闭的商品, 添加团购的时候使用 | 无 |
-| 2 | GET | `/goods/leader/goods/list` | 分页查询团长下的所有商品或（团长控制台首页-商品查询） | **cat** (Long); **page** (int); **pageSize** (int) |
-| 3 | GET | `/goods/leader/goods/count` | 查询团长下的所有商品数量 | **cat** (Long) |
-| 4 | GET | `/goods/get/goods/cat` | 商品分类列表 | 无 |
-| 5 | POST | `/goods/leader/goods/addGoods` | 添加商品 | Body: **request** (LeaderAddGoodsRequest, JSON) |
-| 6 | GET | `/goods/leader/goods/info` | 查询商品 | **id** (Long) |
+| 1 | GET | `/goods/get/goods/cat` | 商品分类列表 | 无 |
+| 2 | GET | `/goods/leader/goods/online` | 查询所有审核通过且未关闭的商品, 添加团购时使用 | 无 |
+| 3 | GET | `/goods/leader/goods/list` | 分页查询团长下的所有商品(团长控制台-商品管理), 支持分类+商品名称关键字筛选 | **cat** (Long); **keyword** (String); **page** (int); **pageSize** (int) |
+| 4 | GET | `/goods/leader/goods/count` | 查询团长下的所有商品数量, 支持分类+商品名称关键字筛选 | **cat** (Long); **keyword** (String) |
+| 5 | GET | `/goods/leader/goods/info` | 商品信息查询: 商品基本信息 + 分类名 + 图片 + 规格(含规格值) + SKU | **id** (Long) |
+| 6 | POST | `/goods/leader/goods/addGoods` | 添加商品 | Body: **request** (LeaderAddGoodsRequest, JSON) |
 | 7 | POST | `/goods/leader/goods/edit` | 修改商品, 如果该商品正在团购中, 则不允许修改 | Body: **request** (LeaderGoodsRequest, JSON) |
-| 8 | GET | `/goods/leader/goods/close` | 关闭商品, 如果该商品正在团购中, 则不允许修改 | **id** (Long) |
-| 9 | GET | `/goods/leader/goods/package/list` | 查询商品所有包装 | **id** (Long) |
-| 10 | POST | `/goods/leader/goods/package/update` | 批量编辑商品所有包装, 如果该商品正在团购中, 则不允许修改 | Body: **request** (LeaderPackageListRequest, JSON) |
-| 11 | GET | `/goods/leader/goods/spec/list` | 查询商品规格(包含规格值) | **id** (Long) |
-| 12 | GET | `/goods/leader/goods/getSpec/list` | 查询商品规格(添加的时候使用,包含规格值) | 无 |
-| 13 | POST | `/goods/leader/goods/spec/update` | 批量编辑商品所有规格(包含规格值), 如果该商品正在团购中, 则不允许修改 | Body: **request** (SpecListRequest, JSON) |
-| 14 | POST | `/goods/leader/goods/spec/add` | 添加规格 | Body: **request** (AddSpecRequest, JSON) |
-| 15 | POST | `/goods/leader/goods/spec/remove` | 删除规格和对应的规格值, 如果该商品正在团购中, 则不允许修改 | **id** (Long) |
-| 16 | GET | `/goods/leader/goods/specVal/list` | 查询商品规格值 | **id** (Long) |
-| 17 | POST | `/goods/leader/goods/specVal/add` | 添加商品规格值, 如果该商品正在团购中, 则不允许修改 | Body: **request** (SpecValRequest, JSON) |
-| 18 | POST | `/goods/leader/goods/specVal/edit` | 编辑商品规格值, 如果该商品正在团购中, 则不允许修改 | Body: **request** (SpecValRequest, JSON) |
-| 19 | POST | `/goods/leader/goods/specVal/remove` | 删除规格值, 如果该商品正在团购中, 则不允许修改 | Body: **request** (SpecValRequest, JSON) |
-| 20 | GET | `/goods/leader/goods/sku/spec` | 根据规格罗列所有SKU, 包括已经存在的sku信息 | **id** (Long) |
-| 21 | POST | `/goods/leader/goods/sku/save` | 如果该商品正在团购中, 则不允许修改 | Body: **requestList** (List<LeaderSkuRequest>, JSON) |
-| 22 | POST | `/goods/leader/goods/stock` | 调整商品库存 | Body: **request** (LeaderGoodsStockRequest, JSON) |
+| 8 | GET | `/goods/leader/goods/close` | 关闭商品(上下架), 如果该商品正在团购中, 则不允许操作 | **id** (Long) |
+| 9 | GET | `/goods/leader/goods/sku/spec` | 根据规格罗列所有SKU, 包括已经存在的sku信息 | **id** (Long) |
+| 10 | POST | `/goods/leader/goods/sku/save` | 注: 前端不再单独调用此接口, SKU已随添加/修改商品接口(addGoods/edit)一并处理, 此处保留兼容 | Body: **requestList** (List<LeaderSkuRequest>, JSON) |
 
 **LeaderGroupManageController**（`cn.com.shopgroup.goods.controller`）
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
 | 1 | POST | `/goods/Leader/get/groupActivity/list` | 查询所有团购活动列表 | Body: **request** (LeaderGroupListRequest, JSON) |
-| 2 | GET | `/goods/Leader/get/groupActivity/count` | 查询所有团购活动总数 | 无 |
+| 2 | GET | `/goods/Leader/get/groupActivity/count` | 查询所有团购活动总数(筛选条件与列表接口一致, 保证分页总页数正确) | **cat** (Long); **name** (String); **status** (Integer) |
 | 3 | POST | `/goods/Leader/groupActivity/add` | 添加团购活动 | Body: **request** (GroupActRequest, JSON) |
-| 4 | GET | `/goods/Leader/get/groupActivity/info` | 查询团购信息, 还要查询商品列表 | **groupId** (Long) |
+| 4 | GET | `/goods/Leader/get/groupActivity/info` | 查询团购信息, 还要查询商品列表(价格以团购商品表冗余的团购价为准) | **groupId** (Long) |
 | 5 | POST | `/goods/Leader/groupActivity/edit` | 修改团购活动, 团购进行中, 不允许修改 | Body: **request** (GroupActRequest, JSON) |
 | 6 | POST | `/goods/Leader/groupActivity/close` | 这样就不需要修改的时候同步Redis缓存了, 只需要关闭修改完, 打开上线的时候更新一次即可 | **groupId** (Long) |
 | 7 | GET | `/goods/Leader/get/groupActivity/cat` | 团购分类列表 | 无 |

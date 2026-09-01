@@ -455,6 +455,10 @@ def infer_return_data(method_body, param_types):
 def parse_file(path):
     with open(path, "r", encoding="utf-8", errors="ignore") as f:
         src = f.read()
+    # 先把非 Javadoc 的块注释(/* ... */)替换为空白(保留行数)，
+    # 避免被注释掉的死代码接口(如 /* @GetMapping(...) */)被误扫描进文档；
+    # /** ... */ Javadoc 保留，供下方功能说明提取使用
+    src = re.sub(r"/\*(?!\*).*?\*/", lambda m: re.sub(r"[^\n]", " ", m.group(0)), src, flags=re.S)
 
     pkg = re.search(r"^package\s+([\w.]+);", src, re.M)
     pkg = pkg.group(1) if pkg else ""

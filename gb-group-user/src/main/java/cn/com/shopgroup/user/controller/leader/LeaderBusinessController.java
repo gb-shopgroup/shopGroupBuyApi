@@ -30,6 +30,9 @@ public class LeaderBusinessController {
     private GbOrgBusinessInfoService service;
 
 
+    /**
+     * 查询当前团长收款账户列表（含Redis累计额度）
+     */
     @GetMapping("/leader/business/list")
     public JsonResult businessList() {
 
@@ -47,6 +50,9 @@ public class LeaderBusinessController {
         return JsonResult.success(data);
     }
 
+    /**
+     * 添加团长收款账户（校验证件号码唯一，返回新增账户ID）
+     */
     @PostMapping("/leader/business/add")
     public JsonResult addBusiness(@Validated @RequestBody BusinessRequest request) {
 
@@ -77,6 +83,9 @@ public class LeaderBusinessController {
         return JsonResult.success("添加成功", busId);
     }
 
+    /**
+     * 修改收款账户（已审核通过的账户不允许修改）
+     */
     @PostMapping("/leader/business/edit")
     public JsonResult editBusiness(@Validated @RequestBody BusinessRequest request) {
 
@@ -116,6 +125,9 @@ public class LeaderBusinessController {
         }
     }
 
+    /**
+     * 关闭/启用收款账户（禁用或启用商户收款）
+     */
     @PostMapping("/leader/business/close")
     public JsonResult closeBusiness(@Validated @RequestBody OCBusinessRequest request) {
 
