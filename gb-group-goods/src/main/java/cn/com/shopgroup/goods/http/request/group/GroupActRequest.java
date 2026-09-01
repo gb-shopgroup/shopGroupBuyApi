@@ -24,8 +24,10 @@ public class GroupActRequest {
     // 虚拟订单数量
     private Integer virtual;
     //活动开始时间
+    @NotNull(message = "活动开始时间不能为空")
     private Integer startTime;
     //活动结束时间
+    @NotNull(message = "活动结束时间不能为空")
     private Integer endTime;
     // 商品列表
     @NotEmpty(message = "团购商品不能为空")

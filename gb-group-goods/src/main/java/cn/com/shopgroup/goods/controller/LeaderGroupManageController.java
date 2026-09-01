@@ -114,7 +114,7 @@ public class LeaderGroupManageController {
         int status = Optional.ofNullable(request.getStatus().intValue()).orElse(0);
 
         // 查询列表(1、团长团查询 2 用户端查询)
-        List<GbGroupActivityInfo> result = activityInfoService.getMiniLeaderGroupList(1, leaderId, request.getCatId(),activityName, status, page, pageSize);
+        List<GbGroupActivityInfo> result = activityInfoService.getMiniLeaderGroupList(1, leaderId, request.getCatId(), activityName, status, page, pageSize);
         List<GroupActResponse> data = GroupActResponse.getGroupResponseList(result);
         return JsonResult.success(data);
     }
@@ -139,6 +139,10 @@ public class LeaderGroupManageController {
     @PostMapping("/groupActivity/add")
     public JsonResult addGroup(@Validated @RequestBody GroupActRequest request) {
         log.info("[添加团购活动]参数:{}", JSON.toJSONString(request));
+        // 1. 校验时间
+        if (request.getEndTime() < (request.getStartTime())) {
+            return JsonResult.fail("结束时间必须晚于开始时间");
+        }
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
