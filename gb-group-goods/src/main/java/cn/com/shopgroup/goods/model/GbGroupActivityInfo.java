@@ -77,7 +77,7 @@ public class GbGroupActivityInfo {
     // 添加人员姓名
     @TableField("staff_name")
     private String staffName;
-    // 平台审核
+    // 平台审核 0 待审核 1 通过 2 不通过
     @TableField("is_check")
     private Byte isCheck;
     // 审核备注

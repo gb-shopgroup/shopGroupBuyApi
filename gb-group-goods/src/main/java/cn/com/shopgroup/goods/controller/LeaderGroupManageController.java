@@ -145,22 +145,30 @@ public class LeaderGroupManageController {
         }
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
+        log.info("添加团购活动时，团长id:{}", leaderId);
         if (leaderId == 0) {
             return JsonResult.fail("lid不存在");
         }
         // 从请求头中获取员工id
         Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
-        if (staffId == 0) {
-            return JsonResult.fail("sid不存在");
-        }
-        GbOrgStaffInfo staffInfo = staffService.getStaffInfo(staffId);
-        if (ObjectUtils.isEmpty(staffInfo)) {
-            return JsonResult.fail("未查询到员工信息");
-        }
-        // 团购商品信息兜底: 价格/名称/图片/类型未传时, 取商品表数据(一次批量查询, 避免循环内 N+1)
-        fillGroupActGoodsInfo(request.getGoods());
+        log.info("添加团购活动时，员工id:{}", staffId);
+        GbOrgStaffInfo staffInfo = new GbOrgStaffInfo();
         // 重构数据
         GbGroupActivityInfo data = new GbGroupActivityInfo();
+        if (staffId != 0) {
+            staffInfo = staffService.getStaffInfo(staffId);
+            log.info("添加团购活动时，stfInfo:{}", JSON.toJSONString(staffInfo));
+            if (ObjectUtils.isEmpty(staffInfo)) {
+                return JsonResult.fail("未查询到员工信息");
+            }
+            // 添加人员id
+            data.setStaffId(staffId);
+            // 添加人员姓名
+            data.setStaffName(staffInfo.getStaffName());
+        }
+
+        // 团购商品信息兜底: 价格/名称/图片/类型未传时, 取商品表数据(一次批量查询, 避免循环内 N+1)
+        fillGroupActGoodsInfo(request.getGoods());
         // 团购id,主键自增
         //data.setGroupId(0);
         // 团购分类id
@@ -230,11 +238,7 @@ public class LeaderGroupManageController {
         data.setStartTime(request.getStartTime());
         data.setEndTime(request.getEndTime());
         // 是否禁用,0上线1下线
-        data.setIsClose((byte) 1);
-        // 添加人员id
-        data.setStaffId(staffId);
-        // 添加人员姓名
-        data.setStaffName(staffInfo.getStaffName());
+        data.setIsClose((byte) 0);
 
         // 重新构建商品列表
         List<GbGroupActivityGoods> lists = new ArrayList<>();
@@ -321,7 +325,10 @@ public class LeaderGroupManageController {
         if (ObjectUtils.isEmpty(groupInfo)) {
             return JsonResult.fail("未查询到团购活动信息");
         }
-        if (groupInfo.getIsClose().intValue() == 0) {
+        int nowTime = TimeUtils.getTimeStamp();
+        int startTime = groupInfo.getStartTime().intValue();
+        int endTime = groupInfo.getEndTime().intValue();
+        if (startTime < nowTime && nowTime < endTime) {
             return JsonResult.fail("团购进行中, 不允许修改");
         }
 

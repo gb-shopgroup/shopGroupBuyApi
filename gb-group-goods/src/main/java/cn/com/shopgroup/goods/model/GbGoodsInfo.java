@@ -59,13 +59,13 @@ public class GbGoodsInfo {
     // 商品介绍
     @TableField("goods_info")
     private String goodsInfo;
-    // 是否禁用
+    // 是否禁用 0 开启 1关闭
     @TableField("is_close")
     private Byte isClose;
-    // 平台审核
+    // 平台审核（
     @TableField("is_check")
     private Byte isCheck;
-    // 审核备注
+    // 审核备注 0待审核 1 通过 2 不同意
     @TableField("check_remark")
     private String checkRemark;
     // 添加时间
