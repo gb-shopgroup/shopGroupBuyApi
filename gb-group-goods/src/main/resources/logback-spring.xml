@@ -41,7 +41,7 @@
             <maxHistory>90</maxHistory>
         </rollingPolicy>
     </appender>
-    
+
     <!-- 开发环境配置(TRACE < DEBUG < INFO < WARN < ERROR) -->
     <springProfile name="dev">
         <!-- SpringBoot的Root日志级别为 INFO 级别 -->
