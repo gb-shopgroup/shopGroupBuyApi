@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
@@ -47,6 +48,18 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
     public GbGoodsInfo getGoodsInfo(Long goodsId) {
 
         return mapper.selectById(goodsId);
+    }
+
+
+    public List<GbGoodsInfo> getGoodsInfoList(List<Long> goodsIds) {
+
+        if (goodsIds == null || goodsIds.isEmpty()) {
+            return new ArrayList<>();
+        }
+        LambdaQueryWrapper<GbGoodsInfo> queryWrapper = Wrappers.lambdaQuery();
+        queryWrapper.in(GbGoodsInfo::getGoodsId, goodsIds);
+        List<GbGoodsInfo> results = mapper.selectList(queryWrapper);
+        return results == null ? new ArrayList<>() : results;
     }
 
 
@@ -127,13 +140,44 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
     }
 
 
+    public List<GbGoodsInfo> getMiniLeaderGoodsList(Long leaderId, Long catId, String keyword, int page, int pageSize) {
+
+        LambdaQueryWrapper<GbGoodsInfo> queryWrapper = Wrappers.lambdaQuery();
+        if (catId != null && catId > 0) {
+            queryWrapper.eq(GbGoodsInfo::getCatId, catId);
+        }
+        if (keyword != null && keyword.trim().length() > 0) {
+            queryWrapper.like(GbGoodsInfo::getGoodsName, keyword.trim());
+        }
+        queryWrapper.eq(GbGoodsInfo::getLeaderId, leaderId);
+        queryWrapper.orderByDesc(GbGoodsInfo::getGoodsId);
+        queryWrapper.last("limit " + (page - 1) * pageSize + "," + pageSize);
+        List<GbGoodsInfo> result = mapper.selectList(queryWrapper);
+        return result == null ? new ArrayList<>() : result;
+    }
+
+
+    public Long getMiniLeaderGoodsCount(Long leaderId, Long catId, String keyword) {
+
+        LambdaQueryWrapper<GbGoodsInfo> queryWrapper = Wrappers.lambdaQuery();
+        if (catId != null && catId > 0) {
+            queryWrapper.eq(GbGoodsInfo::getCatId, catId);
+        }
+        if (keyword != null && keyword.trim().length() > 0) {
+            queryWrapper.like(GbGoodsInfo::getGoodsName, keyword.trim());
+        }
+        queryWrapper.eq(GbGoodsInfo::getLeaderId, leaderId);
+        return mapper.selectCount(queryWrapper);
+    }
+
+
     public Long addMiniLeaderGoodsInfo(Long leaderId, GbGoodsInfo info, List<String> imgList) {
         GbGoodsInfo data = new GbGoodsInfo();
         data.setCatId(info.getCatId());
         data.setLeaderId(leaderId);
         data.setGoodsType(info.getGoodsType());
         data.setGoodsName(info.getGoodsName());
-        data.setGoodsImg(imgList.get(0));
+        data.setGoodsImg(imgList != null && imgList.size() > 0 ? imgList.get(0) : "");
         data.setCostPrice(info.getCostPrice());
         data.setSalesPrice(info.getSalesPrice());
         data.setMarketPrice(info.getMarketPrice());
@@ -142,7 +186,7 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
         data.setIsLimit(info.getIsLimit());
         data.setLimitNum(info.getLimitNum());
         data.setGoodsUnit(info.getGoodsUnit());
-        data.setGoodsInfo("");
+        data.setGoodsInfo(info.getGoodsInfo());
         data.setIsClose((byte) 0);
         data.setIsCheck((byte) 1);
         data.setCheckRemark("");
@@ -167,7 +211,7 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
         LambdaUpdateWrapper<GbGoodsInfo> updateWrapper = Wrappers.lambdaUpdate();
         updateWrapper.set(GbGoodsInfo::getGoodsName, info.getGoodsName());
         updateWrapper.set(GbGoodsInfo::getGoodsImg, imgList.get(0));
-        updateWrapper.set(GbGoodsInfo::getCostPrice, info.getCostPrice());
+        updateWrapper.set(GbGoodsInfo::getCostPrice, Optional.ofNullable(info.getCostPrice()).orElse(0D));
         updateWrapper.set(GbGoodsInfo::getSalesPrice, info.getSalesPrice());
         updateWrapper.set(GbGoodsInfo::getMarketPrice, info.getMarketPrice());
         updateWrapper.set(GbGoodsInfo::getIsStock, info.getIsStock());
@@ -175,20 +219,33 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
         updateWrapper.set(GbGoodsInfo::getIsLimit, info.getIsLimit());
         updateWrapper.set(GbGoodsInfo::getLimitNum, info.getLimitNum());
         updateWrapper.set(GbGoodsInfo::getGoodsUnit, info.getGoodsUnit());
+        updateWrapper.set(GbGoodsInfo::getGoodsInfo, Optional.ofNullable(info.getGoodsInfo()).orElse(""));
         updateWrapper.set(GbGoodsInfo::getIsCheck, 1);
         updateWrapper.eq(GbGoodsInfo::getGoodsId, info.getGoodsId());
         updateWrapper.eq(GbGoodsInfo::getLeaderId, leaderId);
         int flag = mapper.update(updateWrapper);
-        LambdaUpdateWrapper<GbGoodsImageInfo> updateWrapper1 = Wrappers.lambdaUpdate();
+        // 更新商品图片: 已有图片按序更新, 提交图片更多时补充插入, 更少时置空, 每次新建wrapper避免条件叠加
         LambdaQueryWrapper<GbGoodsImageInfo> queryWrapper = Wrappers.lambdaQuery();
         queryWrapper.eq(GbGoodsImageInfo::getGoodsId, info.getGoodsId());
         List<GbGoodsImageInfo> imageInfoList = imageMapper.selectList(queryWrapper);
-        for (int i = 0; i < imageInfoList.size(); i++) {
-            Long tempId = imageInfoList.get(i).getImgId();
-            String tempImg2 = imgList.get(i);
-            updateWrapper1.set(GbGoodsImageInfo::getGoodsImg, tempImg2);
-            updateWrapper1.eq(GbGoodsImageInfo::getImgId, tempId);
-            imageMapper.update(updateWrapper1);
+        int imgCount = imgList == null ? 0 : imgList.size();
+        int maxSize = Math.max(imageInfoList == null ? 0 : imageInfoList.size(), imgCount);
+        for (int i = 0; i < maxSize; i++) {
+            String tempImg = i < imgCount ? imgList.get(i) : "";
+            if (imageInfoList != null && i < imageInfoList.size()) {
+                // 更新已有图片
+                LambdaUpdateWrapper<GbGoodsImageInfo> up = Wrappers.lambdaUpdate();
+                up.set(GbGoodsImageInfo::getGoodsImg, tempImg);
+                up.eq(GbGoodsImageInfo::getImgId, imageInfoList.get(i).getImgId());
+                imageMapper.update(up);
+            } else {
+                // 图片数量增加, 补充插入
+                GbGoodsImageInfo temp = new GbGoodsImageInfo();
+                temp.setGoodsId(info.getGoodsId());
+                temp.setGoodsType((byte) 0);
+                temp.setGoodsImg(tempImg);
+                imageMapper.insert(temp);
+            }
         }
         return flag > 0 ? true : false;
     }
@@ -205,10 +262,12 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
 
     public Boolean reduceGoodsStock(Long goodsId, Integer goodsNum) {
 
+        int num = Math.abs(goodsNum);
         LambdaUpdateWrapper<GbGoodsInfo> updateWrapper = Wrappers.lambdaUpdate();
-        updateWrapper.setSql("goods_num = goods_num - {0}", Math.abs(goodsNum));
+        // 原子扣减并防超扣: 仅当库存 >= 扣减数时才更新, 否则返回false表示库存不足
+        updateWrapper.setSql("goods_num = goods_num - {0}", num);
+        updateWrapper.ge(GbGoodsInfo::getGoodsNum, num);
         updateWrapper.eq(GbGoodsInfo::getGoodsId, goodsId);
-        updateWrapper.gt(GbGoodsInfo::getGoodsNum, 0);
         updateWrapper.eq(GbGoodsInfo::getIsStock, 1);
         int flag = mapper.update(updateWrapper);
         return flag > 0 ? true : false;

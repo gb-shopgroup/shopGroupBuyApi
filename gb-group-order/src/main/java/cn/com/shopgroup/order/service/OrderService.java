@@ -153,10 +153,10 @@ public class OrderService {
             }
 
             // 商品SKU信息(获取sku里面的价格)
-            // 商品SKU信息(获取sku里面的价格)
             Long skuId = item.getSkuId();
+            GbGoodsSkuInfo skuInfo = new GbGoodsSkuInfo();
             if (skuId > 0) {
-                GbGoodsSkuInfo skuInfo = skuService.getGoodsSkuInfo(skuId);
+                skuInfo = skuService.getGoodsSkuInfo(skuId);
                 if (ObjectUtils.isEmpty(skuInfo)) {
                     result.put("msg", "商品sku信息不存在");
                     return result;
@@ -170,22 +170,20 @@ public class OrderService {
 
             // 商品小计累加到订单总价里面
             orderPrice = orderPrice.add(goodsTotal);
-            // 商品库存检查
+            // 商品库存检查: 优先校验SKU库存(用户选择规格后), 再校验商品总库存兜底
             if (goodsInfo.getIsStock() == 1) {
                 int num = item.getNum() * packNum;
-                int stock = goodsInfo.getGoodsNum();
-                if (num > stock) {
+                // SKU库存校验(用户选择了具体规格)
+                if (skuId > 0 && !ObjectUtils.isEmpty(skuInfo) && skuInfo.getGoodsNum() != null
+                        && num > skuInfo.getGoodsNum()) {
+                    result.put("msg", (skuInfo.getSkuNames() == null ? "商品SKU" : skuInfo.getSkuNames()) + "库存不足");
+                    return result;
+                }
+                // 商品总库存校验
+                if (num > goodsInfo.getGoodsNum()) {
                     result.put("msg", goodsInfo.getGoodsName() + "库存不足");
                     return result;
                 }
-                // 先不判断sku的库存
-                //if(skuId > 0){
-                //    stock = stockService.getGoodsSkuStock(goodsId, skuId);
-                //    if(num > stock){
-                //        result.put("msg", goodsInfo.getGoodsName() + "库存不足");
-                //        return result;
-                //    }
-                //}
             }
 
             // 商品限购检查
@@ -318,23 +316,50 @@ public class OrderService {
         // 下单时间
         orderInfo.setAddTime(TimeUtils.getTimeStamp());
         orderInfo.setUpdateTime(TimeUtils.getTimeStamp());
+        // 先扣减库存(商品总库存 + SKU库存), 全部成功后再写订单, 防止并发超卖产生"幽灵订单"
+        List<GbOrderGoodsInfo> reducedGoodsList = new ArrayList<>();
+        for (GbOrderGoodsInfo item : orderGoodsInfoList) {
+            int reduceNum = item.getPackNum() * item.getGoodsNum();
+            boolean goodsFlag = goodsService.reduceGoodsStock(item.getGoodsId(), reduceNum);
+            boolean skuFlag = true;
+            if (item.getSkuId() != null && item.getSkuId() > 0) {
+                skuFlag = skuService.reduceGoodsStock(item.getSkuId(), reduceNum);
+            }
+            // 任一库存扣减失败(库存不足): 回补该商品已扣部分 + 之前已扣减的商品, 并返回
+            if (!goodsFlag || !skuFlag) {
+                if (goodsFlag) goodsService.increaseGoodsStock(item.getGoodsId(), reduceNum);
+                if (skuFlag && item.getSkuId() != null && item.getSkuId() > 0) {
+                    skuService.increaseGoodsStock(item.getSkuId(), reduceNum);
+                }
+                restoreOrderStock(reducedGoodsList);
+                result.put("msg", item.getGoodsName() + "库存不足");
+                return result;
+            }
+            reducedGoodsList.add(item);
+        }
         // 写入数据库
         Long orderId = orderInfoService.addMiniOrder(orderInfo, orderGoodsInfoList);
         if (orderId.intValue() == 0) {
+            // 订单写入失败, 回补全部已扣库存
+            restoreOrderStock(reducedGoodsList);
             result.put("msg", "下单失败");
             return result;
-        }
-        // 订单商品列表扣减库存
-        for (GbOrderGoodsInfo item : orderGoodsInfoList) {
-            // 扣减总库存
-            Boolean flag = goodsService.reduceGoodsStock(item.getGoodsId(), item.getPackNum() * item.getGoodsNum());
-            // 扣减sku库存
-            //if(item.getSkuId() > 0){ stockService.reduceGoodsSkuStock(item.getSkuId(), item.getPackNum() * item.getGoodsNum()); }
         }
         // 返回订单Id
         result.put("success", "1");
         result.put("msg", String.valueOf(orderId));
         return result;
+    }
+
+    // 回补订单商品库存(商品总库存 + SKU库存), 用于下单扣减失败或订单写入失败时的补偿
+    private void restoreOrderStock(List<GbOrderGoodsInfo> goodsList) {
+        for (GbOrderGoodsInfo item : goodsList) {
+            int num = item.getPackNum() * item.getGoodsNum();
+            goodsService.increaseGoodsStock(item.getGoodsId(), num);
+            if (item.getSkuId() != null && item.getSkuId() > 0) {
+                skuService.increaseGoodsStock(item.getSkuId(), num);
+            }
+        }
     }
 
 

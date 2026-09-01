@@ -31,6 +31,7 @@ import cn.com.shopgroup.user.service.GbOrgLeaderInfoService;
 import cn.com.shopgroup.user.service.GbOrgShopInfoService;
 import cn.com.shopgroup.user.service.GbOrgStaffInfoService;
 import cn.com.shopgroup.user.utils.RequestParamsUtils;
+import com.alibaba.fastjson2.JSON;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
@@ -51,7 +52,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -116,9 +119,11 @@ public class LeaderGroupManageController {
         return JsonResult.success(data);
     }
 
-    // 查询所有团购活动总数
+    // 查询所有团购活动总数(筛选条件与列表接口一致, 保证分页总页数正确)
     @GetMapping("/get/groupActivity/count")
-    public JsonResult groupActivityCount() {
+    public JsonResult groupActivityCount(@RequestParam(value = "cat", required = false) Long catId,
+                                         @RequestParam(value = "name", required = false) String name,
+                                         @RequestParam(value = "status", required = false, defaultValue = "0") Integer status) {
 
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
@@ -126,14 +131,14 @@ public class LeaderGroupManageController {
             return JsonResult.fail("lid不存在");
         }
         // 查询总数
-        long total = activityInfoService.getMiniLeaderGroupCount(leaderId);
+        long total = activityInfoService.getMiniLeaderGroupCount(leaderId, catId, name, Optional.ofNullable(status).orElse(0));
         return JsonResult.success(total);
     }
 
     // 添加团购活动
     @PostMapping("/groupActivity/add")
     public JsonResult addGroup(@Validated @RequestBody GroupActRequest request) {
-
+        log.info("[添加团购活动]参数:{}", JSON.toJSONString(request));
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
@@ -148,6 +153,8 @@ public class LeaderGroupManageController {
         if (ObjectUtils.isEmpty(staffInfo)) {
             return JsonResult.fail("未查询到员工信息");
         }
+        // 团购商品信息兜底: 价格/名称/图片/类型未传时, 取商品表数据(一次批量查询, 避免循环内 N+1)
+        fillGroupActGoodsInfo(request.getGoods());
         // 重构数据
         GbGroupActivityInfo data = new GbGroupActivityInfo();
         // 团购id,主键自增
@@ -159,26 +166,26 @@ public class LeaderGroupManageController {
         // 数据隔离id
         data.setIsolationId(0);
         // 商品提货方式,1自提2邮递
-        data.setPickupStyle((byte) 1);
+        data.setPickupStyle(request.getPickup());
         // 团购名称
         data.setGroupName(request.getName());
 
         // 单个商品
         if (request.getGoods().size() == 1) {
 
-            // 查询商品图片
+            // 查询商品图片(不足3张时补空串, 避免越界)
             Long tempId = request.getGoods().get(0).getGid();
             List<String> tempList = goodsService.getMiniGoodsImgList(tempId, 3);
             // 团购主图
-            data.setGroupImg(tempList.get(0));
+            data.setGroupImg(CollectionUtils.isEmpty(tempList) ? "" : tempList.get(0));
             // 团购主图2
-            data.setGroupImg2(tempList.get(1));
+            data.setGroupImg2(tempList.size() > 1 ? tempList.get(1) : "");
             // 团购主图3
-            data.setGroupImg3(tempList.get(2));
+            data.setGroupImg3(tempList.size() > 2 ? tempList.get(2) : "");
             // 团购价格/最小价格
             data.setGroupPrice(request.getGoods().get(0).getPrice());
-            // 团购价格/最大价格
-            data.setMarketPrice(0D);
+            // 团购价格/最大价格(单商品时最大=最小)
+            data.setGroupPrice2(request.getGoods().get(0).getPrice());
             // 市场价格/划线价格
             data.setMarketPrice(request.getGoods().get(0).getPrice2());
 
@@ -208,8 +215,8 @@ public class LeaderGroupManageController {
             data.setGroupPrice(min);
             // 团购价格/最大价格
             data.setGroupPrice2(max);
-            // 市场价格/划线价格
-            data.setMarketPrice(0D);
+            // 市场价格/划线价格(取第一个商品的划线价)
+            data.setMarketPrice(request.getGoods().get(0).getPrice2());
         }
 
         // 团购介绍
@@ -253,7 +260,7 @@ public class LeaderGroupManageController {
         return JsonResult.success(groupId);
     }
 
-    // 查询团购信息, 还要查询商品列表
+    // 查询团购信息, 还要查询商品列表(价格以团购商品表冗余的团购价为准)
     @GetMapping("/get/groupActivity/info")
     public JsonResult getGroupActivity(@RequestParam("groupId") Long groupId) {
 
@@ -261,12 +268,27 @@ public class LeaderGroupManageController {
         if (ObjectUtils.isEmpty(groupInfo)) {
             return JsonResult.fail("未查到相关团购活动信息");
         }
-        List<GbGoodsInfo> goodsList = activityInfoService.getGroupGoodsList(groupId);
-        if (CollectionUtils.isEmpty(goodsList)) {
+        // 团购商品列表(冗余表, 含团购价/市场价/商品名称/主图)
+        List<GbGroupActivityGoods> activityGoodsList = activityInfoService.getGroupActivityGoodsList(groupId);
+        if (CollectionUtils.isEmpty(activityGoodsList)) {
             return JsonResult.fail("未查到相关团购商品信息");
         }
+        // 商品表数据(补充单位/库存), 一次批量查询
+        List<Long> goodsIds = new ArrayList<>();
+        for (GbGroupActivityGoods item : activityGoodsList) {
+            goodsIds.add(item.getGoodsId());
+        }
+        List<GbGoodsInfo> goodsList = goodsService.getGoodsInfoList(goodsIds);
+        Map<Long, GbGoodsInfo> goodsMap = new HashMap<>();
+        for (GbGoodsInfo item : goodsList) {
+            goodsMap.put(item.getGoodsId(), item);
+        }
+
         GroupActResponse response = new GroupActResponse(groupInfo);
-        List<GroupActGoodsResponse> goodsResponses = GroupActGoodsResponse.getGroupActGoodsResponseList(goodsList);
+        List<GroupActGoodsResponse> goodsResponses = new ArrayList<>();
+        for (GbGroupActivityGoods item : activityGoodsList) {
+            goodsResponses.add(new GroupActGoodsResponse(item, goodsMap.get(item.getGoodsId())));
+        }
         response.setGoods(goodsResponses);
         return JsonResult.success(response);
     }
@@ -299,6 +321,9 @@ public class LeaderGroupManageController {
             return JsonResult.fail("团购进行中, 不允许修改");
         }
 
+        // 团购商品信息兜底: 价格/名称/图片/类型未传时, 取商品表数据(一次批量查询, 避免循环内 N+1)
+        fillGroupActGoodsInfo(request.getGoods());
+
         // 重构数据
         GbGroupActivityInfo data = new GbGroupActivityInfo();
         // 团购id
@@ -307,23 +332,25 @@ public class LeaderGroupManageController {
         data.setCatId(request.getCat());
         // 团购名称
         data.setGroupName(request.getName());
+        // 商品提货方式,1自提2邮递
+        data.setPickupStyle(request.getPickup());
 
         // 单个商品
         if (request.getGoods().size() == 1) {
 
-            // 查询商品图片
+            // 查询商品图片(不足3张时补空串, 避免越界)
             Long tempId = request.getGoods().get(0).getGid();
             List<String> tempList = goodsService.getMiniGoodsImgList(tempId, 3);
             // 团购主图
-            data.setGroupImg(tempList.get(0));
+            data.setGroupImg(CollectionUtils.isEmpty(tempList) ? "" : tempList.get(0));
             // 团购主图2
-            data.setGroupImg2(tempList.get(1));
+            data.setGroupImg2(tempList.size() > 1 ? tempList.get(1) : "");
             // 团购主图3
-            data.setGroupImg3(tempList.get(2));
+            data.setGroupImg3(tempList.size() > 2 ? tempList.get(2) : "");
             // 团购价格/最小价格
             data.setGroupPrice(request.getGoods().get(0).getPrice());
-            // 团购价格/最大价格
-            data.setMarketPrice(0D);
+            // 团购价格/最大价格(单商品时最大=最小)
+            data.setGroupPrice2(request.getGoods().get(0).getPrice());
             // 市场价格/划线价格
             data.setMarketPrice(request.getGoods().get(0).getPrice2());
 
@@ -358,8 +385,8 @@ public class LeaderGroupManageController {
             data.setGroupPrice(min);
             // 团购价格/最大价格
             data.setGroupPrice2(max);
-            // 市场价格/划线价格
-            data.setMarketPrice(0D);
+            // 市场价格/划线价格(取第一个商品的划线价)
+            data.setMarketPrice(request.getGoods().get(0).getPrice2());
         }
 
         // 团购介绍
@@ -652,6 +679,55 @@ public class LeaderGroupManageController {
         return JsonResult.fail();
     }
 
+
+    /**
+     * 团购商品信息兜底: 价格/名称/图片/类型未传时, 取商品表数据
+     * 一次批量查询商品信息, 避免循环内 N+1 查询
+     */
+    private void fillGroupActGoodsInfo(List<GroupActGoodsRequest> goodsList) {
+        if (CollectionUtils.isEmpty(goodsList)) {
+            return;
+        }
+        // 收集商品id, 一次查询
+        List<Long> goodsIds = new ArrayList<>();
+        for (GroupActGoodsRequest item : goodsList) {
+            goodsIds.add(item.getGid());
+        }
+        List<GbGoodsInfo> goodsInfoList = goodsService.getGoodsInfoList(goodsIds);
+        Map<Long, GbGoodsInfo> goodsInfoMap = new HashMap<>();
+        for (GbGoodsInfo goodsInfo : goodsInfoList) {
+            goodsInfoMap.put(goodsInfo.getGoodsId(), goodsInfo);
+        }
+        // 逐项兜底
+        for (GroupActGoodsRequest item : goodsList) {
+            GbGoodsInfo goodsInfo = goodsInfoMap.get(item.getGid());
+            if (goodsInfo == null) {
+                continue;
+            }
+            // 团购价格兜底(取商品销售价)
+            if (item.getPrice() == null || item.getPrice() <= 0) {
+                if (goodsInfo.getSalesPrice() != null) {
+                    item.setPrice(goodsInfo.getSalesPrice());
+                }
+            }
+            // 市场价兜底(取商品市场价)
+            if (item.getPrice2() == null || item.getPrice2() <= 0) {
+                if (goodsInfo.getMarketPrice() != null) {
+                    item.setPrice2(goodsInfo.getMarketPrice());
+                }
+            }
+            // 冗余字段兜底: 名称/主图/类型
+            if (item.getGname() == null || item.getGname().trim().length() == 0) {
+                item.setGname(goodsInfo.getGoodsName());
+            }
+            if (item.getImg() == null || item.getImg().trim().length() == 0) {
+                item.setImg(goodsInfo.getGoodsImg());
+            }
+            if (item.getGtype() == null) {
+                item.setGtype(goodsInfo.getGoodsType());
+            }
+        }
+    }
 
     // 输入流保存本地文件
     private void saveStreamToLocalFile(ByteArrayInputStream inputStream, String savePath) throws IOException {

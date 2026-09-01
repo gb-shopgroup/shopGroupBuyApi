@@ -9,7 +9,9 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class GbGoodsCategoryInfoServiceImpl implements GbGoodsCategoryInfoService {
@@ -23,5 +25,19 @@ public class GbGoodsCategoryInfoServiceImpl implements GbGoodsCategoryInfoServic
         queryWrapper.eq(GbGoodsCategoryInfo::getIsClose,0);
         queryWrapper.orderByAsc(GbGoodsCategoryInfo::getSortOrder);
         return goodsCategoryInfoMapper.selectList(queryWrapper);
+    }
+
+    @Override
+    public Map<Long, String> getGoodsCategoryNameMap() {
+        LambdaQueryWrapper<GbGoodsCategoryInfo> queryWrapper = Wrappers.lambdaQuery();
+        queryWrapper.select(GbGoodsCategoryInfo::getCatId, GbGoodsCategoryInfo::getCatName);
+        List<GbGoodsCategoryInfo> list = goodsCategoryInfoMapper.selectList(queryWrapper);
+        Map<Long, String> map = new HashMap<>();
+        if (list != null) {
+            for (GbGoodsCategoryInfo item : list) {
+                map.put(item.getCatId(), item.getCatName());
+            }
+        }
+        return map;
     }
 }

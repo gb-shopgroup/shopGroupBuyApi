@@ -38,7 +38,7 @@ public interface GbGroupActivityInfoService {
 
     List<GbGroupActivityInfo> getMiniLeaderGroupList(int flag,Long leaderId, Long catId,String activityName,int status, int page, int pageSize);
 
-    Long getMiniLeaderGroupCount(Long leaderId);
+    Long getMiniLeaderGroupCount(Long leaderId, Long catId, String activityName, int status);
 
     Long addMiniLeaderGroupInfo(Long leaderId, GbGroupActivityInfo info);
 

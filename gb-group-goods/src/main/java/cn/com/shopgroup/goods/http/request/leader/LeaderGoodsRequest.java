@@ -19,12 +19,14 @@ public class LeaderGoodsRequest {
     // 商品名称
     @NotNull(message = "名称不能为空")
     private String name;
+    // 进货价格
+    private Double costPrice;
     // 销售价格
     private Double price;
     // 市场价格--划价
     private Double price2;
 
-    // 是否设置库存
+    // 是否启用库存, 1=启用
     private Byte isStock;
     // 商品库存,总库存
     private Integer stockNum;
@@ -34,6 +36,8 @@ public class LeaderGoodsRequest {
     private Integer limitNum;
     // 商品单位
     private String unit;
+    // 商品介绍
+    private String goodsInfo;
     // 商品图片
     @NotNull(message = "图片不能为空")
     private String img;
@@ -41,4 +45,6 @@ public class LeaderGoodsRequest {
     private String img3;
     //规格
     private List<LeaderAddSpecRequest> addSpecList;
+    // SKU列表(修改商品时随商品信息一并重建gb_goods_sku_info)
+    private List<LeaderSkuRequest> skuList;
 }

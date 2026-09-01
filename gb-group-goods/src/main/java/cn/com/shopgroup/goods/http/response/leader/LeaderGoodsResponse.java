@@ -14,6 +14,8 @@ public class LeaderGoodsResponse {
     private Long id;
     // 分类id,外键
     private Long cat;
+    // 分类名称
+    private String catName;
     // 商品类型,1普通商品2称重商品
     private Byte type;
     // 商品名称
@@ -22,6 +24,8 @@ public class LeaderGoodsResponse {
     private String img;
     private String img2;
     private String img3;
+    // 进货价格
+    private Double costPrice;
     // 销售价格
     private Double price;
     // 市场价格
@@ -39,6 +43,8 @@ public class LeaderGoodsResponse {
 
     // 商品单位
     private String unit;
+    // 商品介绍
+    private String goodsInfo;
     // 是否禁用
     private Byte isClose;
     // 平台审核
@@ -65,6 +71,8 @@ public class LeaderGoodsResponse {
         this.name = info.getGoodsName();
         // 商品主图
         this.img = info.getGoodsImg();
+        // 进货价格
+        this.costPrice = info.getCostPrice();
         // 销售价格
         this.price = info.getSalesPrice();
         // 市场价格
@@ -82,6 +90,8 @@ public class LeaderGoodsResponse {
 
         // 商品单位
         this.unit = info.getGoodsUnit();
+        // 商品介绍
+        this.goodsInfo = info.getGoodsInfo();
         // 是否禁用
         this.isClose = info.getIsClose();
         // 平台审核

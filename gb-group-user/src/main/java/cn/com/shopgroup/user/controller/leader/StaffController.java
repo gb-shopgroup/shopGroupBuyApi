@@ -8,7 +8,9 @@ import cn.com.shopgroup.user.model.GbOrgStaffInfo;
 import cn.com.shopgroup.user.service.GbMemberInfoService;
 import cn.com.shopgroup.user.service.GbOrgStaffInfoService;
 import cn.com.shopgroup.user.utils.RequestParamsUtils;
+import com.alibaba.fastjson2.JSON;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.util.CollectionUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -44,6 +46,10 @@ public class StaffController {
 
         // 查询列表
         List<GbOrgStaffInfo> result = staffInfoService.getMiniLeaderStaffList(leaderId);
+        log.info("/leader/staff/list leaderId:{},result:{}",leaderId, JSON.toJSONString(result));
+        if(CollectionUtils.isEmpty(result)){
+            return JsonResult.success("未查询到相关员工数据");
+        }
         // 去掉列表中第一个元素，就是超级团长角色
         result.remove(0);
         List<StaffResponse> data = StaffResponse.getStaffResponseList(result);

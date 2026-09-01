@@ -5,6 +5,8 @@ import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.MoneyUtil;
 import cn.com.shopgroup.common.utils.TimeUtils;
 import cn.com.shopgroup.common.yeepay.YeepayUtils;
+import cn.com.shopgroup.goods.service.GbGoodsInfoService;
+import cn.com.shopgroup.goods.service.GbGoodsSkuInfoService;
 import cn.com.shopgroup.order.constants.PaymentStatusEnum;
 import cn.com.shopgroup.order.http.request.OrderApproveRequest;
 import cn.com.shopgroup.order.http.request.OrderRefundGoodsRequest;
@@ -63,6 +65,12 @@ public class OrderRefundController {
     private GbOrderGoodsRefundRecordService refundRecordService;
     @Resource
     private OrderTransactionLogService transactionLogService;
+
+    @Resource
+    private GbGoodsInfoService goodsService;
+
+    @Resource
+    private GbGoodsSkuInfoService skuService;
 
     // 退款订单数量
     @GetMapping("/leader/refund/count")
@@ -220,6 +228,20 @@ public class OrderRefundController {
         } else {
             // 同步原始订单表和商户订单表的退款状态
             orderBusinessInfoService.editMiniLeaderOrderBusinessRefundStatus(orderNo);
+            // 退款成功, 按实际退款数量回补库存(商品总库存 + SKU库存), 支持部分退款
+            List<GbOrderGoodsInfo> goodsList = orderInfoService.getOrderGoodsList(orderNo);
+            for (GbOrderGoodsInfo goods : goodsList) {
+                OrderRefundGoodsRequest refundGoods = request.getRefundGoodsMap().get(goods.getId());
+                int refundNum = refundGoods != null && refundGoods.getRefundNum() != null ? refundGoods.getRefundNum() : 0;
+                if (refundNum > 0) {
+                    int packNum = goods.getPackNum() == null || goods.getPackNum() == 0 ? 1 : goods.getPackNum();
+                    int stockNum = refundNum * packNum;
+                    goodsService.increaseGoodsStock(goods.getGoodsId(), stockNum);
+                    if (goods.getSkuId() != null && goods.getSkuId() > 0) {
+                        skuService.increaseGoodsStock(goods.getSkuId(), stockNum);
+                    }
+                }
+            }
             //查询该订单下是否有没有退款商品。如果没有，就改订单状态：退货，否则不改
             List<Long> orderGoodsIds = new ArrayList<>();
             for (Map.Entry<Long, OrderRefundGoodsRequest> entry : request.getRefundGoodsMap().entrySet()) {

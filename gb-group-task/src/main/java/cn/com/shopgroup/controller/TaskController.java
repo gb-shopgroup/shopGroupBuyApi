@@ -7,6 +7,7 @@ import cn.com.shopgroup.common.wxmini.WxMiniAccessTokenHelper;
 import cn.com.shopgroup.common.wxmini.WxMiniProgramHelper;
 import cn.com.shopgroup.common.yeepay.YeepayUtils;
 import cn.com.shopgroup.goods.service.GbGoodsInfoService;
+import cn.com.shopgroup.goods.service.GbGoodsSkuInfoService;
 import cn.com.shopgroup.order.model.GbOrderBusinessInfo;
 import cn.com.shopgroup.order.model.GbOrderGoodsInfo;
 import cn.com.shopgroup.order.service.GbOrderBusinessInfoService;
@@ -47,6 +48,10 @@ public class TaskController {
 
     @Resource
     private GbGoodsInfoService goodsService;
+
+    @Resource
+    private GbGoodsSkuInfoService skuService;
+
     @Resource
     private GbArticleInfoService articleInfoService;
 
@@ -185,6 +190,16 @@ public class TaskController {
             // 同步原始订单表和商户订单表的退款状态
             orderBusinessInfoService.editMiniLeaderOrderBusinessRefundStatus(orderNo);
             orderInfoService.editMiniLeaderRefundOrder(orderNo);
+            // 退款成功, 回补该订单全部商品库存(商品总库存 + SKU库存)
+            List<GbOrderGoodsInfo> goodsList = orderInfoService.getOrderGoodsList(orderNo);
+            for (GbOrderGoodsInfo goods : goodsList) {
+                int packNum = goods.getPackNum() == null || goods.getPackNum() == 0 ? 1 : goods.getPackNum();
+                int stockNum = goods.getGoodsNum() * packNum;
+                goodsService.increaseGoodsStock(goods.getGoodsId(), stockNum);
+                if (goods.getSkuId() != null && goods.getSkuId() > 0) {
+                    skuService.increaseGoodsStock(goods.getSkuId(), stockNum);
+                }
+            }
             return "ok";
         }
     }
@@ -268,6 +283,10 @@ public class TaskController {
             Integer goodsNum = item.getGoodsNum();
             Integer packNum = item.getPackNum();
             goodsService.increaseGoodsStock(goodsId, goodsNum * packNum);
+            // 回补SKU库存(下单时按skuId同步扣减)
+            if (item.getSkuId() != null && item.getSkuId() > 0) {
+                skuService.increaseGoodsStock(item.getSkuId(), goodsNum * packNum);
+            }
             log.info("恢复订单商品库存：orderNo=" + orderNo + ",goodsId=" + goodsId + ",stock=" + goodsNum * packNum);
         }
         return "ok";

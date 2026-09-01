@@ -28,11 +28,7 @@ public class GbGoodsSkuInfoServiceImpl implements GbGoodsSkuInfoService {
 
     public List<GbGoodsSkuInfo> getMiniGoodsSkuList(Long goodsId) {
         LambdaQueryWrapper<GbGoodsSkuInfo> queryWrapper = Wrappers.lambdaQuery();
-        queryWrapper.select(
-                GbGoodsSkuInfo::getSkuId,
-                GbGoodsSkuInfo::getSkuIds,
-                GbGoodsSkuInfo::getGoodsNum,
-                GbGoodsSkuInfo::getSalesPrice);
+        // 查询全部字段, 保证前端能拿到 skuNames/skuImages/marketPrice 等完整SKU信息(后台自动生成SKU后展示依赖)
         queryWrapper.eq(GbGoodsSkuInfo::getIsClose, 0);
         queryWrapper.eq(GbGoodsSkuInfo::getGoodsId, goodsId);
         List<GbGoodsSkuInfo> result = mapper.selectList(queryWrapper);
@@ -95,8 +91,11 @@ public class GbGoodsSkuInfoServiceImpl implements GbGoodsSkuInfoService {
 
     public Boolean reduceGoodsStock(Long skuId, Integer goodsNum) {
 
+        int num = Math.abs(goodsNum);
         LambdaUpdateWrapper<GbGoodsSkuInfo> updateWrapper = Wrappers.lambdaUpdate();
-        updateWrapper.setSql("goods_num = goods_num - {0}", Math.abs(goodsNum));
+        // 原子扣减并防超扣: 仅当库存 >= 扣减数时才更新, 否则返回false表示库存不足
+        updateWrapper.setSql("goods_num = goods_num - {0}", num);
+        updateWrapper.ge(GbGoodsSkuInfo::getGoodsNum, num);
         updateWrapper.eq(GbGoodsSkuInfo::getSkuId, skuId);
         int flag = mapper.update(updateWrapper);
         return flag > 0 ? true : false;

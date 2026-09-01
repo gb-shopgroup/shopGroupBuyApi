@@ -169,7 +169,8 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
             }
         }
         if (StringUtil.isNotEmpty(activityName)) {
-            queryWrapper.eq(GbGroupActivityInfo::getGroupName, activityName);
+            // 团购名称模糊搜索
+            queryWrapper.like(GbGroupActivityInfo::getGroupName, activityName);
         }
         int cid = Optional.ofNullable(catId).orElse(0L).intValue();
         if(cid != 0 ){
@@ -182,10 +183,29 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
     }
 
 
-    public Long getMiniLeaderGroupCount(Long leaderId) {
-
+    public Long getMiniLeaderGroupCount(Long leaderId, Long catId, String activityName, int status) {
+        // 筛选条件与 getMiniLeaderGroupList 保持一致, 保证分页总页数正确
         LambdaQueryWrapper<GbGroupActivityInfo> queryWrapper = Wrappers.lambdaQuery();
         queryWrapper.eq(GbGroupActivityInfo::getLeaderId, leaderId);
+        Integer nowTime = TimeUtils.getTimeStamp();
+        if (status == 1) {
+            queryWrapper.eq(GbGroupActivityInfo::getIsClose, (byte) 0);
+            queryWrapper.le(GbGroupActivityInfo::getStartTime, nowTime).ge(GbGroupActivityInfo::getEndTime, nowTime);
+        }
+        if (status == 2) {
+            queryWrapper.eq(GbGroupActivityInfo::getIsClose, (byte) 0);
+            queryWrapper.ge(GbGroupActivityInfo::getStartTime, nowTime);
+        }
+        if (status == 3) {
+            queryWrapper.le(GbGroupActivityInfo::getEndTime, nowTime);
+        }
+        if (StringUtil.isNotEmpty(activityName)) {
+            queryWrapper.like(GbGroupActivityInfo::getGroupName, activityName);
+        }
+        int cid = Optional.ofNullable(catId).orElse(0L).intValue();
+        if (cid != 0) {
+            queryWrapper.eq(GbGroupActivityInfo::getCatId, catId);
+        }
         return mapper.selectCount(queryWrapper);
     }
 
@@ -204,8 +224,9 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
         data.setGroupPrice(info.getGroupPrice());
         data.setGroupPrice2(info.getGroupPrice2());
         data.setMarketPrice(info.getMarketPrice());
-        data.setStartTime(0);
-        data.setEndTime(0);
+        // 开团/结束时间以提交为准, 未传时默认 0
+        data.setStartTime(Optional.ofNullable(info.getStartTime()).orElse(0));
+        data.setEndTime(Optional.ofNullable(info.getEndTime()).orElse(0));
         data.setGroupInfo(info.getGroupInfo());
         data.setOrderTotal(0);
         data.setVirtualOrder(info.getVirtualOrder());
@@ -244,6 +265,11 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
         updateWrapper.set(GbGroupActivityInfo::getMarketPrice, info.getMarketPrice());
         updateWrapper.set(GbGroupActivityInfo::getGroupInfo, info.getGroupInfo());
         updateWrapper.set(GbGroupActivityInfo::getVirtualOrder, info.getVirtualOrder());
+        // 提货方式/开团结束时间同步更新
+        updateWrapper.set(GbGroupActivityInfo::getPickupStyle, info.getPickupStyle());
+        updateWrapper.set(GbGroupActivityInfo::getStartTime, info.getStartTime());
+        updateWrapper.set(GbGroupActivityInfo::getEndTime, info.getEndTime());
+        updateWrapper.set(GbGroupActivityInfo::getStaffName, info.getStaffName());
         updateWrapper.eq(GbGroupActivityInfo::getGroupId, info.getGroupId());
         updateWrapper.eq(GbGroupActivityInfo::getLeaderId, leaderId);
         int flag = mapper.update(updateWrapper);
