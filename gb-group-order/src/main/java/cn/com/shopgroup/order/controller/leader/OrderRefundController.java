@@ -83,10 +83,10 @@ public class OrderRefundController {
         }
 
         // 从请求头中获取员工id
-        Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
-        if (staffId == 0) {
-            return JsonResult.fail("sid不存在");
-        }
+//        Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
+//        if (staffId == 0) {
+//            return JsonResult.fail("sid不存在");
+//        }
 
         // 查询总数
         Long total = orderInfoService.getMiniLeaderOrderCount(leaderId, groupId, pointId, 4);
@@ -104,8 +104,15 @@ public class OrderRefundController {
         }
         // 从请求头中获取员工id
         Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
-        if (staffId == 0) {
-            return JsonResult.fail("sid不存在");
+        Long opId = leaderId;
+        String opName = "团长本人";
+        if (staffId != 0) {
+            GbOrgStaffInfo staffInfo = staffService.getStaffInfo(staffId);
+            if (ObjectUtils.isEmpty(staffInfo)) {
+                return JsonResult.fail("staffId=" + staffId + "未查询到相关员工数据");
+            }
+            opName = staffInfo.getStaffName();
+            opId = staffInfo.getStaffId();
         }
         // 操作人员
         GbOrgStaffInfo staffInfo = staffService.getStaffInfo(staffId);
@@ -153,15 +160,16 @@ public class OrderRefundController {
                     }
                 }
             }
+
             //同意处理
             if (approveStatus == 1) {
-                int m = handleAgree(staffInfo, orderInfo, refundInfoRequest, reason);
+                int m = handleAgree(leaderId, opId, opName, orderInfo, refundInfoRequest, reason);
                 if (m == 0) {
                     continue;
                 }
             } else {
                 //拒绝
-                handleRefuse(staffInfo, refundInfoRequest, reason);
+                handleRefuse(leaderId, opId, opName, refundInfoRequest, reason);
             }
         }
         // 返回
@@ -169,11 +177,10 @@ public class OrderRefundController {
     }
 
     //拒绝（不同意）处理
-    public void handleRefuse(GbOrgStaffInfo staffInfo, OrderRefundInfoRequest request, String reason) {
+    public void handleRefuse(Long leaderId, Long opId, String opName, OrderRefundInfoRequest request, String reason) {
         String orderNo = request.getOrderNo();
-        String staffName = staffInfo.getStaffName();
         // 拒绝退款
-        orderInfoService.editMiniLeaderRefundOrder(orderNo, staffName, reason);
+        orderInfoService.editMiniLeaderRefundOrder(orderNo, opName, reason);
         //拒绝请求过来的订单商品
         List<Long> orderGoodsIds = new ArrayList<>();
         for (Map.Entry<Long, OrderRefundGoodsRequest> entry : request.getRefundGoodsMap().entrySet()) {
@@ -184,8 +191,8 @@ public class OrderRefundController {
         orderInfoService.updateOrderGoodsApplyStatus(orderNo, orderGoodsIds, 3);
         //插入退货记录售后日志
         GbOrderGoodsRefundRecord refundRecord = new GbOrderGoodsRefundRecord();
-        refundRecord.setOperateId(staffInfo.getStaffId());
-        refundRecord.setOperateName(staffInfo.getStaffName());
+        refundRecord.setOperateId(opId);
+        refundRecord.setOperateName(opName);
         refundRecord.setIsAgree(2);//不同意
         refundRecord.setOrderNo(orderNo);
         refundRecord.setActionReason(reason);
@@ -197,12 +204,12 @@ public class OrderRefundController {
         // 添加日志, 消息类型: 1=系统消息2=内部消息3=业务消息
         Byte type = 2;
         String oper = "拒绝了";
-        String content = staffName + " " + oper + " 订单号(" + orderNo + ") 的退款订单。";
-        messageService.addMiniLeaderMessageInfo(staffInfo.getLeaderId(), staffInfo.getStaffId(), type, content);
+        String content = opName + " " + oper + " 订单号(" + orderNo + ") 的退款订单。";
+        messageService.addMiniLeaderMessageInfo(leaderId, opId, type, content);
     }
 
     //同意退款处理
-    public int handleAgree(GbOrgStaffInfo staffInfo, GbOrderInfo orderInfo, OrderRefundInfoRequest request, String reason) {
+    public int handleAgree(Long leaderId, Long opId, String opName, GbOrderInfo orderInfo, OrderRefundInfoRequest request, String reason) {
         // 申请退款账户
         String merchantNo = orderInfo.getMerchantNo();
         String orderNo = orderInfo.getOrderNo();
@@ -212,11 +219,11 @@ public class OrderRefundController {
         //插入交易流水表
         OrderTransactionLog transactionLog = new OrderTransactionLog();
         transactionLog.setOrderNo(orderNo);
-        transactionLog.setTransactionNo("tr"+CustomIdGenerator.generateUUID());
+        transactionLog.setTransactionNo("tr" + CustomIdGenerator.generateUUID());
         transactionLog.setPayAmount(amount);
         transactionLog.setPayMethod("yeePay");
-        transactionLog.setOperatorId(staffInfo.getStaffId());
-        transactionLog.setOperatorName(staffInfo.getStaffName());
+        transactionLog.setOperatorId(opId);
+        transactionLog.setOperatorName(opName);
         transactionLog.setAddTime(TimeUtils.getTimeStamp());
         transactionLog.setPayStatus(PaymentStatusEnum.REFUNDED.getCode());
         // 查看是否成功
@@ -252,8 +259,8 @@ public class OrderRefundController {
             orderInfoService.updateOrderGoodsApplyStatus(orderNo, orderGoodsIds, 2);
             //插入退货记录售后日志
             GbOrderGoodsRefundRecord refundRecord = new GbOrderGoodsRefundRecord();
-            refundRecord.setOperateId(staffInfo.getStaffId());
-            refundRecord.setOperateName(staffInfo.getStaffName());
+            refundRecord.setOperateId(opId);
+            refundRecord.setOperateName(opName);
             refundRecord.setIsAgree(1);//同意退款
             refundRecord.setOrderNo(orderNo);
             refundRecord.setActionReason(reason);
@@ -270,8 +277,8 @@ public class OrderRefundController {
             // 添加日志, 消息类型: 1=系统消息2=内部消息3=业务消息
             byte type = 2;
             String oper = "通过了";
-            String content = staffInfo.getStaffName() + " " + oper + " 订单号(" + orderNo + ") 的退款订单。";
-            messageService.addMiniLeaderMessageInfo(staffInfo.getLeaderId(), staffInfo.getStaffId(), type, content);
+            String content = opName + " " + oper + " 订单号(" + orderNo + ") 的退款订单。";
+            messageService.addMiniLeaderMessageInfo(leaderId, opId, type, content);
             // 返回 成功标识
             transactionLog.setRemark("退款成功");
             handleInsertTransaction(transactionLog);

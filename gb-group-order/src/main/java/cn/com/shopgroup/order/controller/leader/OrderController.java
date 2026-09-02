@@ -175,8 +175,13 @@ public class OrderController {
         }
         // 从请求头中获取员工id
         Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
-        if (staffId == 0) {
-            return JsonResult.fail("sid不存在");
+        String opName = "团长本人";
+        if (staffId != 0) {
+            GbOrgStaffInfo staffInfo = staffService.getStaffInfo(staffId);
+            if (ObjectUtils.isEmpty(staffInfo)) {
+                return JsonResult.fail("staffId=" + staffId + "未查询到相关员工数据");
+            }
+            opName = staffInfo.getStaffName();
         }
         // 查看订单是否已经被核销
         GbOrderInfo orderInfo = orderInfoService.getOrderInfoByOrderNo(orderNo);
@@ -199,10 +204,7 @@ public class OrderController {
         }
         // 开始核销
         String pointName = "";
-        GbOrgStaffInfo staffInfo = staffService.getStaffInfo(staffId);
-        if (ObjectUtils.isEmpty(staffInfo)) {
-            return JsonResult.fail("staffId=" + staffId + "未查询到相关员工数据");
-        }
+
         GbOrgPointInfo pointInfo = pointService.getPointInfo(pointId);
         if (ObjectUtils.isEmpty(pointInfo)) {
             return JsonResult.fail("pointId=" + pointId + "未查询到相关point数据");
@@ -211,7 +213,7 @@ public class OrderController {
             pointName = pointInfo.getPointName();
         }
         String receiptCode = orderInfo.getReceiptCode();
-        Boolean flag = orderInfoService.receiptMiniLeaderOrder(leaderId, orderNo, receiptCode, staffId, staffInfo.getStaffName(), pointId, pointName);
+        Boolean flag = orderInfoService.receiptMiniLeaderOrder(leaderId, orderNo, receiptCode, staffId, opName, pointId, pointName);
         // 同步分账订单表, 核销之后的订单才能分账, 这样只要不核销订单, 就可以随时退款
         businessService.updateBusinessOrderCheckStatus(orderNo);
         // 返回结果
@@ -234,8 +236,13 @@ public class OrderController {
         }
         // 从请求头中获取员工id
         Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
-        if (staffId == 0) {
-            return JsonResult.fail("sid不存在");
+        String opName = "团长本人";
+        if (staffId != 0) {
+            GbOrgStaffInfo staffInfo = staffService.getStaffInfo(staffId);
+            if (ObjectUtils.isEmpty(staffInfo)) {
+                return JsonResult.fail("staffId=" + staffId + "未查询到相关员工数据");
+            }
+            opName = staffInfo.getStaffName();
         }
         // 查看订单是否已经被核销
         GbOrderInfo orderInfo = orderInfoService.getOrderInfoByOrderNo(request.getOrderNo());
@@ -271,10 +278,6 @@ public class OrderController {
         }
         // 开始核销
         String pointName = "";
-        GbOrgStaffInfo staffInfo = staffService.getStaffInfo(staffId);
-        if (ObjectUtils.isEmpty(staffInfo)) {
-            return JsonResult.fail("staffId=" + staffId + "未查询到相关员工数据");
-        }
         if (request.getPid() > 0) {
             GbOrgPointInfo pointInfo = pointService.getPointInfo(request.getPid());
             if (ObjectUtils.isEmpty(pointInfo)) {
@@ -283,7 +286,7 @@ public class OrderController {
             pointName = pointInfo.getPointName();
         }
         String receiptCode = orderInfo.getReceiptCode();
-        Boolean flag = orderInfoService.receiptMiniLeaderOrder(leaderId, request.getOrderNo(), receiptCode, staffId, staffInfo.getStaffName(), request.getPid(), pointName, goodsList);
+        Boolean flag = orderInfoService.receiptMiniLeaderOrder(leaderId, request.getOrderNo(), receiptCode, staffId, opName, request.getPid(), pointName, goodsList);
         // 同步分账订单表, 核销之后的订单才能分账, 这样只要不核销订单, 就可以随时退款
         businessService.updateBusinessOrderCheckStatus(orderInfo.getOrderNo());
         // 返回结果
@@ -303,10 +306,10 @@ public class OrderController {
             return JsonResult.fail("lid不存在");
         }
         // 从请求头中获取员工id
-        Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
-        if (staffId == 0) {
-            return JsonResult.fail("sid不存在");
-        }
+//        Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
+//        if (staffId == 0) {
+//            return JsonResult.fail("sid不存在");
+//        }
         // 查询订单
         GbOrderBusinessInfo orderInfo = businessService.getOrderBusinessInfo(orderNo);
         if (ObjectUtils.isEmpty(orderInfo)) {
@@ -344,10 +347,10 @@ public class OrderController {
             return JsonResult.fail("lid不存在");
         }
         // 从请求头中获取员工id
-        Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
-        if (staffId == 0) {
-            return JsonResult.fail("sid不存在");
-        }
+//        Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
+//        if (staffId == 0) {
+//            return JsonResult.fail("sid不存在");
+//        }
         // 返回的数据
         LeaderHomeShowDataResponse response = new LeaderHomeShowDataResponse();
         Integer orderTotal = 0;

@@ -60,4 +60,8 @@ public class RedisConstant {
     public final static String RedisSysAdminTokenKey = "SysAdminToken:";
 
 
+    public final static long RedisMemberTokenExpired = 30*24*60*60;
+    public final static String RedisMemberTokenKey = "MemberToken:";
+
+
 }

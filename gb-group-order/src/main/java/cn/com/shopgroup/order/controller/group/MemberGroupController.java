@@ -21,6 +21,7 @@ import cn.com.shopgroup.user.service.GbOrgShopInfoService;
 import io.swagger.annotations.Api;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.ObjectUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -174,6 +175,9 @@ public class MemberGroupController {
 
             // 查询数据库
             GbOrgShopInfo info = shopService.getMiniLeaderShop(leaderId);
+            if (ObjectUtils.isEmpty(info)) {
+                return JsonResult.success();
+            }
             ShopResponse data = new ShopResponse(info);
 
             // 缓存起来

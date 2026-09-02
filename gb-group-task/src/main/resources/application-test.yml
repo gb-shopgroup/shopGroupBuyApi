@@ -72,4 +72,4 @@ spring:
     port: 6379
     #username: xxxxxxxxxxx
     ###password: 12345678
-    database: 1
+    database: 2

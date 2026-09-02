@@ -23,7 +23,7 @@
         SELECT
         <include refid="Base_Column_List"/>
         FROM gb_org_shop_info
-        WHERE leader_id = #{leaderId} order by id desc
+        WHERE leader_id = #{leaderId} order by id desc limit 1
     </select>
 
 </mapper>

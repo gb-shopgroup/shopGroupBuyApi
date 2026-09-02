@@ -151,17 +151,16 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
         //(1、团长团查询 2 用户端查询)
         LambdaQueryWrapper<GbGroupActivityInfo> queryWrapper = Wrappers.lambdaQuery();
         queryWrapper.eq(GbGroupActivityInfo::getLeaderId, leaderId);
+        Integer nowTime = TimeUtils.getTimeStamp();
         if (flag == 2) {
+            queryWrapper.le(GbGroupActivityInfo::getStartTime, nowTime).ge(GbGroupActivityInfo::getEndTime, nowTime);
             queryWrapper.eq(GbGroupActivityInfo::getIsClose, (byte) 0);
         } else {
             //status 状态：0 全部  1 活动中 2 未开始 3 已结束 \\ 开团时间 start_time / end_time
-            Integer nowTime = TimeUtils.getTimeStamp();
             if (status == 1) {
-                queryWrapper.eq(GbGroupActivityInfo::getIsClose, (byte) 0);
                 queryWrapper.le(GbGroupActivityInfo::getStartTime, nowTime).ge(GbGroupActivityInfo::getEndTime, nowTime);
             }
             if (status == 2) {
-                queryWrapper.eq(GbGroupActivityInfo::getIsClose, (byte) 0);
                 queryWrapper.ge(GbGroupActivityInfo::getStartTime, nowTime);
             }
             if (status == 3) {

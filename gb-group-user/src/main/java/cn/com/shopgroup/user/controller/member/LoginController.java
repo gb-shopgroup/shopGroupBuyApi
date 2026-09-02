@@ -1,5 +1,6 @@
 package cn.com.shopgroup.user.controller.member;
 
+import cn.com.shopgroup.common.cache.RedisConstant;
 import cn.com.shopgroup.common.cache.RedisHelper;
 import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.TimeUtils;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.Resource;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/user")
@@ -99,6 +101,9 @@ public class LoginController {
         // 设置token
         data.setToken(token);
 
+        // 记录登录态到Redis(30天有效), 用于退出登录时清除
+        redisHelper.setCacheObject(RedisConstant.RedisMemberTokenKey + result.getMemberId(), token, RedisConstant.RedisMemberTokenExpired, TimeUnit.SECONDS);
+
         // 返回
         return JsonResult.success(data);
     }
@@ -114,6 +119,8 @@ public class LoginController {
             LoginMemberResponse data = new LoginMemberResponse(results);
             String token = TokenUtils.createToken(String.valueOf(results.getMemberId()));
             data.setToken(token);
+            // 记录登录态到Redis(30天有效), 用于退出登录时清除
+            redisHelper.setCacheObject(RedisConstant.RedisMemberTokenKey + results.getMemberId(), token, RedisConstant.RedisMemberTokenExpired, TimeUnit.SECONDS);
             return JsonResult.success(data);
         }
 
@@ -135,6 +142,9 @@ public class LoginController {
         // 生成token
         String token = TokenUtils.createToken(String.valueOf(memberId));
 
+        // 记录登录态到Redis(30天有效), 用于退出登录时清除
+        redisHelper.setCacheObject(RedisConstant.RedisMemberTokenKey + memberId, token, RedisConstant.RedisMemberTokenExpired, TimeUnit.SECONDS);
+
         // 响应数据
         LoginMemberResponse result = new LoginMemberResponse();
         //result.setId(memberId);
@@ -144,6 +154,29 @@ public class LoginController {
         result.setOpenid(request.getOpenid());
         result.setToken(token);
         return JsonResult.success(result);
+    }
+
+    // 退出登录(小程序调用): 清除服务端登录态, 小程序端需同步删除本地token
+    @PostMapping("/logout")
+    public JsonResult logout() {
+
+        // 获取请求头中的token
+        String token = TokenUtils.getToken();
+        if (token == null || token.length() == 0) {
+            return JsonResult.fail("token不存在");
+        }
+
+        // 解析token获取用户id
+        String userId = TokenUtils.parseToken(token);
+        if (userId == null || userId.length() == 0 || userId.matches("^[0-9]+$") == false) {
+            return JsonResult.fail("用户不存在");
+        }
+
+        // 清除该用户在Redis中的登录态
+        redisHelper.deleteObject(RedisConstant.RedisMemberTokenKey + userId);
+
+        // 返回
+        return JsonResult.success();
     }
 
 

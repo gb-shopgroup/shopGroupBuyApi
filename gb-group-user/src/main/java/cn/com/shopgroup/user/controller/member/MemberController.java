@@ -1,5 +1,6 @@
 package cn.com.shopgroup.user.controller.member;
 
+import cn.com.shopgroup.common.cache.RedisConstant;
 import cn.com.shopgroup.common.cache.RedisHelper;
 import cn.com.shopgroup.common.utils.IntEncryptorUtils;
 import cn.com.shopgroup.common.utils.JsonResult;
@@ -28,6 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
 import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @RestController
@@ -88,6 +90,9 @@ public class MemberController {
         String token2 = TokenUtils.createToken(String.valueOf(result.getMemberId()));
         // 设置token
         data.setToken(token2);
+
+        // 更新Redis登录态(30天有效), 用于退出登录时清除
+        redisHelper.setCacheObject(RedisConstant.RedisMemberTokenKey + result.getMemberId(), token2, RedisConstant.RedisMemberTokenExpired, TimeUnit.SECONDS);
 
         // 返回数据
         return JsonResult.success(data);

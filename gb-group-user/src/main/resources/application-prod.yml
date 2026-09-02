@@ -71,7 +71,7 @@ spring:
     port: 6379
     #username: xxxxxxxxxxx
     password: 3oq923T89#$o24sed
-    database: 1
+    database: 2
     lettuce:
       pool:
         # 连接池最小空闲连接数（默认0）

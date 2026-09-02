@@ -56,7 +56,7 @@ spring:
     port: 6379
     #username: xxxxxxxxxxx
     ###password: 12345678
-    database: 1
+    database: 2
 # 图片上传配置
 upload-config:
   type: 1 # 1=本地上传, 2=云端上传
