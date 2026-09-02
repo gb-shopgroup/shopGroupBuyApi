@@ -110,7 +110,9 @@ public class LeaderPointController {
 
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
-        if (leaderId == 0) return JsonResult.fail("lid不存在");
+        if (leaderId == 0){
+            return JsonResult.fail("lid不存在");
+        }
 
         // 修改信息
         GbOrgPointInfo data = new GbOrgPointInfo();

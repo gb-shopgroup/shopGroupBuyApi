@@ -106,10 +106,13 @@ public class MemberGroupController {
         String activityName = request.getName();
         Long leaderId = request.getLeaderId();
         // 查询列表(flag 1、团长团查询 2 用户端查询) -7 不做任何处理，填充参数
-        List<GbGroupActivityInfo> result = groupActivityInfoService.getMiniLeaderGroupList(2, leaderId, request.getCatId(),activityName, -7, page, pageSize);
+        List<GbGroupActivityInfo> result = groupActivityInfoService.getMiniLeaderGroupList(2, leaderId, request.getCatId(), activityName, -7, page, pageSize);
         List<MemberHomeGroupActResponse> data = MemberHomeGroupActResponse.getGroupActResponseList(result);
         // g
         fillGroupLogList(data);
+        for (MemberHomeGroupActResponse item : data) {
+            item.setOrder(this.getRedisOrderTotal(item.getId(), item.getVirtual()));
+        }
         return JsonResult.success(data);
     }
 

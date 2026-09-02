@@ -11,6 +11,7 @@ import cn.com.shopgroup.user.utils.RequestParamsUtils;
 import com.alibaba.fastjson2.JSON;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.ObjectUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -42,13 +43,15 @@ public class StaffController {
 
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
-        if (leaderId == 0) return JsonResult.fail("lid不存在");
+        if (leaderId == 0) {
+            return JsonResult.fail("lid不存在");
+        }
 
         // 查询列表
         List<GbOrgStaffInfo> result = staffInfoService.getMiniLeaderStaffList(leaderId);
-        log.info("/leader/staff/list leaderId:{},result:{}",leaderId, JSON.toJSONString(result));
-        if(CollectionUtils.isEmpty(result)){
-            return JsonResult.success("未查询到相关员工数据");
+        log.info("/leader/staff/list leaderId:{},result:{}", leaderId, JSON.toJSONString(result));
+        if (CollectionUtils.isEmpty(result)) {
+            return JsonResult.success();
         }
         // 去掉列表中第一个元素，就是超级团长角色
         result.remove(0);
@@ -106,6 +109,9 @@ public class StaffController {
 
         // 查询旧的用户信息
         GbOrgStaffInfo staffInfo = staffInfoService.getStaffInfo(request.getId());
+        if (ObjectUtils.isEmpty(staffInfo)) {
+            return JsonResult.fail("修改员工后参数ID查不到信息");
+        }
 
         // 新的员工信息
         GbOrgStaffInfo newStaffInfo = new GbOrgStaffInfo();
@@ -157,7 +163,9 @@ public class StaffController {
 
         // 从请求头中获取当前员工id
         Long sid = RequestParamsUtils.getRequestHeaderStaffId();
-        if (sid == 0) return JsonResult.fail("sid不存在");
+        if (sid == 0){
+            return JsonResult.fail("sid不存在");
+        }
 
         // 不能自己关闭自己
         if (staffId == sid) {
@@ -186,7 +194,7 @@ public class StaffController {
         if (staffId == leaderId) {
             return JsonResult.fail("不能删除自己");
         }
-        int m = staffInfoService.removeStaff(leaderId,staffId);
+        int m = staffInfoService.removeStaff(leaderId, staffId);
         return JsonResult.success("操作成功");
     }
 

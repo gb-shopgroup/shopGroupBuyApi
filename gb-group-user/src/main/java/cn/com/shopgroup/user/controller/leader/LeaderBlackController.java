@@ -53,19 +53,24 @@ public class LeaderBlackController {
         if (leaderId == 0) {
             return JsonResult.fail("lid不存在");
         }
-
+        // 构建黑名单数据
+        GbMemberBlackList data = new GbMemberBlackList();
         // 从请求头中获取员工id
         Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
-        if (staffId == 0) {
-            return JsonResult.fail("sid不存在");
+        if (staffId != 0) {
+            // 查询店员
+            GbOrgStaffInfo staffInfo = staffService.getStaffInfo(staffId);
+            if(ObjectUtils.isEmpty(staffInfo)){
+                return JsonResult.fail("查询员工信息有误");
+            }
+            data.setStaffId(staffInfo.getStaffId());
+            data.setStaffName(staffInfo.getStaffName());
         }
         // 是否已经添加黑名单
         boolean isExists = blackService.getMemberBlackById(leaderId, memberId);
         if (isExists) {
             return JsonResult.fail("已经添加黑名单了");
         }
-        // 构建黑名单数据
-        GbMemberBlackList data = new GbMemberBlackList();
         // 查询用户信息
         GbMemberInfo info = memberInfoService.getMemberInfo(memberId);
         if (ObjectUtils.isEmpty(info)) {
@@ -75,10 +80,6 @@ public class LeaderBlackController {
         data.setMobile(info.getMobile());
         data.setNickName(info.getNickname());
         data.setAvatar(info.getAvatar());
-        // 查询店员
-        GbOrgStaffInfo staffInfo = staffService.getStaffInfo(staffId);
-        data.setStaffId(staffInfo.getStaffId());
-        data.setStaffName(staffInfo.getStaffName());
         // 写入数据库
         boolean isSuccess = blackService.addMemberBlack(leaderId, data);
         if (isSuccess) {
@@ -115,11 +116,6 @@ public class LeaderBlackController {
         if (leaderId == 0) {
             return JsonResult.fail("lid不存在");
         }
-        // 从请求头中获取员工id
-        Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
-        if (staffId == 0) {
-            return JsonResult.fail("sid不存在");
-        }
         // 解除黑名单
         boolean isSuccess = blackService.removeMemberBlack(leaderId, memberId);
         if (isSuccess) {
@@ -137,11 +133,6 @@ public class LeaderBlackController {
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
             return JsonResult.fail("lid不存在");
-        }
-        // 从请求头中获取员工id
-        Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
-        if (staffId == 0) {
-            return JsonResult.fail("sid不存在");
         }
 
         // 请求参数矫正
@@ -162,11 +153,6 @@ public class LeaderBlackController {
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
             return JsonResult.fail("lid不存在");
-        }
-        // 从请求头中获取员工id
-        Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
-        if (staffId == 0) {
-            return JsonResult.fail("sid不存在");
         }
         // 查询数量
         long total = blackService.getMemberBlackCount(leaderId);
