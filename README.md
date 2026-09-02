@@ -135,7 +135,7 @@ Maven 依赖仓库使用阿里云镜像（`https://maven.aliyun.com/repository/p
 
 ### 4.5 gb-group-order — 订单 / 支付 / 分账服务
 
-覆盖：下单、订单查询、核销（整单 / 部分核销）、退款（申请 / 审批 / 回调）、微信发货、易宝支付发起与回调、团长数据汇总、报表查询等。**44 个接口**。
+覆盖：下单、订单查询、核销（整单 / 部分核销）、退款（申请 / 审批 / 回调）、微信发货、易宝支付发起与回调、团长数据汇总、报表查询，以及团长端「我的团员」（含团购查看埋点，数据表 `gb_group_view_log`）等。**47 个接口**。
 
 ### 4.6 gb-group-admin — 平台管理后台服务
 
@@ -159,9 +159,9 @@ Maven 依赖仓库使用阿里云镜像（`https://maven.aliyun.com/repository/p
 | 图片存储 | 华为云 OBS：`shopgroup.obs.cn-north-9.myhuaweicloud.com`（公有）/ 私有访问经 `https://api.shopgroup.com.cn/image/access` |
 | 支付回调 | `https://api.shopgroup.com.cn/group/order/notify` |
 
-> 建表脚本见 **`sql/group_purchase.sql`**（共 50 张表，从开发库 `group_purchase` 直接导出，仅含表结构）。
+> 建表脚本见 **`sql/group_purchase.sql`**（50 张表，从开发库 `group_purchase` 直接导出，仅含表结构）；后续新增的表单独建脚本，位于 `sql/` 下（如 `sql/gb_group_view_log.sql`），需在对应环境单独执行。
 
-### 5.2 核心表清单（共 50 张）
+### 5.2 核心表清单（共 51 张）
 
 | 表名 | 说明 |
 | --- | --- |
@@ -185,6 +185,7 @@ Maven 依赖仓库使用阿里云镜像（`https://maven.aliyun.com/repository/p
 | `gb_group_sales_info` | 团购帮卖信息表 |
 | `gb_group_sales_price` | 团购帮卖价格表 |
 | `gb_group_sales_set` | 团购帮卖设置表 |
+| `gb_group_view_log` | 团购查看记录表（用户浏览团购详情埋点，团长端"我的团员"查看次数/动态数据源） |
 | `gb_image_library_info` | 图片库信息表 |
 | `gb_member_address_info` | 用户/会员地址表 |
 | `gb_member_blacklist` | 黑名单信息表 |
@@ -216,7 +217,7 @@ Maven 依赖仓库使用阿里云镜像（`https://maven.aliyun.com/repository/p
 | `gb_sys_config_info` | 系统配置信息表 |
 | `gb_sys_user_info` | 系统用户信息表 |
 
-> 业务域分布：**商品域**（9 表）、**团购域**（9 表）、**用户域**（4 表）、**订单域**（5 表）、**团长/商户域**（11 表）、**内容域**（3 表）、**区域域**（2 表）、**报表域**（5 表）、**系统域**（2 表），合计 50 张。
+> 业务域分布：**商品域**（9 表）、**团购域**（10 表，含新增 `gb_group_view_log` 查看埋点表）、**用户域**（4 表）、**订单域**（5 表）、**团长/商户域**（11 表）、**内容域**（3 表）、**区域域**（2 表）、**报表域**（5 表）、**系统域**（2 表），合计 51 张。
 
 ---
 
@@ -303,7 +304,7 @@ mvn -pl gb-group-task spring-boot:run
 | `page` / `pageSize` | 页码（从 1 开始）/ 每页条数 |
 | `start` / `end` | 开始时间 / 结束时间（如 yyyy-MM-dd） |
 
-- **接口数量统计**：user 43 个、order 44 个、goods 21 个、admin 25 个、task 8 个，合计 **141 个**。
+- **接口数量统计**：user 43 个、order 47 个、goods 21 个、admin 25 个、task 8 个，合计 **144 个**。
 - **详细版接口文档**（含每个接口的完整入参 / 出参字段说明，参数含义、必填、嵌套字段均已细化）见根目录 **`API接口文档.md`**，可通过 `python3 generate_api_doc.py` 扫描各模块 `*Controller.java` 重新生成。下方为接口总览清单。
 
 ### 8.2 接口清单
@@ -413,7 +414,7 @@ mvn -pl gb-group-task spring-boot:run
 | 1 | GET | `/user/member/info` | 根据 token 获取用户信息 | 无 |
 | 2 | GET | `/user/member/isleader` | 是否团长身份 | 无 |
 
-#### 8.2.2 gb-group-order（订单/退款/分账）— 44 个接口
+#### 8.2.2 gb-group-order（订单/退款/分账）— 47 个接口
 
 **OrderBusinessController**（`cn.com.shopgroup.order.controller`）
 
@@ -446,6 +447,14 @@ mvn -pl gb-group-task spring-boot:run
 | 5 | GET | `/order/group/groupActivity/shop` | 团长店铺详情 | **leaderId** (Long) |
 | 6 | GET | `/order/group/groupActivity/logs` | 晚上时间只生成固定跟团记录（锁定在19:00-20:00生成的订单）。 | **groupId** (Long) |
 | 7 | GET | `/order/group/groupActivity/logs2` | 团购记录(跟团记录), 滚动部分 | **id** (Long) |
+| 8 | POST | `/order/group/groupActivity/view` | 用户查看团购详情埋点上报（打开详情服务端自动埋点, 可显式调用; 60秒内同团购去重） | Body: **request** (MemberGroupViewRequest, JSON) |
+
+**LeaderMemberController**（`cn.com.shopgroup.order.controller.leader`）
+
+| 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
+| --- | --- | --- | --- | --- |
+| 1 | POST | `/order/leader/member/list` | 我的团员列表（手机号/昵称搜索, 分页；含消费/跟团次数/查看次数/最近动态） | **lid** (Header); Body: **request** (LeaderMemberListRequest, JSON) |
+| 2 | GET | `/order/leader/member/detail` | 团员详情（消费/退款/跟团次数/查看次数/动态, 动态=跟团下单+查看合并按天分组） | **lid** (Header); **memberId** (Long) |
 
 **MemberOrderController**（`cn.com.shopgroup.order.controller.group`）
 
@@ -646,7 +655,8 @@ mvn -pl gb-group-task spring-boot:run
 ShopGroupBuyApi/
 ├── pom.xml                    # 父 POM（依赖版本管理）
 ├── sql/                       # 数据库脚本目录
-│   └── group_purchase.sql     # 建表语句（50 张表，从 MySQL 直接导出）
+│   ├── group_purchase.sql     # 建表语句（50 张表，从 MySQL 直接导出）
+│   └── gb_group_view_log.sql  # 团购查看埋点表（新增, 需单独执行）
 ├── generate_api_doc.py        # 接口文档自动生成脚本（同步更新 README 接口清单）
 ├── API接口文档.md              # 接口文档（自动生成）
 ├── README.md                  # 项目说明文档（本文档）

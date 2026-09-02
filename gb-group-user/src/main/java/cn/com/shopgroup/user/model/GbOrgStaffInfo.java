@@ -40,7 +40,7 @@ public class GbOrgStaffInfo {
     // 权限设置,json格式
     @TableField("auth_list")
     private String authList;
-    // 是否禁用
+    // 是否禁用0 正常 1 关闭
     @TableField("is_close")
     private Byte isClose;
     // 添加时间

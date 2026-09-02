@@ -15,7 +15,7 @@
 ## 目录
 
 1. **gb-group-user**（用户/团长/员工）— 43 个接口
-2. **gb-group-order**（订单/退款/分账）— 44 个接口
+2. **gb-group-order**（订单/退款/分账）— 47 个接口
 3. **gb-group-goods**（商品/团购）— 21 个接口
 4. **gb-group-admin**（后台管理）— 25 个接口
 5. **gb-group-task**（定时任务）— 8 个接口
@@ -24,7 +24,7 @@
 
 ## 接口总览索引
 
-> 共 141 个接口，按下表序号定位到下方各模块接口详情；「功能说明」列为 `—` 表示源码无方法注释，可按入参 / 出参字段推断用途。
+> 共 144 个接口，按下表序号定位到下方各模块接口详情；「功能说明」列为 `—` 表示源码无方法注释，可按入参 / 出参字段推断用途。
 
 | 序号 | 模块 | 方式 | 路径 | 功能说明 |
 | --- | --- | --- | --- | --- |
@@ -115,60 +115,63 @@
 | 85 | order | POST | `/order/get/groupActivity/totalOrder` | 根据团购活动id统计订单数（实时，团长段=端有需求时使用） |
 | 86 | order | GET | `/order/payment/order/pay` | 发起支付 |
 | 87 | order | POST | `/order/payment/order/notify` | 支付回调 |
-| 88 | goods | GET | `/goods/group/goods/list` | 团购商品列表(包装, 规格, sku) |
-| 89 | goods | GET | `/goods/group/goods/stock` | 查询商品库存, 后期增加缓存 |
-| 90 | goods | GET | `/goods/get/goods/cat` | 商品分类列表 |
-| 91 | goods | GET | `/goods/leader/goods/online` | 查询所有审核通过且未关闭的商品, 添加团购时使用 |
-| 92 | goods | GET | `/goods/leader/goods/list` | 分页查询团长下的所有商品(团长控制台-商品管理), 支持分类+商品名称关键字筛选 |
-| 93 | goods | GET | `/goods/leader/goods/count` | 查询团长下的所有商品数量, 支持分类+商品名称关键字筛选 |
-| 94 | goods | GET | `/goods/leader/goods/info` | 商品信息查询: 商品基本信息 + 分类名 + 图片 + 规格(含规格值) + SKU |
-| 95 | goods | POST | `/goods/leader/goods/addGoods` | 添加商品 |
-| 96 | goods | POST | `/goods/leader/goods/edit` | 修改商品, 如果该商品正在团购中, 则不允许修改 |
-| 97 | goods | GET | `/goods/leader/goods/close` | 关闭商品(上下架), 如果该商品正在团购中, 则不允许操作 |
-| 98 | goods | GET | `/goods/leader/goods/sku/spec` | 根据规格罗列所有SKU, 包括已经存在的sku信息 |
-| 99 | goods | POST | `/goods/leader/goods/sku/save` | 注: 前端不再单独调用此接口, SKU已随添加/修改商品接口(addGoods/edit)一并处理, 此处保留兼容 |
-| 100 | goods | POST | `/goods/Leader/get/groupActivity/list` | 查询所有团购活动列表 |
-| 101 | goods | GET | `/goods/Leader/get/groupActivity/count` | 查询所有团购活动总数(筛选条件与列表接口一致, 保证分页总页数正确) |
-| 102 | goods | POST | `/goods/Leader/groupActivity/add` | 添加团购活动 |
-| 103 | goods | GET | `/goods/Leader/get/groupActivity/info` | 查询团购信息, 还要查询商品列表(价格以团购商品表冗余的团购价为准) |
-| 104 | goods | POST | `/goods/Leader/groupActivity/edit` | 修改团购活动, 团购进行中, 不允许修改 |
-| 105 | goods | POST | `/goods/Leader/groupActivity/close` | 这样就不需要修改的时候同步Redis缓存了, 只需要关闭修改完, 打开上线的时候更新一次即可 |
-| 106 | goods | GET | `/goods/Leader/get/groupActivity/cat` | 团购分类列表 |
-| 107 | goods | POST | `/goods/Leader/share/groupActivity/poster` | 分享团购海报生成1 |
-| 108 | goods | POST | `/goods/Leader/share/groupActivity/make/poster` | 分享团购活动海报（带有logo的海报） |
-| 109 | admin | GET | `/admin/business/list` | 分页查询团长收款账户列表(含累计额度) |
-| 110 | admin | GET | `/admin/business/count` | 查询收款账户总数 |
-| 111 | admin | GET | `/admin/business/info` | 查询收款账户详情 |
-| 112 | admin | POST | `/admin/business/add` | 添加团长收款账户(商户编号需唯一) |
-| 113 | admin | GET | `/admin/goods/list` | 分页查询商品列表 |
-| 114 | admin | GET | `/admin/goods/count` | 查询商品总数 |
-| 115 | admin | GET | `/admin/goods/info` | 查询商品详情 |
-| 116 | admin | GET | `/admin/goods/img` | 查询商品缩略图列表(最多3张) |
-| 117 | admin | GET | `/admin/group/list` | 分页查询团购活动列表 |
-| 118 | admin | GET | `/admin/group/count` | 查询团购活动总数 |
-| 119 | admin | GET | `/admin/group/info` | 查询团购活动详情 |
-| 120 | admin | GET | `/admin/leader/list` | 分页查询团长列表(可按手机号筛选) |
-| 121 | admin | GET | `/admin/leader/count` | 查询团长总数 |
-| 122 | admin | POST | `/admin/leader/add` | 添加团长(校验手机号/商户编号, 同步创建员工/店铺/收款账户) |
-| 123 | admin | GET | `/admin/leader/select` | 团长下拉选项列表(id/名称) |
-| 124 | admin | GET | `/admin/login/kaptcha` | 获取后台登录图形验证码(Base64图片, 5分钟有效) |
-| 125 | admin | POST | `/admin/login/submit` | 后台登录(验证码+账号密码, 返回token) |
-| 126 | admin | GET | `/admin/member/list` | 分页查询会员列表 |
-| 127 | admin | GET | `/admin/member/count` | 查询会员总数 |
-| 128 | admin | GET | `/admin/orderbusiness/list` | 分页查询订单列表 |
-| 129 | admin | GET | `/admin/orderbusiness/count` | 查询订单总数 |
-| 130 | admin | GET | `/admin/order/list` | 分页查询订单列表 |
-| 131 | admin | GET | `/admin/order/count` | 查询订单总数 |
-| 132 | admin | GET | `/admin/report/list` | 分页查询订单列表 |
-| 133 | admin | GET | `/admin/report/count` | 查询订单总数 |
-| 134 | task | GET | `/task/order/send` | 微信订单发货 |
-| 135 | task | GET | `/task/order/divide` | 订单分账 |
-| 136 | task | GET | `/task/order/query` | 查询订单 |
-| 137 | task | GET | `/task/order/refund` | 同步原始订单表和商户订单表的退款状态 |
-| 138 | task | GET | `/task/order/cash` | 提现 |
-| 139 | task | GET | `/task/order/verify` | 自动收货 |
-| 140 | task | GET | `/task/order/backstock` | 库存恢复 |
-| 141 | task | GET | `/task/test/user` | 查询文章信息(联调测试接口) |
+| 88 | order | POST | `/order/leader/member/list` | 团长端-我的团员列表（手机号/昵称搜索, 分页） |
+| 89 | order | GET | `/order/leader/member/detail` | 团长端-团员详情（消费/退款/跟团次数/查看次数/动态） |
+| 90 | order | POST | `/order/group/groupActivity/view` | 用户查看团购详情埋点上报（打开详情自动埋点, 可显式调用） |
+| 91 | goods | GET | `/goods/group/goods/list` | 团购商品列表(包装, 规格, sku) |
+| 92 | goods | GET | `/goods/group/goods/stock` | 查询商品库存, 后期增加缓存 |
+| 93 | goods | GET | `/goods/get/goods/cat` | 商品分类列表 |
+| 94 | goods | GET | `/goods/leader/goods/online` | 查询所有审核通过且未关闭的商品, 添加团购时使用 |
+| 95 | goods | GET | `/goods/leader/goods/list` | 分页查询团长下的所有商品(团长控制台-商品管理), 支持分类+商品名称关键字筛选 |
+| 96 | goods | GET | `/goods/leader/goods/count` | 查询团长下的所有商品数量, 支持分类+商品名称关键字筛选 |
+| 97 | goods | GET | `/goods/leader/goods/info` | 商品信息查询: 商品基本信息 + 分类名 + 图片 + 规格(含规格值) + SKU |
+| 98 | goods | POST | `/goods/leader/goods/addGoods` | 添加商品 |
+| 99 | goods | POST | `/goods/leader/goods/edit` | 修改商品, 如果该商品正在团购中, 则不允许修改 |
+| 100 | goods | GET | `/goods/leader/goods/close` | 关闭商品(上下架), 如果该商品正在团购中, 则不允许操作 |
+| 101 | goods | GET | `/goods/leader/goods/sku/spec` | 根据规格罗列所有SKU, 包括已经存在的sku信息 |
+| 102 | goods | POST | `/goods/leader/goods/sku/save` | 注: 前端不再单独调用此接口, SKU已随添加/修改商品接口(addGoods/edit)一并处理, 此处保留兼容 |
+| 103 | goods | POST | `/goods/Leader/get/groupActivity/list` | 查询所有团购活动列表 |
+| 104 | goods | GET | `/goods/Leader/get/groupActivity/count` | 查询所有团购活动总数(筛选条件与列表接口一致, 保证分页总页数正确) |
+| 105 | goods | POST | `/goods/Leader/groupActivity/add` | 添加团购活动 |
+| 106 | goods | GET | `/goods/Leader/get/groupActivity/info` | 查询团购信息, 还要查询商品列表(价格以团购商品表冗余的团购价为准) |
+| 107 | goods | POST | `/goods/Leader/groupActivity/edit` | 修改团购活动, 团购进行中, 不允许修改 |
+| 108 | goods | POST | `/goods/Leader/groupActivity/close` | 这样就不需要修改的时候同步Redis缓存了, 只需要关闭修改完, 打开上线的时候更新一次即可 |
+| 109 | goods | GET | `/goods/Leader/get/groupActivity/cat` | 团购分类列表 |
+| 110 | goods | POST | `/goods/Leader/share/groupActivity/poster` | 分享团购海报生成1 |
+| 111 | goods | POST | `/goods/Leader/share/groupActivity/make/poster` | 分享团购活动海报（带有logo的海报） |
+| 112 | admin | GET | `/admin/business/list` | 分页查询团长收款账户列表(含累计额度) |
+| 113 | admin | GET | `/admin/business/count` | 查询收款账户总数 |
+| 114 | admin | GET | `/admin/business/info` | 查询收款账户详情 |
+| 115 | admin | POST | `/admin/business/add` | 添加团长收款账户(商户编号需唯一) |
+| 116 | admin | GET | `/admin/goods/list` | 分页查询商品列表 |
+| 117 | admin | GET | `/admin/goods/count` | 查询商品总数 |
+| 118 | admin | GET | `/admin/goods/info` | 查询商品详情 |
+| 119 | admin | GET | `/admin/goods/img` | 查询商品缩略图列表(最多3张) |
+| 120 | admin | GET | `/admin/group/list` | 分页查询团购活动列表 |
+| 121 | admin | GET | `/admin/group/count` | 查询团购活动总数 |
+| 122 | admin | GET | `/admin/group/info` | 查询团购活动详情 |
+| 123 | admin | GET | `/admin/leader/list` | 分页查询团长列表(可按手机号筛选) |
+| 124 | admin | GET | `/admin/leader/count` | 查询团长总数 |
+| 125 | admin | POST | `/admin/leader/add` | 添加团长(校验手机号/商户编号, 同步创建员工/店铺/收款账户) |
+| 126 | admin | GET | `/admin/leader/select` | 团长下拉选项列表(id/名称) |
+| 127 | admin | GET | `/admin/login/kaptcha` | 获取后台登录图形验证码(Base64图片, 5分钟有效) |
+| 128 | admin | POST | `/admin/login/submit` | 后台登录(验证码+账号密码, 返回token) |
+| 129 | admin | GET | `/admin/member/list` | 分页查询会员列表 |
+| 130 | admin | GET | `/admin/member/count` | 查询会员总数 |
+| 131 | admin | GET | `/admin/orderbusiness/list` | 分页查询订单列表 |
+| 132 | admin | GET | `/admin/orderbusiness/count` | 查询订单总数 |
+| 133 | admin | GET | `/admin/order/list` | 分页查询订单列表 |
+| 134 | admin | GET | `/admin/order/count` | 查询订单总数 |
+| 135 | admin | GET | `/admin/report/list` | 分页查询订单列表 |
+| 136 | admin | GET | `/admin/report/count` | 查询订单总数 |
+| 137 | task | GET | `/task/order/send` | 微信订单发货 |
+| 138 | task | GET | `/task/order/divide` | 订单分账 |
+| 139 | task | GET | `/task/order/query` | 查询订单 |
+| 140 | task | GET | `/task/order/refund` | 同步原始订单表和商户订单表的退款状态 |
+| 141 | task | GET | `/task/order/cash` | 提现 |
+| 142 | task | GET | `/task/order/verify` | 自动收货 |
+| 143 | task | GET | `/task/order/backstock` | 库存恢复 |
+| 144 | task | GET | `/task/test/user` | 查询文章信息(联调测试接口) |
 
 ---
 
@@ -1582,7 +1585,7 @@ data 类型：`String`（基本类型，无子字段）
 
 > 类路径：`cn.com.shopgroup.order.controller.group.MemberGroupController`
 
-> 接口数量：7
+> 接口数量：8
 
 #### 1. GET `/order/group/groupActivity/cat`
 
@@ -1842,6 +1845,150 @@ data 类型：`List<GroupLogs>`（数组，元素类型 `GroupLogs`，字段说�
 | userTime | `String` | 否 | — |
 | userGoodsName | `String` | 否 | — |
 | userGoodsNum | `String` | 否 | — |
+
+
+
+#### 8. POST `/order/group/groupActivity/view`
+
+**功能说明**：用户查看团购详情-埋点上报。首页进入详情接口已服务端自动埋点，本接口供分享卡片等场景显式上报；同一用户同一团购 60 秒内只记一次（防抖），防抖命中返回 false，不影响主流程。
+
+**入参**
+
+| 参数 | 类型 | 位置 | 必填 | 说明 |
+| --- | --- | --- | --- | --- |
+| request | `MemberGroupViewRequest` | Body | 是 | 请求体对象，字段说明见下方表格 |
+
+**MemberGroupViewRequest 字段**
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| groupId | `Long` | 是 | 团购id |
+| source | `Integer` | 否 | 埋点来源：1 首页进入详情(默认)，2 分享进入 |
+
+**出参（JsonResult 统一返回体）**
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| code | `Integer` | 状态码：200=成功，300=失败，400=无权限，500=错误 |
+| msg | `String` | 提示信息 |
+| data | `Object` | 返回数据，类型：`Boolean`（是否新入库：true=已记录，false=未记录/防抖命中） |
+
+data 类型：`Boolean`（基本类型，无子字段）
+
+注：数据写入 `gb_group_view_log` 表，供团长端「我的团员」查看次数/查看动态使用；团长端「我的团员」接口见下方 LeaderMemberController。
+
+
+### LeaderMemberController
+
+> 模块说明：团长端-我的团员（团员即在该团长下有成功订单的用户；含查看次数与查看动态，数据来自 `gb_group_view_log` 埋点表）
+
+> 类路径：`cn.com.shopgroup.order.controller.leader.LeaderMemberController`
+
+> 接口数量：2
+
+#### 1. POST `/order/leader/member/list`
+
+**功能说明**：我的团员列表（支持手机号/昵称搜索，分页）。列表项含消费总额、跟团次数、查看次数及最近动态；最近动态在「跟团下单」与「查看」之间取时间更近者展示。
+
+**入参（Header）**
+
+| 参数 | 类型 | 位置 | 必填 | 说明 |
+| --- | --- | --- | --- | --- |
+| lid | `String` | Header | 是 | 团长id（缺失或为0时返回 300） |
+
+**入参（Body）**
+
+| 参数 | 类型 | 位置 | 必填 | 说明 |
+| --- | --- | --- | --- | --- |
+| request | `LeaderMemberListRequest` | Body | 是 | 请求体对象，字段说明见下方表格 |
+
+**LeaderMemberListRequest 字段**
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| keyword | `String` | 否 | 搜索关键字：团员手机号或昵称 |
+| page | `Integer` | 否 | 页码，默认1 |
+| pageSize | `Integer` | 否 | 每页数量，默认10，最大100 |
+
+**出参（JsonResult 统一返回体）**
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| code | `Integer` | 状态码：200=成功，300=失败，400=无权限，500=错误 |
+| msg | `String` | 提示信息 |
+| data | `Object` | 返回数据，类型：`List<LeaderMemberListResponse>`（具体字段见下方表格） |
+
+data 类型：`List<LeaderMemberListResponse>`（数组，元素类型 `LeaderMemberListResponse`，字段说明见下）
+
+**LeaderMemberListResponse 字段**
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| memberId | `Long` | 否 | 用户id |
+| mobile | `String` | 否 | 脱敏手机号，如：13\*\*\*\*\*\*5678 |
+| nickname | `String` | 否 | 用户昵称 |
+| avatar | `String` | 否 | 用户头像 |
+| lastTimeDesc | `String` | 否 | 最近动态时间描述，如：20分钟前 |
+| lastActionDesc | `String` | 否 | 最近动态内容，如：查看了麒麟大西瓜团 / 跟团下单 麒麟大西瓜 |
+| consumeAmount | `String` | 否 | 消费总额，单位元 |
+| orderCount | `Integer` | 否 | 跟团次数 |
+| viewCount | `Integer` | 否 | 查看次数（同一用户同一团购60秒内去重） |
+
+
+#### 2. GET `/order/leader/member/detail`
+
+**功能说明**：团员详情：消费总额/退款金额/跟团次数/查看次数/动态。动态 = 「跟团下单」+「查看」按时间倒序合并后按天分组展示。
+
+**入参（Header）**
+
+| 参数 | 类型 | 位置 | 必填 | 说明 |
+| --- | --- | --- | --- | --- |
+| lid | `String` | Header | 是 | 团长id（缺失或为0时返回 300） |
+
+**入参（Query）**
+
+| 参数 | 类型 | 位置 | 必填 | 说明 |
+| --- | --- | --- | --- | --- |
+| memberId | `Long` | Query 参数 | 是 | 用户id |
+
+**出参（JsonResult 统一返回体）**
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| code | `Integer` | 状态码：200=成功，300=失败，400=无权限，500=错误 |
+| msg | `String` | 提示信息 |
+| data | `Object` | 返回数据，类型：`LeaderMemberDetailResponse`（具体字段见下方表格） |
+
+data 类型：`LeaderMemberDetailResponse`（字段说明见下）
+
+**LeaderMemberDetailResponse 字段**
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| memberId | `Long` | 否 | 用户id |
+| mobile | `String` | 否 | 脱敏手机号，如：13\*\*\*\*\*\*5678 |
+| nickname | `String` | 否 | 用户昵称 |
+| avatar | `String` | 否 | 用户头像 |
+| consumeAmount | `String` | 否 | 消费总额，单位元 |
+| refundAmount | `String` | 否 | 退款金额，单位元 |
+| orderCount | `Integer` | 否 | 跟团次数 |
+| viewCount | `Integer` | 否 | 查看次数（查看记录全量统计） |
+| dynamicList | `List<MemberDynamicGroup>` | 否 | 动态分组列表（按天分组，最近动态在前） |
+
+**→MemberDynamicGroup 字段**（字段 `dynamicList`（List<MemberDynamicGroup>））
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| date | `String` | 否 | 日期文案，如：今天、08-17、2025-08-05 |
+| items | `List<MemberDynamicItem>` | 否 | 当天动态列表 |
+
+**→→MemberDynamicItem 字段**（字段 `items`（List<MemberDynamicItem>））
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| time | `String` | 否 | 时间，HH:mm |
+| action | `String` | 否 | 动作类型：view=查看，order=跟团下单 |
+| content | `String` | 否 | 动作文本，如：查看了麒麟大西瓜团 / 跟团下单 麒麟大西瓜 |
 
 
 

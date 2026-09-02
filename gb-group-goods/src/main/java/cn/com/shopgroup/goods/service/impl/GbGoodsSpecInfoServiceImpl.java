@@ -39,6 +39,8 @@ public class GbGoodsSpecInfoServiceImpl implements GbGoodsSpecInfoService {
     public List<GbGoodsSpecInfo> getMiniGoodsSpecList(Long goodsId) {
         LambdaQueryWrapper<GbGoodsSpecInfo> queryWrapper = Wrappers.lambdaQuery();
         queryWrapper.select(GbGoodsSpecInfo::getSpecId, GbGoodsSpecInfo::getSpecName);
+        // 只查该商品自己的规格(goods_id 关联), 避免全库规格(含 goods_id=0 的全局模板)混入其他商品的 SKU 自动生成
+        queryWrapper.eq(GbGoodsSpecInfo::getGoodsId, goodsId);
         queryWrapper.eq(GbGoodsSpecInfo::getIsClose, 0);
         queryWrapper.orderByAsc(GbGoodsSpecInfo::getSpecId);
         List<GbGoodsSpecInfo> data = mapper.selectList(queryWrapper);
@@ -140,6 +142,9 @@ public class GbGoodsSpecInfoServiceImpl implements GbGoodsSpecInfoService {
         GbGoodsSpecInfo data = new GbGoodsSpecInfo();
 
         data.setSpecName(info.getSpecName());
+        // 规格归属团长与商品, 否则落库为 0 变成孤儿/全局规格
+        data.setLeaderId(info.getLeaderId());
+        data.setGoodsId(info.getGoodsId());
 
         data.setIsPrice(info.getIsPrice());
 

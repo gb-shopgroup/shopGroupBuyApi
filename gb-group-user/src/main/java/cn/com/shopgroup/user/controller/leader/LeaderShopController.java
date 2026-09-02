@@ -69,8 +69,8 @@ public class LeaderShopController {
                 return JsonResult.success("暂无店铺信息");
             }
             // 缓存起来
-            redisHelper.setCacheObject(redisKey, shopInfo, RedisConstant.RedisShopInfoExpired, TimeUnit.SECONDS);
             ShopResponse data = new ShopResponse(shopInfo);
+            redisHelper.setCacheObject(redisKey, data, RedisConstant.RedisShopInfoExpired, TimeUnit.SECONDS);
             return JsonResult.success(data);
         }
 

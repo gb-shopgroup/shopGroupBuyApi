@@ -71,9 +71,6 @@ public class LeaderGroupManageController {
     private GbOrgStaffInfoService staffService;
 
     @Autowired
-    private GbOrgLeaderInfoService leaderService;
-
-    @Autowired
     private GbOrgShopInfoService shopService;
 
     @Autowired
@@ -100,10 +97,10 @@ public class LeaderGroupManageController {
     public JsonResult getGroupActiveList(@Validated @RequestBody LeaderGroupListRequest request) {
         log.info("团长端-查询所有团购活动列表,request:{}", JSON.toJSONString(request));
         // 从请求头中获取团长id
-//        Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
-//        if (leaderId == 0) {
-//            return JsonResult.fail("lid不存在");
-//        }
+        Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
+        if (leaderId == 0) {
+            return JsonResult.fail("lid不存在");
+        }
 
         // 请求参数矫正
         int page = Optional.ofNullable(request.getPage()).orElse(1);
@@ -114,7 +111,7 @@ public class LeaderGroupManageController {
         int status = Optional.ofNullable(request.getStatus().intValue()).orElse(0);
 
         // 查询列表(1、团长团查询 2 用户端查询)
-        List<GbGroupActivityInfo> result = activityInfoService.getMiniLeaderGroupList(1, 1L, request.getCatId(), activityName, status, page, pageSize);
+        List<GbGroupActivityInfo> result = activityInfoService.getMiniLeaderGroupList(1, leaderId, request.getCatId(), activityName, status, page, pageSize);
         List<GroupActResponse> data = GroupActResponse.getGroupResponseList(result);
         return JsonResult.success(data);
     }

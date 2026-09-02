@@ -20,7 +20,6 @@ import java.util.concurrent.TimeUnit;
 @RestController
 @RequestMapping("/user")
 @Slf4j
-@Api(value = "团长端-自提点管理")
 public class GroupPointController {
 
     @Resource

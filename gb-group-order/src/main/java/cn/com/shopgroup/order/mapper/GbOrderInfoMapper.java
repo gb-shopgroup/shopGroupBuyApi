@@ -262,4 +262,24 @@ public interface GbOrderInfoMapper extends BaseMapper<GbOrderInfo> {
     List<GbOrderInfo> getPaidOrderInfoBy(@Param("memberId") Long memberId, @Param("shopId") Long shopId);
 
     Integer getSumOfGroupActivityOrder(@Param("groupId") Long groupId);
+
+    /**
+     * 团长端-聚合查询团员列表
+     */
+    List<Map<String, Object>> getLeaderMemberSummaryList(@Param("leaderId") Long leaderId,
+                                                         @Param("keyword") String keyword,
+                                                         @Param("offset") Integer offset,
+                                                         @Param("pageSize") Integer pageSize);
+
+    /**
+     * 团长端-统计团员数量
+     */
+    Integer getLeaderMemberSummaryCount(@Param("leaderId") Long leaderId,
+                                          @Param("keyword") String keyword);
+
+    /**
+     * 团长端-查询某个团员在团长下的有效订单列表
+     */
+    List<GbOrderInfo> getLeaderMemberOrderList(@Param("leaderId") Long leaderId,
+                                               @Param("memberId") Long memberId);
 }

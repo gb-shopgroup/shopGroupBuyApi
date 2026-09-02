@@ -153,13 +153,12 @@ public class MemberOrderController {
         Long memberId = 0L;
         try {
             memberId = Long.parseLong(userId);
+            if (memberId == 0) {
+                return JsonResult.fail("用户不存在");
+            }
         } catch (NumberFormatException e) {
             return JsonResult.fail("用户不存在");
         }
-        if (memberId == 0) {
-            return JsonResult.fail("用户不存在");
-        }
-
         // 根据提货点ID查询团长ID
         Long leaderId = 0L;
         if (pointId > 0) {
@@ -188,10 +187,10 @@ public class MemberOrderController {
         Long memberId = 0L;
         try {
             memberId = Long.parseLong(userId);
+            if (memberId == 0) {
+                return JsonResult.fail("用户不存在");
+            }
         } catch (NumberFormatException e) {
-            return JsonResult.fail("用户不存在");
-        }
-        if (memberId == 0) {
             return JsonResult.fail("用户不存在");
         }
 

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.shopgroup.order.mapper.GbGroupViewLogMapper">
+
+    <!-- 团长端-统计指定成员在团长下的查看次数 -->
+    <select id="countViewsByMembers" resultType="java.util.HashMap">
+        SELECT v.`member_id` AS memberId, COUNT(*) AS viewCount
+        FROM `gb_group_view_log` v
+        WHERE v.`leader_id` = #{leaderId}
+        <if test="memberIds != null and memberIds.size() > 0">
+            AND v.`member_id` IN
+            <foreach collection="memberIds" item="mid" open="(" separator="," close=")">
+                #{mid}
+            </foreach>
+        </if>
+        GROUP BY v.`member_id`
+    </select>
+
+    <!-- 团长端-查询指定成员最近一条查看记录(含团购名称), 同一秒多条时按 id 倒序取最近 -->
+    <select id="getLastViewByMembers" resultType="java.util.HashMap">
+        SELECT v.`member_id` AS memberId, v.`group_name` AS groupName, v.`view_time` AS viewTime
+        FROM `gb_group_view_log` v
+        WHERE v.`leader_id` = #{leaderId}
+        <if test="memberIds != null and memberIds.size() > 0">
+            AND v.`member_id` IN
+            <foreach collection="memberIds" item="mid" open="(" separator="," close=")">
+                #{mid}
+            </foreach>
+        </if>
+          AND v.`view_time` = (
+              SELECT MAX(v2.`view_time`)
+              FROM `gb_group_view_log` v2
+              WHERE v2.`leader_id` = v.`leader_id`
+                AND v2.`member_id` = v.`member_id`
+          )
+        GROUP BY v.`member_id`, v.`group_name`, v.`view_time`
+        ORDER BY v.`view_time` DESC
+    </select>
+
+</mapper>

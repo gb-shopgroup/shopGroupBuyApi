@@ -31,6 +31,9 @@ public class GbGoodsSpecValueServiceImpl implements GbGoodsSpecValueService {
         GbGoodsSpecValue data = new GbGoodsSpecValue();
 
         data.setSpecId(info.getSpecId());
+        // 规格值归属团长与商品, 否则落库为 0 变成孤儿/全局规格
+        data.setLeaderId(info.getLeaderId());
+        data.setGoodsId(info.getGoodsId());
 
         data.setSpecVal(info.getSpecVal());
 

@@ -229,7 +229,7 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
         data.setGroupInfo(info.getGroupInfo());
         data.setOrderTotal(0);
         data.setVirtualOrder(info.getVirtualOrder());
-        data.setIsClose((byte) 1);
+        data.setIsClose(info.getIsClose());
         data.setSortOrder(65535);
         data.setStaffId(info.getStaffId());
         data.setStaffName(info.getStaffName());

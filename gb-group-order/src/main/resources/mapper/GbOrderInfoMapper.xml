@@ -90,4 +90,57 @@
         WHERE group_id = #{groupId}
     </select>
 
+    <!-- 团长端-聚合查询团员列表 -->
+    <select id="getLeaderMemberSummaryList" resultType="java.util.HashMap">
+        SELECT
+            o.member_id AS memberId,
+            MAX(o.mobile) AS mobile,
+            MAX(o.nickname) AS nickname,
+            MAX(o.avatar) AS avatar,
+            COUNT(*) AS orderCount,
+            SUM(o.pay_fee) AS totalPayFee,
+            SUM(o.refund_fee) AS totalRefundFee,
+            MAX(o.add_time) AS lastTime,
+            (
+                SELECT group_name
+                FROM gb_order_info
+                WHERE leader_id = #{leaderId}
+                  AND member_id = o.member_id
+                  AND pay_time &gt; 0
+                ORDER BY add_time DESC
+                LIMIT 1
+            ) AS lastGroupName
+        FROM gb_order_info o
+        WHERE o.leader_id = #{leaderId}
+          AND o.pay_time &gt; 0
+        <if test="keyword != null and keyword != ''">
+            AND (o.mobile LIKE CONCAT('%', #{keyword}, '%') OR o.nickname LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        GROUP BY o.member_id
+        ORDER BY lastTime DESC
+        LIMIT #{offset}, #{pageSize}
+    </select>
+
+    <!-- 团长端-统计团员数量 -->
+    <select id="getLeaderMemberSummaryCount" resultType="java.lang.Integer">
+        SELECT COUNT(DISTINCT member_id)
+        FROM gb_order_info
+        WHERE leader_id = #{leaderId}
+          AND pay_time &gt; 0
+        <if test="keyword != null and keyword != ''">
+            AND (mobile LIKE CONCAT('%', #{keyword}, '%') OR nickname LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+    </select>
+
+    <!-- 团长端-查询某个团员在团长下的有效订单列表 -->
+    <select id="getLeaderMemberOrderList" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM gb_order_info
+        WHERE leader_id = #{leaderId}
+          AND member_id = #{memberId}
+          AND pay_time &gt; 0
+        ORDER BY add_time DESC
+    </select>
+
 </mapper>

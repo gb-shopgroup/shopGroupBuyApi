@@ -114,5 +114,34 @@ public class TimeUtils {
         return todayZeroSecond.intValue();
     }
 
+    /**
+     * 相对时间描述
+     * @param timestamp 秒级时间戳
+     * @return 刚刚、N分钟前、N小时前、N天前，超过30天返回 yyyy-MM-dd HH:mm
+     */
+    public static String getRelativeTime(int timestamp) {
+        if (timestamp <= 0) {
+            return "";
+        }
+        long now = System.currentTimeMillis() / 1000L;
+        long diff = now - timestamp;
+        if (diff < 0) {
+            diff = 0;
+        }
+        if (diff < 60) {
+            return "刚刚";
+        }
+        if (diff < 3600) {
+            return (diff / 60) + "分钟前";
+        }
+        if (diff < 86400) {
+            return (diff / 3600) + "小时前";
+        }
+        if (diff < 30 * 86400L) {
+            return (diff / 86400) + "天前";
+        }
+        return getFormatTimeStamp(timestamp);
+    }
+
 
 }

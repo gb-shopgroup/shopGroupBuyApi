@@ -4,6 +4,7 @@ import cn.com.shopgroup.common.utils.TimeUtils;
 import cn.com.shopgroup.order.constants.OrderStatusEnum;
 import cn.com.shopgroup.order.mapper.GbOrderGoodsInfoMapper;
 import cn.com.shopgroup.order.mapper.GbOrderInfoMapper;
+import cn.com.shopgroup.order.model.GbGroupViewLog;
 import cn.com.shopgroup.order.model.GbOrderGoodsInfo;
 import cn.com.shopgroup.order.model.GbOrderInfo;
 import cn.com.shopgroup.user.service.GbOrgMessageInfoService;
@@ -20,12 +21,27 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
+import cn.com.shopgroup.order.http.response.GroupOrderRecordResponse;
+import cn.com.shopgroup.order.http.response.LeaderMemberDetailResponse;
+import cn.com.shopgroup.order.http.response.LeaderMemberListResponse;
+import cn.com.shopgroup.order.http.response.MemberDynamicGroup;
+import cn.com.shopgroup.order.http.response.MemberDynamicItem;
+
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.text.DecimalFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.TimeZone;
 import java.util.stream.Collectors;
 
 @Service
@@ -37,6 +53,9 @@ public class GbOrderInfoService {
 
     @Resource
     private GbOrderGoodsInfoMapper goodsMapper;
+
+    @Resource
+    private GbGroupViewLogService viewLogService;
 
     @Resource
     private TransactionTemplate transactionTemplate;
@@ -992,5 +1011,349 @@ public class GbOrderInfoService {
 
     public Integer getSumOfGroupActivityOrder(Long groupId) {
         return mapper.getSumOfGroupActivityOrder(groupId);
+    }
+
+    /**
+     * 查询团购活动的真实跟团记录
+     *
+     * @param groupId 团购活动id
+     * @param limit   返回条数，默认20，最大50
+     * @return 跟团记录列表
+     */
+    public List<GroupOrderRecordResponse> getGroupOrderRecordList(Long groupId, Integer limit) {
+
+        List<GroupOrderRecordResponse> result = new ArrayList<>();
+        if (groupId == null || groupId <= 0) {
+            return result;
+        }
+        if (limit == null || limit <= 0) {
+            limit = 20;
+        }
+        limit = Math.min(limit, 50);
+
+        // 已支付/待收货/部分收货/已提货 视为有效订单
+        LambdaQueryWrapper<GbOrderInfo> orderWrapper = Wrappers.lambdaQuery();
+        orderWrapper.eq(GbOrderInfo::getGroupId, groupId);
+        orderWrapper.in(GbOrderInfo::getStatus, Arrays.asList(1, 2, 3));
+        orderWrapper.orderByDesc(GbOrderInfo::getId);
+        orderWrapper.last("limit 0," + limit);
+        List<GbOrderInfo> orderList = mapper.selectList(orderWrapper);
+        if (CollectionUtils.isEmpty(orderList)) {
+            return result;
+        }
+
+        List<String> orderNos = orderList.stream()
+                .map(GbOrderInfo::getOrderNo)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        Map<String, GbOrderInfo> orderMap = orderList.stream()
+                .collect(Collectors.toMap(GbOrderInfo::getOrderNo, v -> v, (v1, v2) -> v1));
+
+        LambdaQueryWrapper<GbOrderGoodsInfo> goodsWrapper = Wrappers.lambdaQuery();
+        goodsWrapper.in(GbOrderGoodsInfo::getOrderNo, orderNos);
+        goodsWrapper.orderByAsc(GbOrderGoodsInfo::getId);
+        List<GbOrderGoodsInfo> goodsList = goodsMapper.selectList(goodsWrapper);
+        if (CollectionUtils.isEmpty(goodsList)) {
+            return result;
+        }
+
+        for (GbOrderGoodsInfo goods : goodsList) {
+            GbOrderInfo order = orderMap.get(goods.getOrderNo());
+            if (order == null) {
+                continue;
+            }
+            Integer addTime = order.getAddTime();
+            result.add(new GroupOrderRecordResponse(
+                    order.getMemberId(),
+                    hideMobile(order.getMobile()),
+                    order.getAvatar(),
+                    order.getNickname(),
+                    TimeUtils.getRelativeTime(addTime == null ? 0 : addTime),
+                    buildGroupRecordGoodsDesc(goods),
+                    goods.getGoodsNum()
+            ));
+        }
+        return result;
+    }
+
+    /**
+     * 手机号脱敏：只展示前2位和后4位，中间5位用*代替
+     * 例如：13812345678 -> 13*****5678
+     */
+    private String hideMobile(String mobile) {
+        if (StringUtils.isEmpty(mobile)) {
+            return "";
+        }
+        mobile = mobile.trim();
+        if (mobile.length() == 11) {
+            return mobile.substring(0, 2) + "*****" + mobile.substring(7);
+        }
+        return mobile;
+    }
+
+    private String buildGroupRecordGoodsDesc(GbOrderGoodsInfo goods) {
+        StringBuilder sb = new StringBuilder();
+        if (!StringUtils.isEmpty(goods.getGoodsName())) {
+            sb.append(goods.getGoodsName());
+        }
+        if (!StringUtils.isEmpty(goods.getSkuNames())) {
+            if (sb.length() > 0) {
+                sb.append("/");
+            }
+            sb.append(goods.getSkuNames());
+        }
+        return sb.toString();
+    }
+
+    // ======================= 团长端-我的团员相关接口 =======================
+
+    /**
+     * 团长端-我的团员列表
+     */
+    public List<LeaderMemberListResponse> getLeaderMemberList(Long leaderId, String keyword, Integer page, Integer pageSize) {
+        List<LeaderMemberListResponse> result = new ArrayList<>();
+        if (leaderId == null || leaderId <= 0) {
+            return result;
+        }
+        int currentPage = page == null || page <= 0 ? 1 : page;
+        int size = pageSize == null || pageSize <= 0 ? 10 : Math.min(pageSize, 100);
+        int offset = (currentPage - 1) * size;
+
+        List<Map<String, Object>> summaryList = mapper.getLeaderMemberSummaryList(leaderId, keyword, offset, size);
+        if (CollectionUtils.isEmpty(summaryList)) {
+            return result;
+        }
+        // 当前页成员id集合(批量查询查看次数/最近查看)
+        List<Long> memberIds = new ArrayList<>();
+        for (Map<String, Object> item : summaryList) {
+            memberIds.add(toLong(item.get("memberId")));
+        }
+        Map<Long, Integer> viewCountMap = viewLogService.getViewCountMap(leaderId, memberIds);
+        Map<Long, Map<String, Object>> lastViewMap = viewLogService.getLastViewMap(leaderId, memberIds);
+
+        for (Map<String, Object> item : summaryList) {
+            Long memberId = toLong(item.get("memberId"));
+            String mobile = toStr(item.get("mobile"));
+            String nickname = toStr(item.get("nickname"));
+            String avatar = toStr(item.get("avatar"));
+            Integer orderCount = toInt(item.get("orderCount"));
+            Integer totalPayFee = toInt(item.get("totalPayFee"));
+            Integer lastOrderTime = toInt(item.get("lastTime"));
+            String lastGroupName = toStr(item.get("lastGroupName"));
+            Integer viewCount = viewCountMap.get(memberId) == null ? 0 : viewCountMap.get(memberId);
+
+            // 最近一次动态: 对比最近一次"查看"与最近一次"跟团下单", 取时间更近的
+            int lastViewTime = 0;
+            Map<String, Object> lastViewRow = lastViewMap.get(memberId);
+            if (lastViewRow != null) {
+                lastViewTime = toInt(lastViewRow.get("viewTime"));
+            }
+            String lastActionDesc = "";
+            int latestTime = lastOrderTime == null ? 0 : lastOrderTime;
+            if (lastViewTime > latestTime) {
+                String viewGroupName = toStr(lastViewRow.get("groupName"));
+                lastActionDesc = StringUtils.isEmpty(viewGroupName) ? "查看了团购页面" : "查看了" + viewGroupName + "团";
+                latestTime = lastViewTime;
+            } else if (latestTime > 0) {
+                lastActionDesc = StringUtils.isEmpty(lastGroupName) ? "跟团下单" : "跟团下单 " + lastGroupName;
+            }
+
+            result.add(new LeaderMemberListResponse(
+                    memberId,
+                    hideMobile(mobile),
+                    nickname,
+                    avatar,
+                    TimeUtils.getRelativeTime(latestTime),
+                    lastActionDesc,
+                    fenToYuan(totalPayFee),
+                    orderCount == null ? 0 : orderCount,
+                    viewCount
+            ));
+        }
+        return result;
+    }
+
+    /**
+     * 团长端-团员详情（含统计与动态）
+     */
+    public LeaderMemberDetailResponse getLeaderMemberDetail(Long leaderId, Long memberId) {
+        if (leaderId == null || leaderId <= 0 || memberId == null || memberId <= 0) {
+            return new LeaderMemberDetailResponse();
+        }
+        List<GbOrderInfo> orders = mapper.getLeaderMemberOrderList(leaderId, memberId);
+        // 查看记录(埋点)最近50条
+        List<GbGroupViewLog> views = viewLogService.getRecentViewList(leaderId, memberId);
+        if (CollectionUtils.isEmpty(orders) && CollectionUtils.isEmpty(views)) {
+            return new LeaderMemberDetailResponse(memberId, "", "", "", "0.00", "0.00", 0, 0, new ArrayList<>());
+        }
+
+        int orderCount = CollectionUtils.isEmpty(orders) ? 0 : orders.size();
+        int totalPayFee = CollectionUtils.isEmpty(orders) ? 0
+                : orders.stream().mapToInt(o -> o.getPayFee() == null ? 0 : o.getPayFee()).sum();
+        int totalRefundFee = CollectionUtils.isEmpty(orders) ? 0
+                : orders.stream().mapToInt(o -> o.getRefundFee() == null ? 0 : o.getRefundFee()).sum();
+        // 查看次数(不受动态截断影响, 全量统计)
+        Integer viewCount = viewLogService.getViewCount(leaderId, memberId);
+
+        // 生成动态: 跟团下单 + 查看团购, 按时间从新到旧合并
+        List<DynamicEntry> entries = new ArrayList<>();
+        if (!CollectionUtils.isEmpty(orders)) {
+            for (GbOrderInfo order : orders) {
+                Integer addTime = order.getAddTime();
+                if (addTime == null || addTime <= 0) {
+                    continue;
+                }
+                String groupName = StringUtils.isEmpty(order.getGroupName()) ? "" : order.getGroupName();
+                entries.add(new DynamicEntry(addTime, "order", "跟团下单 " + groupName));
+            }
+        }
+        if (!CollectionUtils.isEmpty(views)) {
+            for (GbGroupViewLog view : views) {
+                Integer viewTime = view.getViewTime();
+                if (viewTime == null || viewTime <= 0) {
+                    continue;
+                }
+                String groupName = StringUtils.isEmpty(view.getGroupName()) ? "" : view.getGroupName();
+                String content = StringUtils.isEmpty(groupName) ? "查看了团购页面" : "查看了" + groupName + "团";
+                entries.add(new DynamicEntry(viewTime, "view", content));
+            }
+        }
+        if (entries.size() > DETAIL_DYNAMIC_LIMIT) {
+            entries = new ArrayList<>(entries.subList(0, DETAIL_DYNAMIC_LIMIT));
+        }
+        List<MemberDynamicGroup> dynamicList = buildDynamicGroups(entries);
+
+        // 用户信息: 优先最近一笔订单冗余, 其次最近一条查看记录冗余
+        String mobile = "";
+        String nickname = "";
+        String avatar = "";
+        if (!CollectionUtils.isEmpty(orders)) {
+            GbOrderInfo latest = orders.get(0);
+            mobile = latest.getMobile();
+            nickname = latest.getNickname();
+            avatar = latest.getAvatar();
+        } else if (!CollectionUtils.isEmpty(views)) {
+            GbGroupViewLog latestView = views.get(0);
+            mobile = latestView.getMobile();
+            nickname = latestView.getNickname();
+            avatar = latestView.getAvatar();
+        }
+        return new LeaderMemberDetailResponse(
+                memberId,
+                hideMobile(mobile),
+                nickname,
+                avatar,
+                fenToYuan(totalPayFee),
+                fenToYuan(totalRefundFee),
+                orderCount,
+                viewCount,
+                dynamicList
+        );
+    }
+
+    // 详情动态最多展示条数
+    private static final int DETAIL_DYNAMIC_LIMIT = 100;
+
+    /**
+     * 动态条目按时间倒序后按天分组
+     */
+    private List<MemberDynamicGroup> buildDynamicGroups(List<DynamicEntry> entries) {
+        Map<String, MemberDynamicGroup> groupMap = new LinkedHashMap<>();
+        SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm");
+        entries.sort((a, b) -> Integer.compare(b.timestamp, a.timestamp));
+        for (DynamicEntry entry : entries) {
+            if (entry.timestamp <= 0) {
+                continue;
+            }
+            String dateKey = formatDynamicDateKey(entry.timestamp);
+            String dateLabel = formatDynamicDateLabel(entry.timestamp);
+            MemberDynamicGroup group = groupMap.computeIfAbsent(dateKey, k -> new MemberDynamicGroup(dateLabel, new ArrayList<>()));
+            String timeLabel = timeFormat.format(new Date(entry.timestamp * 1000L));
+            group.getItems().add(new MemberDynamicItem(timeLabel, entry.action, entry.content));
+        }
+        return new ArrayList<>(groupMap.values());
+    }
+
+    /**
+     * 团员动态条目
+     */
+    private static class DynamicEntry {
+        private final int timestamp;
+        private final String action;
+        private final String content;
+
+        DynamicEntry(int timestamp, String action, String content) {
+            this.timestamp = timestamp;
+            this.action = action;
+            this.content = content;
+        }
+    }
+
+    private String fenToYuan(Integer fen) {
+        if (fen == null) {
+            return "0.00";
+        }
+        return BigDecimal.valueOf(fen).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP).toString();
+    }
+
+    private Long toLong(Object obj) {
+        if (obj == null) {
+            return 0L;
+        }
+        if (obj instanceof Number) {
+            return ((Number) obj).longValue();
+        }
+        try {
+            return Long.valueOf(obj.toString());
+        } catch (NumberFormatException e) {
+            return 0L;
+        }
+    }
+
+    private Integer toInt(Object obj) {
+        if (obj == null) {
+            return 0;
+        }
+        if (obj instanceof Number) {
+            return ((Number) obj).intValue();
+        }
+        try {
+            return Integer.valueOf(obj.toString());
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    private String toStr(Object obj) {
+        return obj == null ? "" : obj.toString();
+    }
+
+    private String formatDynamicDateKey(int timestamp) {
+        Calendar c = Calendar.getInstance();
+        c.setTimeInMillis(timestamp * 1000L);
+        return String.format("%04d-%02d-%02d", c.get(Calendar.YEAR), c.get(Calendar.MONTH) + 1, c.get(Calendar.DAY_OF_MONTH));
+    }
+
+    private String formatDynamicDateLabel(int timestamp) {
+        Calendar now = Calendar.getInstance();
+        Calendar target = Calendar.getInstance();
+        target.setTimeInMillis(timestamp * 1000L);
+
+        if (isSameDay(now, target)) {
+            return "今天";
+        }
+        now.add(Calendar.DAY_OF_YEAR, -1);
+        if (isSameDay(now, target)) {
+            return "昨天";
+        }
+        if (now.get(Calendar.YEAR) == target.get(Calendar.YEAR)) {
+            return String.format("%02d-%02d", target.get(Calendar.MONTH) + 1, target.get(Calendar.DAY_OF_MONTH));
+        }
+        return String.format("%04d-%02d-%02d", target.get(Calendar.YEAR), target.get(Calendar.MONTH) + 1, target.get(Calendar.DAY_OF_MONTH));
+    }
+
+    private boolean isSameDay(Calendar c1, Calendar c2) {
+        return c1.get(Calendar.YEAR) == c2.get(Calendar.YEAR)
+                && c1.get(Calendar.DAY_OF_YEAR) == c2.get(Calendar.DAY_OF_YEAR);
     }
 }

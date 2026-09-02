@@ -4,6 +4,7 @@ import cn.com.shopgroup.common.cache.RedisConstant;
 import cn.com.shopgroup.common.cache.RedisHelper;
 import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.PhoneGeneratorUtils;
+import cn.com.shopgroup.common.utils.TokenUtils;
 import cn.com.shopgroup.goods.http.response.group.GroupActivityResponse;
 import cn.com.shopgroup.goods.http.response.group.GroupCategoryResponse;
 import cn.com.shopgroup.goods.model.GbGroupActivityGoods;
@@ -12,8 +13,11 @@ import cn.com.shopgroup.goods.model.GbGroupCategoryInfo;
 import cn.com.shopgroup.goods.service.GbGroupActivityInfoService;
 import cn.com.shopgroup.goods.service.GbGroupCategoryInfoService;
 import cn.com.shopgroup.order.http.request.MemberGroupListRequest;
+import cn.com.shopgroup.order.http.request.MemberGroupViewRequest;
 import cn.com.shopgroup.order.http.response.GroupLogs;
+import cn.com.shopgroup.order.http.response.GroupOrderRecordResponse;
 import cn.com.shopgroup.order.http.response.MemberHomeGroupActResponse;
+import cn.com.shopgroup.order.service.GbGroupViewLogService;
 import cn.com.shopgroup.order.service.GbOrderInfoService;
 import cn.com.shopgroup.user.http.response.ShopResponse;
 import cn.com.shopgroup.user.model.GbOrgShopInfo;
@@ -62,6 +66,9 @@ public class MemberGroupController {
     @Resource
     private RedisHelper redisHelper;
 
+    @Resource
+    private GbGroupViewLogService viewLogService;
+
 
     // 团购分类列表（首页）
     @GetMapping("/group/groupActivity/cat")
@@ -72,29 +79,6 @@ public class MemberGroupController {
         return JsonResult.success(data);
     }
 
-    /*// 团购列表（首页）
-    @GetMapping("/group/groupActivity/list")
-    public JsonResult groupList(@RequestParam("leaderId") Long leaderId, @RequestParam("catId") Long catId,
-                                @RequestParam("page") int page, @RequestParam("pageSize") int pageSize) {
-
-        // 请求参数矫正
-        if (page == 0) page = 1;
-        if (pageSize == 0) pageSize = 10;
-        if (pageSize > 100) pageSize = 100;
-
-        // 查询数据库
-        List<GbGroupActivityInfo> lists = groupActivityInfoService.getMiniGroupActivityList(leaderId, catId, page, pageSize);
-        List<GroupActivityResponse> data = GroupActivityResponse.getGroupActivityResponseList(lists);
-
-        // 实时获取团购销售数量
-        for (GroupActivityResponse item : data) {
-            item.setNum(this.getRedisOrderTotal(item.getId(), item.getNum2()));
-        }
-
-        // 暂时直接返回结果，如果缓存的话，会员头像如何更新？
-        return JsonResult.success(data);
-    }
-*/
     // 用户首页-查询所有团购活动列表
     @PostMapping("/group/get/groupActivity/list")
     public JsonResult getGroupActiveList(@RequestBody MemberGroupListRequest request) {
@@ -150,8 +134,10 @@ public class MemberGroupController {
 
             // 根据id查询团购详情
             GbGroupActivityInfo item = groupActivityInfoService.getMiniGroupActivityInfo(groupId);
+            if(ObjectUtils.isEmpty(item)){
+                return JsonResult.success();
+            }
             GroupActivityResponse data = new GroupActivityResponse(item);
-
             // 放入Redis中缓存
             redisHelper.setCacheObject(key, data, RedisConstant.RedisGroupInfoExpired, TimeUnit.SECONDS);
         }
@@ -162,8 +148,55 @@ public class MemberGroupController {
         // 订单销售数量
         cacheData.setNum(this.getRedisOrderTotal(groupId, cacheData.getNum2()));
 
+        // 服务端自动埋点: 记录用户"查看"团购(未登录/防抖命中会忽略, 不影响主流程)
+        this.recordViewQuietly(groupId);
+
         // 返回数据
         return JsonResult.success(cacheData);
+    }
+
+    // 用户查看团购详情-显式埋点上报(分享等场景前端调用; 首页进入详情会自动埋点, 可不上报)
+    @PostMapping("/group/groupActivity/view")
+    public JsonResult groupView(@RequestBody MemberGroupViewRequest request) {
+        if (request == null || request.getGroupId() == null || request.getGroupId() <= 0) {
+            return JsonResult.fail("groupId不能为空");
+        }
+        Long memberId = this.getCurrentMemberId();
+        if (memberId == null || memberId <= 0) {
+            return JsonResult.fail("请先登录");
+        }
+        // 防抖在服务内部处理
+        Boolean flag = viewLogService.recordView(memberId, request.getGroupId());
+        return JsonResult.success(flag == null ? false : flag);
+    }
+
+    // 从请求头Token中解析当前登录用户id, 未登录返回0
+    private Long getCurrentMemberId() {
+        String token = TokenUtils.getToken();
+        if (token == null || token.trim().length() == 0) {
+            return 0L;
+        }
+        String userId = TokenUtils.parseToken(token);
+        if (userId == null || userId.length() == 0 || userId.matches("^[0-9]+$") == false) {
+            return 0L;
+        }
+        try {
+            return Long.parseLong(userId);
+        } catch (NumberFormatException e) {
+            return 0L;
+        }
+    }
+
+    // 静默记录查看(异常不影响主流程)
+    private void recordViewQuietly(Long groupId) {
+        try {
+            Long memberId = this.getCurrentMemberId();
+            if (memberId != null && memberId > 0) {
+                viewLogService.recordView(memberId, groupId);
+            }
+        } catch (Exception e) {
+            log.error("查看团购自动埋点异常 groupId:{}", groupId, e);
+        }
     }
 
     // 团长店铺详情
@@ -404,6 +437,19 @@ public class MemberGroupController {
         List<Integer> list = new ArrayList<>(set);
         Collections.sort(list, Collections.reverseOrder());
         return list;
+    }
+
+    /**
+     * 真实跟团记录：基于支付成功订单数据
+     */
+    @GetMapping("/group/order/records")
+    public JsonResult groupOrderRecords(@RequestParam(value = "groupId", required = false) Long groupId,
+                                        @RequestParam(value = "limit", required = false) Integer limit) {
+        if (groupId == null || groupId <= 0) {
+            return JsonResult.fail("团购活动id不能为空");
+        }
+        List<GroupOrderRecordResponse> data = orderInfoService.getGroupOrderRecordList(groupId, limit);
+        return JsonResult.success(data);
     }
 
 }
