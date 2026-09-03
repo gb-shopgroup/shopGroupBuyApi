@@ -14,6 +14,7 @@ import cn.com.shopgroup.user.service.GbOrgShopInfoService;
 import cn.com.shopgroup.user.utils.QRCodeUtil;
 import cn.com.shopgroup.user.utils.RequestParamsUtils;
 import com.alibaba.csp.sentinel.util.StringUtil;
+import com.alibaba.fastjson2.JSON;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -82,13 +83,14 @@ public class LeaderShopController {
     // 修改店铺信息
     @PostMapping("/leader/shop/save")
     public JsonResult saveShop(@Validated @RequestBody ShopRequest request) {
-
+        log.info("修改店铺信息.../leader/shop/save req:{}", JSON.toJSONString(request));
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
             return JsonResult.fail("lid不存在");
         }
         GbOrgShopInfo shopInfo = shopInfoService.getInfoByLeaderAndShopId(leaderId, request.getShopId());
+        log.info("修改店铺信息.先查询店铺结果shopInfo:{}", JSON.toJSONString(shopInfo));
         if (ObjectUtils.isEmpty(shopInfo)) {
             String msg = "shopId=" + request.getShopId() + ",leaderId=" + leaderId + "未查询相关店铺信息";
             return JsonResult.fail(msg);
@@ -113,7 +115,7 @@ public class LeaderShopController {
     // 修改店铺信息
     @PostMapping("/leader/shop/update")
     public JsonResult saveShop(@Validated @RequestBody ShopErCodeRequest request) {
-
+        log.info("修改店铺信息.../leader/shop/update req:{}", JSON.toJSONString(request));
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {

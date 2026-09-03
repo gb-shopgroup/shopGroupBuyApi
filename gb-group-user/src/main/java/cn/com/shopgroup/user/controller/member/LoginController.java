@@ -11,6 +11,7 @@ import cn.com.shopgroup.user.http.request.MemberRequest;
 import cn.com.shopgroup.user.http.response.LoginMemberResponse;
 import cn.com.shopgroup.user.model.GbMemberInfo;
 import cn.com.shopgroup.user.service.GbMemberInfoService;
+import com.alibaba.fastjson2.JSON;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -111,7 +112,7 @@ public class LoginController {
     // 注册新用户
     @PostMapping("/reg")
     public JsonResult reg(@RequestBody MemberRequest request) {
-
+        log.info("用户注册/user/reg req:{}", JSON.toJSONString(request));
         // 查询是否已经注册成功了
         String openid = request.getOpenid();
         GbMemberInfo results = service.getMiniMemberByOpenId(openid);

@@ -29,7 +29,7 @@ public class WxOrderController {
     //查询微信订单发货状态（查询订单状态枚举：(1) 待发货；(2) 已发货；(3) 确认收货；(4) 交易完成；(5) 已退款；(6) 资金待结算）
     @GetMapping("/group/wx/order")
     public JsonResult wxOrder(@RequestParam("orderNo") String orderNo) {
-        log.info("【接口：/order/group/wx/order】 orderNo:{}", orderNo);
+        log.info("【查询订单发货状态接口：/order/group/wx/order】 orderNo:{}", orderNo);
         // 查询订单详情
         GbOrderInfo orderInfo = orderInfoService.getOrderInfoByOrderNo(orderNo);
         log.info("【接口：/group/order/wx/order】 查询结果-orderInfo:{}", JSON.toJSON(orderInfo));

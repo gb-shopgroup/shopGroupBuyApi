@@ -13,7 +13,7 @@ public interface GbOrgLeaderInfoService {
 
 
     Long addAdminLeaderInfo(String name, String mobile, String nickName,
-                            String avatar, String openid, byte commission);
+                            String avatar, String openid, byte commission, Integer cashType);
 
 
     List<GbOrgLeaderInfo> getAdminLeaderSelectList();

@@ -53,6 +53,9 @@ public class GbOrgLeaderInfo {
     // 平台抽成,千分率
     @TableField("commission")
     private Byte commission;
+    // 结算到账方式,默认0=支付时延迟到账型,1=核销时延迟到账型
+    @TableField("cash_type")
+    private Integer cashType;
     // 发团数量限制（状态：在线）
     @TableField("num_limit")
     private Integer numLimit;

@@ -86,7 +86,7 @@ public class AdminLeaderController {
         String openid = memberInfo.getOpenid();
 
         // 添加团长信息
-        Long leaderId = service.addAdminLeaderInfo(request.getName(), mobile, nickName, avatar, openid, request.getCommission());
+        Long leaderId = service.addAdminLeaderInfo(request.getName(), mobile, nickName, avatar, openid, request.getCommission(), request.getCashType());
         if (leaderId.intValue() <= 0) {
             return JsonResult.fail("添加失败");
         }

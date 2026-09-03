@@ -22,6 +22,7 @@ import cn.com.shopgroup.order.service.GbOrderInfoService;
 import cn.com.shopgroup.user.http.response.ShopResponse;
 import cn.com.shopgroup.user.model.GbOrgShopInfo;
 import cn.com.shopgroup.user.service.GbOrgShopInfoService;
+import com.alibaba.fastjson2.JSON;
 import io.swagger.annotations.Api;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
@@ -82,7 +83,7 @@ public class MemberGroupController {
     // 用户首页-查询所有团购活动列表
     @PostMapping("/group/get/groupActivity/list")
     public JsonResult getGroupActiveList(@RequestBody MemberGroupListRequest request) {
-
+        log.info("order/group/get/groupActivity/list req:{}", JSON.toJSONString(request));
         // 请求参数矫正
         int page = Optional.ofNullable(request.getPage()).orElse(1);
         int pageSize = Optional.ofNullable(request.getPageSize())
@@ -134,7 +135,7 @@ public class MemberGroupController {
 
             // 根据id查询团购详情
             GbGroupActivityInfo item = groupActivityInfoService.getMiniGroupActivityInfo(groupId);
-            if(ObjectUtils.isEmpty(item)){
+            if (ObjectUtils.isEmpty(item)) {
                 return JsonResult.success();
             }
             GroupActivityResponse data = new GroupActivityResponse(item);
@@ -158,6 +159,7 @@ public class MemberGroupController {
     // 用户查看团购详情-显式埋点上报(分享等场景前端调用; 首页进入详情会自动埋点, 可不上报)
     @PostMapping("/group/groupActivity/view")
     public JsonResult groupView(@RequestBody MemberGroupViewRequest request) {
+        log.info("order/group/groupActivity/view req:{}", JSON.toJSONString(request));
         if (request == null || request.getGroupId() == null || request.getGroupId() <= 0) {
             return JsonResult.fail("groupId不能为空");
         }
@@ -202,7 +204,7 @@ public class MemberGroupController {
     // 团长店铺详情
     @GetMapping("/group/groupActivity/shop")
     public JsonResult groupShop(@RequestParam("leaderId") Long leaderId) {
-
+        log.info("order/group/groupActivity/shop req:{}", leaderId);
         String key = RedisConstant.RedisShopInfoKey + leaderId;
         if (redisHelper.hasKey(key) == false) {
 

@@ -97,8 +97,8 @@ public class LeaderGoodsManageController {
     public JsonResult goodsList(@RequestParam("cat") Long catId,
                                 @RequestParam(value = "keyword", required = false) String keyword,
                                 @RequestParam("page") int page, @RequestParam("pageSize") int pageSize) {
+        log.info("goods/leader/goods/list catId:{},keyword:{}",catId,keyword);
         Long leaderId = getLeaderId();
-
         // 请求参数矫正
         if (page == 0) page = 1;
         if (pageSize == 0) pageSize = 10;

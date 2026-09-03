@@ -418,7 +418,7 @@ public class MemberOrderController {
         // 查询用户信息
         String token = TokenUtils.getToken();
         if (token == null || token.length() == 0) {
-            JsonResult.fail("token不存在");
+            JsonResult.fail("请登录后操作");
         }
         String userId = TokenUtils.parseToken(token);
         if (StringUtils.isEmpty(userId) || userId.matches("^[0-9]+$") == false) {
@@ -431,7 +431,7 @@ public class MemberOrderController {
             return JsonResult.fail("用户不存在");
         }
         if (memberId == 0) {
-            return JsonResult.fail("用户不存在");
+            return JsonResult.fail("请先登录");
         }
         // 查询订单信息
         List<GbOrderInfo> list = orderInfoService.getPaidOrderInfoBy(memberId, shopId);

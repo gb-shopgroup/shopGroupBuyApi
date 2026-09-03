@@ -9,6 +9,8 @@ import cn.com.shopgroup.common.utils.IpUtils;
 import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.MoneyUtil;
 import cn.com.shopgroup.common.utils.TimeUtils;
+import cn.com.shopgroup.common.wxmini.WxMiniAccessTokenHelper;
+import cn.com.shopgroup.common.wxmini.WxMiniProgramHelper;
 import cn.com.shopgroup.common.yeepay.YeepayConfig;
 import cn.com.shopgroup.common.yeepay.YeepayUtils;
 import cn.com.shopgroup.goods.service.GbGroupActivityInfoService;
@@ -72,11 +74,11 @@ public class OrderPaymentController {
     private GbGroupActivityInfoService groupService;
     @Resource
     private OrderTransactionLogService transactionLogService;
-
     // 支付回调
     @Resource
     private YeepayConfig yeepayConfig;
-
+    @Resource
+    private WxMiniAccessTokenHelper tokenHelper;
 
     // 发起支付
     @GetMapping("/order/pay")
@@ -109,6 +111,10 @@ public class OrderPaymentController {
         String goodsName = orderInfo.getGroupName();
         // 查询团长的收款账户
         Long leaderId = orderInfo.getLeaderId();
+        GbOrgLeaderInfo leaderInfo = leaderService.getLeaderInfo(leaderId);
+        if (ObjectUtils.isEmpty(leaderInfo)) {
+            return JsonResult.fail("团长信息有误");
+        }
         List<GbOrgBusinessInfo> businessList = businessService.getMiniBusinessList(leaderId);
         if (CollectionUtils.isEmpty(businessList)) {
             return JsonResult.fail("该团长没有收款账户");
@@ -148,6 +154,15 @@ public class OrderPaymentController {
         transactionLog.setAddTime(TimeUtils.getTimeStamp());
         if (Integer.parseInt(success) == 1) {
             transactionLog.setPayStatus(PaymentStatusEnum.PENDING.getCode());
+            //订单对应的团长的cashType[结算到账方式,0=支付时延迟到账型,1=核销时延迟到账型]
+            int type = leaderInfo.getCashType().intValue();
+            if (type == 1) {
+                GbOrderBusinessInfo orderBusinessInfo = orderBusinessService.getOrderBusinessInfo(orderNo);
+                String accessToken = tokenHelper.getAccessToken(false);
+                String name = orderInfo.getGroupName();
+                String transactionId = orderBusinessInfo.getTransactionId();
+                WxMiniProgramHelper.uploadShippingInfo(accessToken, transactionId, name, openid);
+            }
             handleInsertTransaction(transactionLog);
             return JsonResult.success(JSONObject.parse(data));
         } else {

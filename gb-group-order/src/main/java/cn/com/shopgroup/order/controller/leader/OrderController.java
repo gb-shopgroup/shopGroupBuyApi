@@ -17,8 +17,10 @@ import cn.com.shopgroup.order.model.GbOrderGoodsInfo;
 import cn.com.shopgroup.order.model.GbOrderInfo;
 import cn.com.shopgroup.order.service.GbOrderBusinessInfoService;
 import cn.com.shopgroup.order.service.GbOrderInfoService;
+import cn.com.shopgroup.user.model.GbOrgLeaderInfo;
 import cn.com.shopgroup.user.model.GbOrgPointInfo;
 import cn.com.shopgroup.user.model.GbOrgStaffInfo;
+import cn.com.shopgroup.user.service.GbOrgLeaderInfoService;
 import cn.com.shopgroup.user.service.GbOrgPointInfoService;
 import cn.com.shopgroup.user.service.GbOrgStaffInfoService;
 import cn.com.shopgroup.user.utils.RequestParamsUtils;
@@ -53,6 +55,8 @@ public class OrderController {
     private GbOrderBusinessInfoService businessService;
     @Resource
     private WxMiniAccessTokenHelper helper;
+    @Resource
+    private GbOrgLeaderInfoService leaderInfoService;
 
     // 团长订单列表（按团活动/订单状态/关键字筛选, 关键字支持商品名称或手机号, 分页查询）
     @PostMapping("/leader/order/list")
@@ -173,6 +177,10 @@ public class OrderController {
         if (leaderId == 0) {
             return JsonResult.fail("lid不存在");
         }
+        GbOrgLeaderInfo leaderInfo = leaderInfoService.getLeaderInfo(leaderId);
+        if (ObjectUtils.isEmpty(leaderInfo)) {
+            return JsonResult.fail("团长信息有误");
+        }
         // 从请求头中获取员工id
         Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
         String opName = "团长本人";
@@ -220,6 +228,7 @@ public class OrderController {
         if (flag) {
             //核销成功后。同步订单商品数量全部收货（方便展示同步商品核销数量）
             int m = orderInfoService.updateGoodsNum(goodsList);
+            //核销成功后，//订单对应的团长的cashType[结算到账方式,0=支付时延迟到账型,1=核销时延迟到账型]
             return JsonResult.success("核销成功");
         } else {
             return JsonResult.success("核销失败");
@@ -229,6 +238,7 @@ public class OrderController {
     // 部分核销订单
     @PostMapping("/leader/order/partWriteOff")
     public JsonResult partWriteOff(@RequestBody OrderVerifyRequest request) {
+        log.info("[核销订单:/leader/order/partWriteOff] params request:{}", JSON.toJSONString(request));
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
@@ -300,16 +310,12 @@ public class OrderController {
     // 团长端-查询微信发货
     @GetMapping("/leader/order/send")
     public JsonResult sendOrder(@RequestParam("orderNo") String orderNo) {
+        log.info("查询微信发货 orderNo:{}", orderNo);
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
             return JsonResult.fail("lid不存在");
         }
-        // 从请求头中获取员工id
-//        Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
-//        if (staffId == 0) {
-//            return JsonResult.fail("sid不存在");
-//        }
         // 查询订单
         GbOrderBusinessInfo orderInfo = businessService.getOrderBusinessInfo(orderNo);
         if (ObjectUtils.isEmpty(orderInfo)) {
@@ -346,11 +352,6 @@ public class OrderController {
         if (leaderId == 0) {
             return JsonResult.fail("lid不存在");
         }
-        // 从请求头中获取员工id
-//        Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
-//        if (staffId == 0) {
-//            return JsonResult.fail("sid不存在");
-//        }
         // 返回的数据
         LeaderHomeShowDataResponse response = new LeaderHomeShowDataResponse();
         Integer orderTotal = 0;

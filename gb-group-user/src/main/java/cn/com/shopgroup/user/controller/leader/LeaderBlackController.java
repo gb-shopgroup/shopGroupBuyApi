@@ -9,6 +9,8 @@ import cn.com.shopgroup.user.service.GbMemberBlackListService;
 import cn.com.shopgroup.user.service.GbMemberInfoService;
 import cn.com.shopgroup.user.service.GbOrgStaffInfoService;
 import cn.com.shopgroup.user.utils.RequestParamsUtils;
+import com.alibaba.fastjson2.JSON;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.ObjectUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,6 +23,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/user")
+@Slf4j
 public class LeaderBlackController {
 
     @Resource
@@ -35,8 +38,9 @@ public class LeaderBlackController {
     // 根据手机号查询用户
     @GetMapping("/leader/member/mobile")
     public JsonResult getMemberMobile(@RequestParam("mobile") String mobile) {
-
+        log.info("/user/leader/member/mobile req mobile:{}",mobile);
         GbMemberInfo data = memberInfoService.getMemberInfoByMobile(mobile);
+        log.info("data from db info:{}", JSON.toJSONString(data));
         if (ObjectUtils.isEmpty(data)) {
             return JsonResult.fail("用户不存在");
         }
@@ -47,7 +51,7 @@ public class LeaderBlackController {
     // 加入黑名单
     @PostMapping("/leader/add/black")
     public JsonResult addMemberBlack(@RequestParam("memberId") Long memberId) {
-
+        log.info("/user/leader//add/black req memberId:{}",memberId);
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
@@ -92,7 +96,7 @@ public class LeaderBlackController {
     // 根据手机号查询黑名单用户
     @GetMapping("/leader/black/mobile")
     public JsonResult queryMemberBlack(@RequestParam("mobile") String mobile) {
-
+        log.info("根据手机号查询黑名单用户 req mobile:{}",mobile);
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {

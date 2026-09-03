@@ -5,6 +5,7 @@ import cn.com.shopgroup.order.http.response.ReportResponse;
 import cn.com.shopgroup.order.model.GbReportBusinessInfo;
 import cn.com.shopgroup.order.service.GbReportBusinessInfoService;
 import cn.com.shopgroup.user.utils.RequestParamsUtils;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -15,6 +16,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/order")
+@Slf4j
 public class ReportController {
 
     @Resource
@@ -23,7 +25,7 @@ public class ReportController {
     // 分账汇总列表
     @GetMapping("/leader/report/business/list")
     public JsonResult reportBusinessList(@RequestParam("page") int page, @RequestParam("pageSize") int pageSize) {
-
+        log.info("/leader/report/business/list");
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) return JsonResult.fail("lid不存在");

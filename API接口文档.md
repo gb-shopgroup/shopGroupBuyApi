@@ -4640,6 +4640,7 @@ data 类型：`Object`（未能静态推断，以接口实际返回为准）
 | shopName | `String` | 是 | 请输入店铺名称 |
 | shopCode | `String` | 是 | 请输入商户编号 |
 | commission | `Byte` | 是 | 最小是3 |
+| cashType | `Integer` | 否 | 结算到账方式：0=支付时延迟到账型(默认)，1=核销时延迟到账型 |
 
 **出参（JsonResult 统一返回体）**
 

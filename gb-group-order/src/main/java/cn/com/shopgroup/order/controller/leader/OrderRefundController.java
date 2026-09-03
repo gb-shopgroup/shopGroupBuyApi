@@ -75,18 +75,12 @@ public class OrderRefundController {
     // 退款订单数量
     @GetMapping("/leader/refund/count")
     public JsonResult refundOrderCount(@RequestParam("gid") Long groupId, @RequestParam("pid") Long pointId) {
-
+        log.info("退款订单数量 /leader/refund/count groupId:{},pointId:{}",groupId,pointId);
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
             return JsonResult.fail("lid不存在");
         }
-
-        // 从请求头中获取员工id
-//        Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
-//        if (staffId == 0) {
-//            return JsonResult.fail("sid不存在");
-//        }
 
         // 查询总数
         Long total = orderInfoService.getMiniLeaderOrderCount(leaderId, groupId, pointId, 4);

@@ -268,7 +268,7 @@ public class LeaderGroupManageController {
     // 查询团购信息, 还要查询商品列表(价格以团购商品表冗余的团购价为准)
     @GetMapping("/get/groupActivity/info")
     public JsonResult getGroupActivity(@RequestParam("groupId") Long groupId) {
-
+        log.info("goods/get/groupActivity/info groupId:{}",groupId);
         GbGroupActivityInfo groupInfo = activityInfoService.getGroupInfo(groupId);
         if (ObjectUtils.isEmpty(groupInfo)) {
             return JsonResult.fail("未查到相关团购活动信息");
@@ -301,7 +301,7 @@ public class LeaderGroupManageController {
     // 修改团购活动, 团购进行中, 不允许修改
     @PostMapping("/groupActivity/edit")
     public JsonResult editGroup(@Validated @RequestBody GroupActRequest request) {
-        log.info("编辑团购活动请求reques:{}", JSON.toJSONString(request));
+        log.info("编辑团购活动请求request:{}", JSON.toJSONString(request));
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
@@ -446,7 +446,7 @@ public class LeaderGroupManageController {
     // 这样就不需要修改的时候同步Redis缓存了, 只需要关闭修改完, 打开上线的时候更新一次即可
     @PostMapping("/groupActivity/close")
     public JsonResult closeGroup(@RequestParam("groupId") Long groupId) {
-
+        log.info("goods/groupActivity/close groupId:{}",groupId);
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {

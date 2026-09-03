@@ -37,7 +37,7 @@ public class GbOrgLeaderInfoServiceImpl implements GbOrgLeaderInfoService {
     }
 
 
-    public Long addAdminLeaderInfo(String name, String mobile, String nickName, String avatar, String openid, byte commission){
+    public Long addAdminLeaderInfo(String name, String mobile, String nickName, String avatar, String openid, byte commission, Integer cashType){
 
         GbOrgLeaderInfo info = new GbOrgLeaderInfo();
 
@@ -66,6 +66,8 @@ public class GbOrgLeaderInfoServiceImpl implements GbOrgLeaderInfoService {
         info.setLeaderBalance(0D);
 
         info.setCommission(commission);
+
+        info.setCashType(cashType == null ? 0 : cashType);
 
         info.setNumLimit(0);
 

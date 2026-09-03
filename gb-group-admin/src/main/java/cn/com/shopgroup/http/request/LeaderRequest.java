@@ -25,5 +25,10 @@ public class LeaderRequest {
     @Max(value = 10, message = "最大是10")
     private Byte commission;
 
+    // 结算到账方式,默认0=支付时延迟到账型,1=核销时延迟到账型(不传默认0)
+    @Min(value = 0, message = "到账方式最小是0")
+    @Max(value = 1, message = "到账方式最大是1")
+    private Integer cashType;
+
 
 }

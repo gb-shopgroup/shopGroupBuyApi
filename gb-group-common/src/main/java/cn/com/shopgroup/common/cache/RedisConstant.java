@@ -33,7 +33,7 @@ public class RedisConstant {
 
 
 
-    public final static long RedisOrderAddExpired = 10;
+    public final static long RedisOrderAddExpired = 5;
     public final static String RedisOrderAddKey = "OrderAdd:";
 
 

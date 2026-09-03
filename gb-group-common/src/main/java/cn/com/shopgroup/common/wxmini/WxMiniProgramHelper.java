@@ -292,6 +292,7 @@ public class WxMiniProgramHelper {
         String json = JSON.toJSONString(data);
 
         RestTemplate restTemplate = new RestTemplate();
+        log.info("微信发货参数data:{}" + JSON.toJSONString(data));
         ResponseEntity<Map> response = restTemplate.postForEntity(url, data, Map.class);
         log.info("微信发货响应：" + response.getBody().toString());
         Map<String, Object> responseBody = response.getBody();
@@ -323,6 +324,7 @@ public class WxMiniProgramHelper {
 
 
         RestTemplate restTemplate = new RestTemplate();
+        log.info("查询订单发货状态参数:data:{}", JSON.toJSONString(data));
         ResponseEntity<Map> response = restTemplate.postForEntity(url, data, Map.class);
         log.info("微信查询订单响应：" + response.getBody().toString());
         Map<String, Object> responseBody = response.getBody();

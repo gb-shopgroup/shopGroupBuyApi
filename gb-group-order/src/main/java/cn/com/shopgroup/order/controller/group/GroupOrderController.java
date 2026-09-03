@@ -4,19 +4,23 @@ import cn.com.shopgroup.common.cache.RedisConstant;
 import cn.com.shopgroup.common.cache.RedisHelper;
 import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.TokenUtils;
+import cn.com.shopgroup.order.http.request.OrderGoodsRequest;
 import cn.com.shopgroup.order.http.request.OrderRequest;
 import cn.com.shopgroup.order.service.OrderService;
 import com.alibaba.fastjson2.JSON;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.Resource;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/order/group")
@@ -50,15 +54,21 @@ public class GroupOrderController {
             JsonResult.fail("用户不存在");
         }
         if (memberId == 0) {
-            JsonResult.fail("用户不存在");
+            return JsonResult.fail("用户不存在");
         }
-
+        List<OrderGoodsRequest> goods = request.getGoods();
+        if (CollectionUtils.isEmpty(goods)) {
+            return JsonResult.fail("请选择商品后再下单");
+        }
+        String ids = goods.stream().map(OrderGoodsRequest::getId).collect(Collectors.toList()).toString();
+        String nums = goods.stream().map(OrderGoodsRequest::getNum).collect(Collectors.toList()).toString();
         // 防刷
-        String key = RedisConstant.RedisOrderAddKey + memberId + request.getGroupId();
+        String key = RedisConstant.RedisOrderAddKey + memberId + request.getGroupId() + ids + nums;
         if (redisHelper.hasKey(key)) {
-            return JsonResult.fail("系统繁忙, 请稍后提交订单");
+            return JsonResult.fail("订单正在处理中，请勿重复提交");
         } else {
-            redisHelper.setCacheObject(key, memberId, RedisConstant.RedisOrderAddExpired, TimeUnit.SECONDS);
+            //key----value--随便设置值，暂时用不到
+            redisHelper.setCacheObject(key, key, RedisConstant.RedisOrderAddExpired, TimeUnit.SECONDS);
         }
 
         // 下单

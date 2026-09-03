@@ -602,6 +602,7 @@ CREATE TABLE `gb_org_leader_info` (
   `end_time` int unsigned NOT NULL DEFAULT '0' COMMENT '结束时间,使用有效期',
   `leader_balance` decimal(8,2) NOT NULL DEFAULT '0.00' COMMENT '账户余额',
   `commission` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '平台抽成,千分率',
+  `cash_type` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '结算到账方式,0=支付时延迟到账型,1=核销时延迟到账型',
   `num_limit` int unsigned NOT NULL DEFAULT '0' COMMENT '发团数量限制（状态：在线）',
   `remark` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '系统备注',
   `is_close` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '是否禁用',
