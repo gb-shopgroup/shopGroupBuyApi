@@ -71,6 +71,7 @@ public class GbGoodsSpecValueServiceImpl implements GbGoodsSpecValueService {
 
         LambdaQueryWrapper<GbGoodsSpecValue> queryWrapper = Wrappers.lambdaQuery();
         queryWrapper.eq(GbGoodsSpecValue::getSpecId, specId);
+        queryWrapper.eq(GbGoodsSpecValue::getIsClose, (byte) 0);
         queryWrapper.orderByAsc(GbGoodsSpecValue::getValId);
         List<GbGoodsSpecValue> result = specValueMapper.selectList(queryWrapper);
         return result == null ? new ArrayList<>() : result;

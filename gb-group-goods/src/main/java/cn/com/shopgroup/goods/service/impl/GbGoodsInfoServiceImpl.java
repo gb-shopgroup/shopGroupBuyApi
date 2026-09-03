@@ -33,7 +33,7 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
 
         LambdaQueryWrapper<GbGoodsInfo> queryWrapper = Wrappers.lambdaQuery();
         queryWrapper.orderByDesc(GbGoodsInfo::getGoodsId);
-        queryWrapper.eq(GbGoodsInfo::getIsClose, (byte)0);
+        queryWrapper.eq(GbGoodsInfo::getIsClose, (byte) 0);
         queryWrapper.last("limit " + (page - 1) * pageSize + "," + pageSize);
         List<GbGoodsInfo> result = mapper.selectList(queryWrapper);
         return result == null ? new ArrayList<>() : result;
@@ -41,9 +41,8 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
 
 
     public Long getAdminGoodsCount() {
-
         LambdaQueryWrapper<GbGoodsInfo> queryWrapper = Wrappers.lambdaQuery();
-        queryWrapper.eq(GbGoodsInfo::getIsClose, (byte)0);
+        queryWrapper.eq(GbGoodsInfo::getIsClose, (byte) 0);
         return mapper.selectCount(queryWrapper);
     }
 
@@ -55,12 +54,12 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
 
 
     public List<GbGoodsInfo> getGoodsInfoList(List<Long> goodsIds) {
-
         if (CollectionUtils.isEmpty(goodsIds)) {
             return new ArrayList<>();
         }
         LambdaQueryWrapper<GbGoodsInfo> queryWrapper = Wrappers.lambdaQuery();
         queryWrapper.in(GbGoodsInfo::getGoodsId, goodsIds);
+        queryWrapper.eq(GbGoodsInfo::getIsClose, (byte) 0);
         List<GbGoodsInfo> results = mapper.selectList(queryWrapper);
         return results == null ? new ArrayList<>() : results;
     }
@@ -71,6 +70,7 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
         LambdaQueryWrapper<GbGoodsInfo> queryWrapper = Wrappers.lambdaQuery();
         queryWrapper.select(GbGoodsInfo::getGoodsId, GbGoodsInfo::getGoodsNum);
         queryWrapper.in(GbGoodsInfo::getGoodsId, goodsIds);
+        queryWrapper.eq(GbGoodsInfo::getIsClose, (byte) 0);
         queryWrapper.orderByAsc(GbGoodsInfo::getGoodsId);
         List<GbGoodsInfo> results = mapper.selectList(queryWrapper);
         return results == null ? new ArrayList<>() : results;
@@ -99,6 +99,7 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
 
         LambdaQueryWrapper<GbGoodsInfo> queryWrapper = Wrappers.lambdaQuery();
         queryWrapper.select(GbGoodsInfo::getGoodsNum);
+        queryWrapper.eq(GbGoodsInfo::getIsClose, (byte) 0);
         queryWrapper.eq(GbGoodsInfo::getGoodsId, goodsId);
         GbGoodsInfo info = mapper.selectOne(queryWrapper);
         return info.getGoodsNum();
@@ -125,7 +126,7 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
             queryWrapper.eq(GbGoodsInfo::getCatId, catId);
         }
         queryWrapper.eq(GbGoodsInfo::getLeaderId, leaderId);
-        queryWrapper.eq(GbGoodsInfo::getIsClose, (byte)0);
+        queryWrapper.eq(GbGoodsInfo::getIsClose, (byte) 0);
         queryWrapper.orderByDesc(GbGoodsInfo::getGoodsId);
         queryWrapper.last("limit " + (page - 1) * pageSize + "," + pageSize);
         List<GbGoodsInfo> result = mapper.selectList(queryWrapper);
@@ -140,7 +141,7 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
             queryWrapper.eq(GbGoodsInfo::getCatId, catId);
         }
         queryWrapper.eq(GbGoodsInfo::getLeaderId, leaderId);
-        queryWrapper.eq(GbGoodsInfo::getIsClose, (byte)0);
+        queryWrapper.eq(GbGoodsInfo::getIsClose, (byte) 0);
         return mapper.selectCount(queryWrapper);
     }
 
@@ -155,7 +156,7 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
             queryWrapper.like(GbGoodsInfo::getGoodsName, keyword.trim());
         }
         queryWrapper.eq(GbGoodsInfo::getLeaderId, leaderId);
-        queryWrapper.eq(GbGoodsInfo::getIsClose, (byte)0);
+        queryWrapper.eq(GbGoodsInfo::getIsClose, (byte) 0);
         queryWrapper.orderByDesc(GbGoodsInfo::getGoodsId);
         queryWrapper.last("limit " + (page - 1) * pageSize + "," + pageSize);
         List<GbGoodsInfo> result = mapper.selectList(queryWrapper);
@@ -169,7 +170,7 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
         if (catId != null && catId > 0) {
             queryWrapper.eq(GbGoodsInfo::getCatId, catId);
         }
-        queryWrapper.eq(GbGoodsInfo::getIsClose, (byte)0);
+        queryWrapper.eq(GbGoodsInfo::getIsClose, (byte) 0);
         if (keyword != null && keyword.trim().length() > 0) {
             queryWrapper.like(GbGoodsInfo::getGoodsName, keyword.trim());
         }
@@ -228,6 +229,7 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
         updateWrapper.set(GbGoodsInfo::getGoodsUnit, info.getGoodsUnit());
         updateWrapper.set(GbGoodsInfo::getGoodsInfo, Optional.ofNullable(info.getGoodsInfo()).orElse(""));
         updateWrapper.set(GbGoodsInfo::getIsCheck, 1);
+        updateWrapper.set(GbGoodsInfo::getIsClose, (byte) 0);
         updateWrapper.eq(GbGoodsInfo::getGoodsId, info.getGoodsId());
         updateWrapper.eq(GbGoodsInfo::getLeaderId, leaderId);
         int flag = mapper.update(updateWrapper);
@@ -268,7 +270,6 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
 
 
     public Boolean reduceGoodsStock(Long goodsId, Integer goodsNum) {
-
         int num = Math.abs(goodsNum);
         LambdaUpdateWrapper<GbGoodsInfo> updateWrapper = Wrappers.lambdaUpdate();
         // 原子扣减并防超扣: 仅当库存 >= 扣减数时才更新, 否则返回false表示库存不足

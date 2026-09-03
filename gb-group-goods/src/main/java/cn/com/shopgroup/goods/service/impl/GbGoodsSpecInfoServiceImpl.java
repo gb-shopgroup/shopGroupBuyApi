@@ -41,7 +41,7 @@ public class GbGoodsSpecInfoServiceImpl implements GbGoodsSpecInfoService {
         queryWrapper.select(GbGoodsSpecInfo::getSpecId, GbGoodsSpecInfo::getSpecName);
         // 只查该商品自己的规格(goods_id 关联), 避免全库规格(含 goods_id=0 的全局模板)混入其他商品的 SKU 自动生成
         queryWrapper.eq(GbGoodsSpecInfo::getGoodsId, goodsId);
-        queryWrapper.eq(GbGoodsSpecInfo::getIsClose, 0);
+        queryWrapper.eq(GbGoodsSpecInfo::getIsClose, (byte) 0);
         queryWrapper.orderByAsc(GbGoodsSpecInfo::getSpecId);
         List<GbGoodsSpecInfo> data = mapper.selectList(queryWrapper);
         if (data == null || data.size() == 0) return new ArrayList<>();
@@ -56,6 +56,7 @@ public class GbGoodsSpecInfoServiceImpl implements GbGoodsSpecInfoService {
                 GbGoodsSpecValue::getSpecId,
                 GbGoodsSpecValue::getValId,
                 GbGoodsSpecValue::getSpecVal);
+        queryWrapper2.eq(GbGoodsSpecValue::getIsClose, (byte) 0);
         queryWrapper2.in(GbGoodsSpecValue::getSpecId, specIds);
         queryWrapper2.orderByAsc(GbGoodsSpecValue::getValId); // 这个排序非常重要
         List<GbGoodsSpecValue> specValueList = valueMapper.selectList(queryWrapper2);
@@ -73,7 +74,6 @@ public class GbGoodsSpecInfoServiceImpl implements GbGoodsSpecInfoService {
             }
         }
 
-
         for (GbGoodsSpecInfo item : data) {
             Long tempId = item.getSpecId();
             if (specValueMap.containsKey(tempId)) {
@@ -82,33 +82,26 @@ public class GbGoodsSpecInfoServiceImpl implements GbGoodsSpecInfoService {
                 item.setSpecValueList(new ArrayList<>());
             }
         }
-
-
         return data;
     }
 
 
     public List<GbGoodsSpecInfo> getMiniLeaderGoodsSpecList(Long goodsId) {
 
-
         LambdaQueryWrapper<GbGoodsSpecInfo> queryWrapper = Wrappers.lambdaQuery();
+        queryWrapper.eq(GbGoodsSpecInfo::getIsClose, (byte) 0);
         queryWrapper.orderByAsc(GbGoodsSpecInfo::getSpecId);
         List<GbGoodsSpecInfo> result = mapper.selectList(queryWrapper);
         if (result == null || result.size() == 0) return result;
-
-
         List<Long> specIds = new ArrayList<>();
         for (GbGoodsSpecInfo item : result) {
             specIds.add(item.getSpecId());
         }
-
-
         LambdaQueryWrapper<GbGoodsSpecValue> queryWrapper2 = Wrappers.lambdaQuery();
+        queryWrapper2.eq(GbGoodsSpecValue::getIsClose, (byte) 0);
         queryWrapper2.in(GbGoodsSpecValue::getSpecId, specIds);
         queryWrapper2.orderByAsc(GbGoodsSpecValue::getValId);
         List<GbGoodsSpecValue> valList = valueMapper.selectList(queryWrapper2);
-
-
         Map<Long, List<GbGoodsSpecValue>> valMap = new HashMap<>();
         for (GbGoodsSpecValue item : valList) {
             Long tempId = item.getSpecId();
@@ -120,8 +113,6 @@ public class GbGoodsSpecInfoServiceImpl implements GbGoodsSpecInfoService {
                 valMap.put(tempId, tempList);
             }
         }
-
-
         for (GbGoodsSpecInfo item : result) {
 
             Long tempId = item.getSpecId();
@@ -131,56 +122,37 @@ public class GbGoodsSpecInfoServiceImpl implements GbGoodsSpecInfoService {
                 item.setSpecValueList(new ArrayList<>());
             }
         }
-
-
         return result == null ? new ArrayList<>() : result;
     }
 
 
     public Long addMiniLeaderGoodsSpec(GbGoodsSpecInfo info) {
-
         GbGoodsSpecInfo data = new GbGoodsSpecInfo();
-
         data.setSpecName(info.getSpecName());
         // 规格归属团长与商品, 否则落库为 0 变成孤儿/全局规格
         data.setLeaderId(info.getLeaderId());
         data.setGoodsId(info.getGoodsId());
-
         data.setIsPrice(info.getIsPrice());
-
         data.setIsStock(info.getIsStock());
-
         data.setSortOrder(255);
-
         data.setIsClose((byte) 0);
-
         data.setAddTime(TimeUtils.getTimeStamp());
-
-
         mapper.insert(data);
         return data.getSpecId();
     }
 
-
     public Boolean editMiniLeaderGoodsSpec(GbGoodsSpecInfo info) {
-
         LambdaUpdateWrapper<GbGoodsSpecInfo> updateWrapper = Wrappers.lambdaUpdate();
-
         updateWrapper.set(GbGoodsSpecInfo::getSpecName, info.getSpecName());
-
         updateWrapper.set(GbGoodsSpecInfo::getIsPrice, info.getIsPrice());
-
         updateWrapper.set(GbGoodsSpecInfo::getIsStock, info.getIsStock());
-
         updateWrapper.eq(GbGoodsSpecInfo::getSpecId, info.getSpecId());
-
         int flag = mapper.update(updateWrapper);
         return flag > 0 ? true : false;
     }
 
 
     public Boolean closeMiniLeaderGoodsSpec(Long specId, int status) {
-
         LambdaUpdateWrapper<GbGoodsSpecInfo> updateWrapper = Wrappers.lambdaUpdate();
         updateWrapper.set(GbGoodsSpecInfo::getIsClose, status);
         updateWrapper.eq(GbGoodsSpecInfo::getSpecId, specId);
@@ -190,14 +162,12 @@ public class GbGoodsSpecInfoServiceImpl implements GbGoodsSpecInfoService {
 
 
     public Boolean removeMiniLeaderGoodsSpec(Long specId) {
-
         int flag = mapper.deleteById(specId);
         return flag > 0 ? true : false;
     }
 
 
     public Boolean closeMiniLeaderGoodsSpecVal(int valId, int status) {
-
         LambdaUpdateWrapper<GbGoodsSpecValue> updateWrapper = Wrappers.lambdaUpdate();
         updateWrapper.set(GbGoodsSpecValue::getIsClose, status);
         updateWrapper.eq(GbGoodsSpecValue::getValId, valId);
@@ -231,13 +201,9 @@ public class GbGoodsSpecInfoServiceImpl implements GbGoodsSpecInfoService {
             Long specId = item.getSpecId();
             List<GbGoodsSpecValue> valueList = item.getSpecValueList();
             for (GbGoodsSpecValue temp : valueList) {
-
                 temp.setLeaderId(leaderId);
-
                 temp.setSpecId(specId);
-
                 temp.setIsClose((byte) 0);
-
                 temp.setAddTime(nowTime);
             }
             valueMapper.insert(valueList);
@@ -250,16 +216,16 @@ public class GbGoodsSpecInfoServiceImpl implements GbGoodsSpecInfoService {
     public List<GbGoodsSpecInfo> getLeaderGoodsSpecList(Long leaderId) {
         LambdaQueryWrapper<GbGoodsSpecInfo> queryWrapper = Wrappers.lambdaQuery();
         queryWrapper.eq(GbGoodsSpecInfo::getLeaderId, leaderId);
+        queryWrapper.eq(GbGoodsSpecInfo::getIsClose, (byte) 0);
         queryWrapper.orderByAsc(GbGoodsSpecInfo::getSpecId);
         List<GbGoodsSpecInfo> result = mapper.selectList(queryWrapper);
         if (result == null || result.size() == 0) return result;
-
-
         List<Long> specIds = new ArrayList<>();
         for (GbGoodsSpecInfo item : result) {
             specIds.add(item.getSpecId());
         }
         LambdaQueryWrapper<GbGoodsSpecValue> queryWrapper2 = Wrappers.lambdaQuery();
+        queryWrapper2.eq(GbGoodsSpecValue::getIsClose, (byte) 0);
         queryWrapper2.in(GbGoodsSpecValue::getSpecId, specIds);
         queryWrapper2.orderByAsc(GbGoodsSpecValue::getValId);
         List<GbGoodsSpecValue> valList = valueMapper.selectList(queryWrapper2);

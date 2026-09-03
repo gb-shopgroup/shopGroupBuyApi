@@ -2,7 +2,6 @@ package cn.com.shopgroup.goods.service.impl;
 
 import cn.com.shopgroup.goods.mapper.GbGoodsCategoryInfoMapper;
 import cn.com.shopgroup.goods.model.GbGoodsCategoryInfo;
-import cn.com.shopgroup.goods.model.GbGoodsInfo;
 import cn.com.shopgroup.goods.service.GbGoodsCategoryInfoService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -31,6 +30,7 @@ public class GbGoodsCategoryInfoServiceImpl implements GbGoodsCategoryInfoServic
     public Map<Long, String> getGoodsCategoryNameMap() {
         LambdaQueryWrapper<GbGoodsCategoryInfo> queryWrapper = Wrappers.lambdaQuery();
         queryWrapper.select(GbGoodsCategoryInfo::getCatId, GbGoodsCategoryInfo::getCatName);
+        queryWrapper.eq(GbGoodsCategoryInfo::getIsClose,(byte)0);
         List<GbGoodsCategoryInfo> list = goodsCategoryInfoMapper.selectList(queryWrapper);
         Map<Long, String> map = new HashMap<>();
         if (list != null) {

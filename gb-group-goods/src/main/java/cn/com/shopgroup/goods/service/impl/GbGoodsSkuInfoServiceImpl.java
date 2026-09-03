@@ -41,6 +41,7 @@ public class GbGoodsSkuInfoServiceImpl implements GbGoodsSkuInfoService {
         LambdaQueryWrapper<GbGoodsSkuInfo> queryWrapper = Wrappers.lambdaQuery();
         queryWrapper.select(GbGoodsSkuInfo::getGoodsNum, GbGoodsSkuInfo::getSalesPrice);
         queryWrapper.eq(GbGoodsSkuInfo::getSkuId, skuId);
+        queryWrapper.eq(GbGoodsSkuInfo::getIsClose, 0);
         return mapper.selectOne(queryWrapper);
     }
 
@@ -48,6 +49,7 @@ public class GbGoodsSkuInfoServiceImpl implements GbGoodsSkuInfoService {
     public List<GbGoodsSkuInfo> getMiniLeaderGoodsSkuList(Long goodsId) {
         LambdaQueryWrapper<GbGoodsSkuInfo> queryWrapper = Wrappers.lambdaQuery();
         queryWrapper.eq(GbGoodsSkuInfo::getGoodsId, goodsId);
+        queryWrapper.eq(GbGoodsSkuInfo::getIsClose, 0);
         queryWrapper.orderByAsc(GbGoodsSkuInfo::getSkuId);
         queryWrapper.last("limit 0, 100");
         List<GbGoodsSkuInfo> result = mapper.selectList(queryWrapper);
@@ -59,6 +61,7 @@ public class GbGoodsSkuInfoServiceImpl implements GbGoodsSkuInfoService {
         LambdaQueryWrapper<GbGoodsSkuInfo> queryWrapper = Wrappers.lambdaQuery();
         queryWrapper.eq(GbGoodsSkuInfo::getGoodsId, goodsId);
         queryWrapper.eq(GbGoodsSkuInfo::getLeaderId, leaderId);
+        queryWrapper.eq(GbGoodsSkuInfo::getIsClose, 0);
         mapper.delete(queryWrapper);
         int nowTime = TimeUtils.getTimeStamp();
         List<GbGoodsSkuInfo> dataList = new ArrayList<>();
