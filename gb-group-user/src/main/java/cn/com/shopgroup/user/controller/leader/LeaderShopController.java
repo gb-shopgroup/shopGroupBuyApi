@@ -6,12 +6,13 @@ import cn.com.shopgroup.common.config.UploadConfig;
 import cn.com.shopgroup.common.utils.HuaWeiOBS;
 import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.TimeUtils;
+import cn.com.shopgroup.common.wxmini.WxMiniAccessTokenHelper;
+import cn.com.shopgroup.common.wxmini.WxMiniProgramHelper;
 import cn.com.shopgroup.user.http.request.ShopErCodeRequest;
 import cn.com.shopgroup.user.http.request.ShopRequest;
 import cn.com.shopgroup.user.http.response.ShopResponse;
 import cn.com.shopgroup.user.model.GbOrgShopInfo;
 import cn.com.shopgroup.user.service.GbOrgShopInfoService;
-import cn.com.shopgroup.user.utils.QRCodeUtil;
 import cn.com.shopgroup.user.utils.RequestParamsUtils;
 import com.alibaba.csp.sentinel.util.StringUtil;
 import com.alibaba.fastjson2.JSON;
@@ -30,10 +31,12 @@ import org.springframework.web.bind.annotation.RestController;
 import javax.annotation.Resource;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import javax.imageio.ImageIO;
 
 @RestController
 @Api(value = "团长端首页展示订单数据统计对象")
@@ -50,6 +53,9 @@ public class LeaderShopController {
     @Resource
     private UploadConfig uploadConfig;
 
+    @Resource
+    private WxMiniAccessTokenHelper helper;
+
     @ApiOperation("查看店铺信息")
     @GetMapping("/leader/shop/info")
     public JsonResult getShopInfo() {
@@ -63,20 +69,33 @@ public class LeaderShopController {
 
     private JsonResult handleGetShop(Long leaderId) {
         String redisKey = RedisConstant.RedisShopInfoKey + leaderId;
-        if (redisHelper.hasKey(redisKey) == false) {
-            // 查询数据库 ---获取店铺信息
-            GbOrgShopInfo shopInfo = shopInfoService.getMiniLeaderShop(leaderId);
-            if (ObjectUtils.isEmpty(shopInfo)) {
-                return JsonResult.success("暂无店铺信息");
+        // 命中缓存直接返回
+        if (redisHelper.hasKey(redisKey)) {
+            ShopResponse cacheData = null;
+            try {
+                cacheData = redisHelper.getCacheObject(redisKey);
+            } catch (Exception e) {
+                log.error("读取店铺缓存失败,key:{},重新查询数据库", redisKey, e);
             }
-            // 缓存起来
-            ShopResponse data = new ShopResponse(shopInfo);
-            redisHelper.setCacheObject(redisKey, data, RedisConstant.RedisShopInfoExpired, TimeUnit.SECONDS);
-            return JsonResult.success(data);
+            if (cacheData != null) {
+                return JsonResult.success(cacheData);
+            }
+            // 缓存数据异常(反序列化失败/空值), 清除脏缓存后重新查询
+            redisHelper.deleteObject(redisKey);
         }
 
-        // 读取缓存数据
-        ShopResponse data = redisHelper.getCacheObject(redisKey);
+        // 查询数据库 ---获取店铺信息
+        GbOrgShopInfo shopInfo = shopInfoService.getMiniLeaderShop(leaderId);
+        if (ObjectUtils.isEmpty(shopInfo)) {
+            return JsonResult.success("暂无店铺信息");
+        }
+        // 缓存起来
+        ShopResponse data = new ShopResponse(shopInfo);
+        try {
+            redisHelper.setCacheObject(redisKey, data, RedisConstant.RedisShopInfoExpired, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            log.error("写店铺缓存失败,key:{}", redisKey, e);
+        }
         return JsonResult.success(data);
     }
 
@@ -98,8 +117,11 @@ public class LeaderShopController {
         // 保存店铺信息
         shopInfo.setShopBanner(request.getBanner());
         shopInfo.setShopName(request.getName());
+        shopInfo.setShopShortName(request.getShortName());
         shopInfo.setShopMobile(request.getMobile());
         shopInfo.setShopInfo(request.getShopInfo());
+        shopInfo.setShopCodeUrl(request.getShopCodeUrl());
+        shopInfo.setShopLogo(request.getShopLogo());
         boolean flag = shopInfoService.updateShopInfo(shopInfo);
         // 返回
         if (flag) {
@@ -146,7 +168,7 @@ public class LeaderShopController {
         return handleGetShop(leaderId);
     }
 
-    // 团长-我的店铺二维码,上传到服务器返回URL
+    // 团长-我的店铺小程序码,上传到服务器返回URL
     @PostMapping("/leader/shop/makeQrCode")
     public JsonResult shopMakeQrcode(@RequestParam("shopId") Long shopId) {
         log.info("【团长-我的店铺二维码生成】/leader/shop/makeQrCode shopId:{}", shopId);
@@ -165,11 +187,25 @@ public class LeaderShopController {
             return JsonResult.fail("二维码已经存在，二维码生成失败");
         }
 
-        // 生成二维码图片
+        // 统一获取AccessToken
+        String accessToken = helper.getAccessToken(false);
+        if (accessToken == null || accessToken.length() == 0) return JsonResult.fail("获取AccessToken失败");
+
+        // 生成小程序码图片
         byte[] bytes;
         try {
-            BufferedImage qrImg = QRCodeUtil.createQRCode(String.valueOf(shopId), 640, 640);
-            bytes = QRCodeUtil.imageToBytes(qrImg, "png");
+            // 小程序码落地页与scene参数: 需与小程序前端onLoad解析保持一致
+            String page = "pages/group/index";
+            String scene = "lid=" + leaderId;
+            int wh = 640; // 图片像素(最高1280像素)
+            BufferedImage qrImg = WxMiniProgramHelper.getMiniProgramPageERcodeBufferedImage(accessToken, page, scene, wh);
+            if (qrImg == null) {
+                log.error("生成小程序码失败,微信返回为空");
+                return JsonResult.fail("二维码生成失败");
+            }
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            ImageIO.write(qrImg, "png", baos);
+            bytes = baos.toByteArray();
         } catch (Exception e) {
             log.error("生成二维码失败：" + e.getMessage());
             return JsonResult.fail("二维码生成失败");
@@ -205,6 +241,8 @@ public class LeaderShopController {
         String url = domain + "/" + obsKey;
         shopInfo.setShopCodeUrl(url);
         shopInfoService.updateShopInfo(shopInfo);
+        // 删除店铺缓存, 保证 /leader/shop/info 等接口能查到最新店铺码
+        redisHelper.deleteObject(RedisConstant.RedisShopInfoKey + leaderId);
         // 返回访问路径
         return JsonResult.success("二维码生成成功", url);
     }

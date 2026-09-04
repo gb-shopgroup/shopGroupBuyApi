@@ -102,7 +102,7 @@ public class GbOrgBusinessInfoServiceImpl implements GbOrgBusinessInfoService {
     public List<GbOrgBusinessInfo> getMiniBusinessList(Long leaderId){
 
         LambdaQueryWrapper<GbOrgBusinessInfo> queryWrapper = Wrappers.lambdaQuery();
-        queryWrapper.eq(GbOrgBusinessInfo::getIsCheck, 0);
+        queryWrapper.eq(GbOrgBusinessInfo::getIsCheck, 1);
         queryWrapper.eq(GbOrgBusinessInfo::getIsClose, 0);
         queryWrapper.eq(GbOrgBusinessInfo::getLeaderId, leaderId);
         queryWrapper.orderByDesc(GbOrgBusinessInfo::getBusId);

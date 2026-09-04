@@ -190,13 +190,14 @@ public interface GbOrderInfoMapper extends BaseMapper<GbOrderInfo> {
     List<Map<String, String>> getUnReceiptOrderIds(int startTime, int endTime);
 
 
-    // (定时任务)查询超时未支付(pay_time=0)且需要回滚库存的订单商品
+    // (定时任务)查询超时未支付(pay_time=0)且仍为待支付(status=0)的订单商品, 用于自动取消订单并回滚库存
     @Select({
-            "SELECT g.`order_no`, g.`goods_id`, g.`goods_num`, g.`pack_num`",
+            "SELECT g.`order_no`, g.`goods_id`, g.`sku_id`, g.`goods_num`, g.`pack_num`",
             "FROM `gb_order_goods_info` AS g",
             "JOIN `gb_order_info` AS o ON g.`order_no` = o.`order_no`",
             "JOIN `gb_goods_info` AS i ON g.`goods_id` = i.`goods_id`",
             "WHERE o.`pay_time` = 0",
+            "  AND o.`status` = 0",
             "  AND o.`add_time` < #{time}",
             "  AND i.`is_stock` = 1",
             "ORDER BY g.`id` ASC, g.`goods_id` ASC",
@@ -260,6 +261,11 @@ public interface GbOrderInfoMapper extends BaseMapper<GbOrderInfo> {
     List<GbOrderInfo> getAllByLeaderId(@Param("leaderId") Long leaderId);
 
     List<GbOrderInfo> getPaidOrderInfoBy(@Param("memberId") Long memberId, @Param("shopId") Long shopId);
+
+    // 用户端-查询还有商品未全部收货的订单列表(已支付, 存在商品行收货数量<购买数量的订单)
+    List<GbOrderInfo> getNotAllReceiptOrderList(@Param("memberId") Long memberId,
+                                                @Param("leaderId") Long leaderId,
+                                                @Param("shopId") Long shopId);
 
     Integer getSumOfGroupActivityOrder(@Param("groupId") Long groupId);
 

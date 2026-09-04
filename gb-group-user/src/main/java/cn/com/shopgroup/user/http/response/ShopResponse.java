@@ -1,6 +1,7 @@
 package cn.com.shopgroup.user.http.response;
 
 import cn.com.shopgroup.user.model.GbOrgShopInfo;
+import com.baomidou.mybatisplus.annotation.TableField;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -12,6 +13,8 @@ public class ShopResponse {
     private Long id;
     @ApiModelProperty(value = "店铺名称")
     private String name;
+    @ApiModelProperty(value = "店铺简称")
+    private String shortName;
     @ApiModelProperty(value = "联系电话")
     private String mobile;
     @ApiModelProperty(value = "店铺banner")
@@ -20,6 +23,8 @@ public class ShopResponse {
     private String shopCodeUrl;
     @ApiModelProperty(value = "店铺信息介绍")
     private String shopInfo;
+    //店铺logo
+    private String shopLogo;
 
     public ShopResponse() {
 
@@ -28,10 +33,12 @@ public class ShopResponse {
     public ShopResponse(GbOrgShopInfo data) {
         this.id = data.getId();
         this.name = data.getShopName();
+        this.shortName = data.getShopShortName();
         this.mobile = data.getShopMobile();
         this.banner = data.getShopBanner();
         this.shopCodeUrl = data.getShopCodeUrl();
         this.shopInfo = data.getShopInfo();
+        this.shopLogo = data.getShopLogo();
     }
 
 }

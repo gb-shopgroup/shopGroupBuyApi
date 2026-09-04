@@ -79,6 +79,8 @@ public class OrderPaymentController {
     private YeepayConfig yeepayConfig;
     @Resource
     private WxMiniAccessTokenHelper tokenHelper;
+    //订单支付时间 15分钟，900秒；
+    private static final int limitPayOrderTime = 900;
 
     // 发起支付
     @GetMapping("/order/pay")
@@ -101,6 +103,11 @@ public class OrderPaymentController {
         log.info("[order/pay] params->orderNo:{},getOrderInfo:{}", orderNo, JSON.toJSONString(orderInfo));
         if (ObjectUtils.isEmpty(orderInfo)) {
             return JsonResult.fail("订单不存在");
+        }
+        int nowTime = TimeUtils.getTimeStamp();
+        int orderAddTime = orderInfo.getAddTime().intValue();
+        if (nowTime - orderAddTime > limitPayOrderTime) {
+            return JsonResult.fail("订单已超时不能支付");
         }
         int orderStatus = orderInfo.getStatus().intValue();
         if (orderStatus != OrderStatusEnum.UNPAID.getCode()) {
@@ -154,15 +161,6 @@ public class OrderPaymentController {
         transactionLog.setAddTime(TimeUtils.getTimeStamp());
         if (Integer.parseInt(success) == 1) {
             transactionLog.setPayStatus(PaymentStatusEnum.PENDING.getCode());
-            //订单对应的团长的cashType[结算到账方式,0=支付时延迟到账型,1=核销时延迟到账型]
-            int type = leaderInfo.getCashType().intValue();
-            if (type == 1) {
-                GbOrderBusinessInfo orderBusinessInfo = orderBusinessService.getOrderBusinessInfo(orderNo);
-                String accessToken = tokenHelper.getAccessToken(false);
-                String name = orderInfo.getGroupName();
-                String transactionId = orderBusinessInfo.getTransactionId();
-                WxMiniProgramHelper.uploadShippingInfo(accessToken, transactionId, name, openid);
-            }
             handleInsertTransaction(transactionLog);
             return JsonResult.success(JSONObject.parse(data));
         } else {
@@ -210,45 +208,8 @@ public class OrderPaymentController {
         }
         // 加密签名后的业务数据
         String response = req.getParameter("response");
-        // 应用标识(appKey)
-        //String appKey = req.getParameter("customerIdentification");
-
         // 解密成明文
         String plaintText = DigitalEnvelopeUtils.decrypt(response, "RSA2048");
-        // 易宝支付回调明文：{
-        // "sumDiscountPromotionAmount":"0",
-        // "orderId":"227",
-        // "bankOrderId":"398755024020260605",
-        // "settleAmount":"4.00",
-        // "channel":"WECHAT",
-        // "yopMerchantNo":"10093508056",
-        // "payWay":"MINI_PROGRAM",
-        // "uniqueOrderNo":"301320260605000000355019578335",
-        // "merchantName":"新乐器店",
-        // "orderAmount":"4.00",
-        // "payAmount":"4.00",
-        // "yopMerchantName":"河北顺商电子科技有限公司",
-        // "realPayAmount":"4.00",
-        // "basicsProductFirst":"MINI_PROGRAM",
-        // "tradeType":"REALTIME",
-        // "channelOrderId":"4200003043202606052281192339",
-        // "basicsProductThird":"OFFLINE",
-        // "paySuccessDate":"2026-06-05 10:10:28",
-        // "basicsProductSecond":"WECHAT",
-        // "outClearChannel":"NUCC",
-        // "payerInfo":"{\"appID\":\"wx959de27ff559b753\",\"bankCardNo\":\"\",\"bankId\":\"CFT\",\"cardType\":\"DEBIT\",\"channelTrxId\":\"4200003043202606052281192339\",\"mobilePhoneNo\":\"\",\"userID\":\"oUtR03UDbY5uOvYc1hq9p8uZmd2E\",\"yeepayOpenID\":\"obwCas8iuB91_0FD-WRJmCdiWkuU\"}",
-        // "appID":"wx959de27ff559b753",
-        // "channelSettleAmount":"4.00",
-        // "parentMerchantNo":"10093508056",
-        // "channelTrxId":"4200003043202606052281192339",
-        // "fundControlCsStatus":"INIT",
-        // "businessType":"DIRECT_OPERATION",
-        // "merchantNo":"10093512255",
-        // "status":"SUCCESS",
-        // "channelMerchantInfo":"{\"channelMerchantNo\":\"897077321\"}",
-        // "tradeChannel":"YEEPAY"}
-        //log.error("易宝支付回调明文：" + plaintText);
-
         // 将明文转化为Json对象
         JSONObject jsonResponse = JSONObject.parse(plaintText);
 
@@ -294,24 +255,6 @@ public class OrderPaymentController {
         if (jsonResponse.containsKey("orderId")) {
             orderNo = jsonResponse.getString("orderId");
         }
-        // 易宝支付回调明文 orderId = ：201
-        //log.error("易宝支付回调明文 orderId = ：" + orderId);
-
-        // 易宝订单号
-        //String uniqueOrderNo = "";
-        //if(jsonResponse.containsKey("uniqueOrderNo")){
-        //    uniqueOrderNo = jsonResponse.getString("uniqueOrderNo");
-        //}
-        // 易宝支付回调明文 uniqueOrderNo = ：301320260602000000251684094007
-        // log.error("易宝支付回调明文 uniqueOrderNo = ：" + uniqueOrderNo);
-
-        // 支付机构在渠道侧的外部商户订单号，微信商户单号/支付宝商家订单号
-        //String bankOrderId = "";
-        //if(jsonResponse.containsKey("bankOrderId")){
-        //    bankOrderId = jsonResponse.getString("bankOrderId");
-        //}
-        // 易宝支付回调明文 bankOrderId = ：391022639520260602
-        //log.error("易宝支付回调明文 bankOrderId = ：" + bankOrderId);
 
         // 该笔订单在微信支付宝侧的唯一订单号，微信交易单号/支付宝订单号
         String channelTrxId = "";
@@ -376,23 +319,33 @@ public class OrderPaymentController {
         // 累加商户收款金额
         int merchantMoney = MoneyUtil.yuanToCent(orderInfo.getOrderPrice());
         merchantService.addMerchantMoney(orderInfo.getLeaderId(), orderInfo.getBusId(), merchantMoney);
-        // 超过限额的话，就报警
-        //long limit = businessInfoList.get(index).getTaxLimit() * 1000000;
-        //if(moneyTotal >= limit){
-        // 添加日志, 消息类型: 1=系统消息2=内部消息3=业务消息
-        //String content = "收款账号(" + businessInfoList.get(index).getBusName()  + ")超出纳税额度限制了。";
-        //messageService.addMiniLeaderMessageInfo(leaderId, 0, (byte)1, content);
-        //}
-
         // 累加团购订单数量
         groupService.addGroupOrderNumber(orderInfo.getGroupId());
 
         // 累加Redis订单数量
         String key = RedisConstant.RedisOrderTotalKey + orderInfo.getGroupId();
         redisHelper.increment(key);
-
+        //订单对应的团长的cashType[结算到账方式,0=支付时延迟到账型,1=核销时延迟到账型]
+        handleWxUploadShippingInfo(orderInfo, channelTrxId);
         // 返回
         return "success";
+    }
+
+    public void handleWxUploadShippingInfo(GbOrderInfo orderInfo, String transactionId) {
+        GbOrgLeaderInfo leaderInfo = leaderService.getLeaderInfo(orderInfo.getLeaderId());
+        if (ObjectUtils.isEmpty(leaderInfo)) {
+            return;
+        }
+        int type = leaderInfo.getCashType().intValue();
+        if (type == 0) {
+            String accessToken = tokenHelper.getAccessToken(false);
+            String name = orderInfo.getGroupName();
+            int wxFlag = WxMiniProgramHelper.uploadShippingInfo(accessToken, transactionId, name, orderInfo.getOpenid());
+            // 微信发货调用成功, 标记订单已调用微信发货(wx_shipment:0=未调用,1=已调用)
+            if (wxFlag == 1) {
+                orderInfoService.updateWxShipment(orderInfo.getOrderNo());
+            }
+        }
     }
 
     // 新的轮询算法: 按照收款金额从小到大排列, 取第一个即可

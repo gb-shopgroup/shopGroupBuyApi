@@ -74,7 +74,7 @@ public class GroupOrderController {
         // 下单
         Map<String, String> res = orderService.addOrder(memberId, request);
         int success = Integer.parseInt(res.get("success"));
-        String msg = res.get("msg"); // 订单id
+        String msg = res.get("msg"); // 订单号
         if (success == 1) {
             return JsonResult.success("下单成功", msg);
         } else {

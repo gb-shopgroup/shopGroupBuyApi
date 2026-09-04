@@ -636,6 +636,10 @@ def render_data_block(data_types):
     if not data_types:
         chunks.append("data 类型：`Object`（未能静态推断，以接口实际返回为准）")
         return "\n".join(chunks)
+    # 同一方法既有空返回(JsonResult.success() 早退)又有真实数据分支时, 只保留真实类型说明, 避免"data 类型: 无"冗余
+    real = [d for d in data_types if d != "<none>"]
+    if real:
+        data_types = real
     visited = set()
     for dt in data_types:
         if dt == "<none>":

@@ -316,6 +316,10 @@ public class OrderService {
         // 下单时间
         orderInfo.setAddTime(TimeUtils.getTimeStamp());
         orderInfo.setUpdateTime(TimeUtils.getTimeStamp());
+        // 微信发货调用标记,新订单默认未调用
+        orderInfo.setWxShipment(0);
+        // 确认收货操作标记,新订单默认未操作
+        orderInfo.setClickConfirmFlag(0);
         // 先扣减库存(商品总库存 + SKU库存), 全部成功后再写订单, 防止并发超卖产生"幽灵订单"
         List<GbOrderGoodsInfo> reducedGoodsList = new ArrayList<>();
         for (GbOrderGoodsInfo item : orderGoodsInfoList) {

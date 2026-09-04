@@ -270,26 +270,15 @@ public class TaskController {
         return "ok";
     }
 
-    // 库存恢复
+    // 超时未支付订单自动取消并恢复库存(手动触发, 与定时任务同一套逻辑)
     @GetMapping("/task/order/backstock")
     public String backstock() {
 
-        // 查询半个小时之前下的未支付的订单商品
+        // 处理下单时间早于(当前时间-30分钟)的待支付订单: 状态改为已取消 + 恢复商品/SKU库存
         int time = TimeUtils.getTimeStamp() - 30 * 60;
-        List<GbOrderGoodsInfo> resutls = taskOrderService.getUnPayOrderGoodsList(time, 100);
-        for (GbOrderGoodsInfo item : resutls) {
-            String orderNo = item.getOrderNo();
-            Long goodsId = item.getGoodsId();
-            Integer goodsNum = item.getGoodsNum();
-            Integer packNum = item.getPackNum();
-            goodsService.increaseGoodsStock(goodsId, goodsNum * packNum);
-            // 回补SKU库存(下单时按skuId同步扣减)
-            if (item.getSkuId() != null && item.getSkuId() > 0) {
-                skuService.increaseGoodsStock(item.getSkuId(), goodsNum * packNum);
-            }
-            log.info("恢复订单商品库存：orderNo=" + orderNo + ",goodsId=" + goodsId + ",stock=" + goodsNum * packNum);
-        }
-        return "ok";
+        int cancelCount = taskOrderService.cancelTimeoutUnpaidOrderAndReturnStock(time, 100);
+        log.info("手动触发超时未支付订单取消: 本次取消订单数=" + cancelCount);
+        return "ok,cancelCount=" + cancelCount;
     }
 
     // 查询文章信息(联调测试接口)

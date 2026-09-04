@@ -471,6 +471,19 @@ CREATE TABLE `gb_order_goods_refund_record` (
   KEY `idx_order_no` (`order_no`)
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='订单退款记录信息表';
 
+-- group_purchase.gb_refund_reason definition
+
+CREATE TABLE `gb_refund_reason` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '原因id,主键自增',
+  `reason` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '退款原因文本',
+  `sort` int NOT NULL DEFAULT '0' COMMENT '排序,数值越小越靠前',
+  `status` tinyint unsigned NOT NULL DEFAULT '1' COMMENT '状态,0=停用,1=启用',
+  `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '创建时间,秒级时间戳',
+  `update_time` int unsigned NOT NULL DEFAULT '0' COMMENT '更新时间,秒级时间戳',
+  PRIMARY KEY (`id`),
+  KEY `idx_status_sort` (`status`,`sort`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='退款原因配置表';
+
 -- group_purchase.gb_order_info definition
 
 CREATE TABLE `gb_order_info` (
@@ -516,6 +529,8 @@ CREATE TABLE `gb_order_info` (
   `remark` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '订单备注,c端客户使用',
   `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '下单时间',
   `update_time` int unsigned NOT NULL DEFAULT '0' COMMENT '更改时间',
+  `wx_shipment` int NOT NULL DEFAULT '0' COMMENT '微信发货是否已调用,0=未调用,1=已调用',
+  `click_confirm_flag` int NOT NULL DEFAULT '0' COMMENT '0 未操作,1 已操作',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_order_no` (`order_no`),
   KEY `idx_leader_id` (`leader_id`),
@@ -667,6 +682,7 @@ CREATE TABLE `gb_org_shop_info` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id,主键自增',
   `leader_id` bigint NOT NULL DEFAULT '0' COMMENT '团长id',
   `shop_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '店铺名称',
+  `shop_short_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '店铺简称',
   `shop_logo` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '店铺logo',
   `shop_banner` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '店铺banner',
   `shop_mobile` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '联系电话',

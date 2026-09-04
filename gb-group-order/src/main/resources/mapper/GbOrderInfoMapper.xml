@@ -46,6 +46,8 @@
         <result column="remark" property="remark"/>
         <result column="add_time" property="addTime"/>
         <result column="update_time" property="updateTime"/>
+        <result column="wx_shipment" property="wxShipment"/>
+        <result column="click_confirm_flag" property="clickConfirmFlag"/>
     </resultMap>
 
     <sql id="Base_Column_List">
@@ -53,7 +55,7 @@
         , order_no, member_id, group_id, leader_id, isolation_id, shop_id,shop_name, mobile, nickname, avatar, openid, group_name, group_price,
         order_price, bus_id, merchant_no, status, pay_fee, pay_time, pay_no, refund_fee, refund_time, refund_no, refund_staff,
         refund_reason, receipt_type, true_name, telephone, receipt_time, verify_time, point_id, point_name, point_address,
-        receipt_code, staff_id, staff_name, point_id2, point_name2, remark, add_time,update_time
+        receipt_code, staff_id, staff_name, point_id2, point_name2, remark, add_time,update_time, wx_shipment, click_confirm_flag
     </sql>
 
     <select id="getOrderInfoByOrderNo" resultMap="BaseResultMap">
@@ -140,6 +142,23 @@
         WHERE leader_id = #{leaderId}
           AND member_id = #{memberId}
           AND pay_time &gt; 0
+        ORDER BY add_time DESC
+    </select>
+
+    <!-- 用户端-查询还有商品未全部收货的订单列表(条件: 用户id, 团长id, 店铺id)
+         判定: 已支付(pay_time>0)且存在商品行 收货数量(receipt_num) < 购买数量(goods_num) -->
+    <select id="getNotAllReceiptOrderList" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM gb_order_info
+        WHERE member_id = #{memberId} AND leader_id = #{leaderId} AND shop_id = #{shopId}
+        AND pay_time &gt; 0
+        AND EXISTS (
+            SELECT 1
+            FROM gb_order_goods_info
+            WHERE gb_order_goods_info.order_no = gb_order_info.order_no
+              AND gb_order_goods_info.goods_num &gt; gb_order_goods_info.receipt_num
+        )
         ORDER BY add_time DESC
     </select>
 

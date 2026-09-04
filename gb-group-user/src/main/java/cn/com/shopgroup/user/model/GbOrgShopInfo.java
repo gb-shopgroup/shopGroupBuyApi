@@ -17,6 +17,9 @@ public class GbOrgShopInfo {
     // 店铺名称
     @TableField("shop_name")
     private String shopName;
+    // 店铺简称
+    @TableField("shop_short_name")
+    private String shopShortName;
     // 店铺logo
     @TableField("shop_logo")
     private String shopLogo;

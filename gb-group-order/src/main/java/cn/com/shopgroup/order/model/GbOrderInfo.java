@@ -145,6 +145,12 @@ public class GbOrderInfo {
     private Integer addTime;
     @TableField("update_time")
     private Integer updateTime;
+    // 微信发货是否已调用,0=未调用,1=已调用
+    @TableField("wx_shipment")
+    private Integer wxShipment;
+    // 确认收货操作标记,0=未操作,1=已操作
+    @TableField("click_confirm_flag")
+    private Integer clickConfirmFlag;
 
     // 不是订单表里面的字段哦
     @TableField(exist = false)

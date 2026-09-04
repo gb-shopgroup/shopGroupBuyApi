@@ -60,7 +60,7 @@ public class GbOrgShopInfoServiceImpl implements GbOrgShopInfoService {
     public GbOrgShopInfo getInfoByLeaderAndShopId(Long leaderId, Long shopId) {
         LambdaQueryWrapper<GbOrgShopInfo> queryWrapper = Wrappers.lambdaQuery();
         queryWrapper.eq(GbOrgShopInfo::getLeaderId, leaderId);
-        queryWrapper.eq(GbOrgShopInfo::getShopInfo, shopId);
+        queryWrapper.eq(GbOrgShopInfo::getId, shopId);
         return mapper.selectOne(queryWrapper);
     }
 

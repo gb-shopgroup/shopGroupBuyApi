@@ -53,6 +53,12 @@ public class OrderResponse {
     private String nickname;
     private String mobile;
 
+    // 微信发货是否已调用:0=未调用,1=已调用
+    private Integer wxShipment;
+
+    // 确认收货操作标记:0=未操作,1=已操作
+    private Integer clickConfirmFlag;
+
     public OrderResponse() {
 
     }
@@ -96,6 +102,12 @@ public class OrderResponse {
         // 下单用户信息（内部调用使用）
         this.nickname = data.getNickname();
         this.mobile = data.getMobile();
+
+        // 微信发货是否已调用:0=未调用,1=已调用
+        this.wxShipment = data.getWxShipment();
+
+        // 确认收货操作标记:0=未操作,1=已操作
+        this.clickConfirmFlag = data.getClickConfirmFlag();
     }
 
     // 列表转换

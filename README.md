@@ -127,7 +127,7 @@ Maven 依赖仓库使用阿里云镜像（`https://maven.aliyun.com/repository/p
 
 ### 4.3 gb-group-user — 用户 / 团长 / 员工服务
 
-覆盖：会员登录注册（微信 openid / 手机号）、用户信息、团长店铺管理、自提点管理、员工管理、黑名单、消息、图片上传、文章与轮播图等。**43 个接口**。
+覆盖：会员登录注册（微信 openid / 手机号）、用户信息、团长店铺管理、自提点管理、员工管理、黑名单、消息、图片上传、文章与轮播图等。**44 个接口**。
 
 ### 4.4 gb-group-goods — 商品 / 团购服务
 
@@ -135,7 +135,7 @@ Maven 依赖仓库使用阿里云镜像（`https://maven.aliyun.com/repository/p
 
 ### 4.5 gb-group-order — 订单 / 支付 / 分账服务
 
-覆盖：下单、订单查询、核销（整单 / 部分核销）、退款（申请 / 审批 / 回调）、微信发货、易宝支付发起与回调、团长数据汇总、报表查询，以及团长端「我的团员」（含团购查看埋点，数据表 `gb_group_view_log`）等。**47 个接口**。
+覆盖：下单、订单查询、核销（整单 / 部分核销）、退款（申请 / 审批 / 回调）、微信发货、易宝支付发起与回调、团长数据汇总、报表查询，以及团长端「我的团员」（含团购查看埋点，数据表 `gb_group_view_log`）等。**51 个接口**。
 
 ### 4.6 gb-group-admin — 平台管理后台服务
 
@@ -304,12 +304,12 @@ mvn -pl gb-group-task spring-boot:run
 | `page` / `pageSize` | 页码（从 1 开始）/ 每页条数 |
 | `start` / `end` | 开始时间 / 结束时间（如 yyyy-MM-dd） |
 
-- **接口数量统计**：user 43 个、order 47 个、goods 21 个、admin 25 个、task 8 个，合计 **144 个**。
+- **接口数量统计**：user 44 个、order 51 个、goods 21 个、admin 25 个、task 8 个，合计 **149 个**。
 - **详细版接口文档**（含每个接口的完整入参 / 出参字段说明，参数含义、必填、嵌套字段均已细化）见根目录 **`API接口文档.md`**，可通过 `python3 generate_api_doc.py` 扫描各模块 `*Controller.java` 重新生成。下方为接口总览清单。
 
 ### 8.2 接口清单
 
-#### 8.2.1 gb-group-user（用户/团长/员工）— 43 个接口
+#### 8.2.1 gb-group-user（用户/团长/员工）— 44 个接口
 
 **ImageSourceController**（`cn.com.shopgroup.user.controller`）
 
@@ -377,7 +377,7 @@ mvn -pl gb-group-task spring-boot:run
 | 2 | POST | `/user/leader/shop/save` | 修改店铺信息 | Body: **request** (ShopRequest, JSON) |
 | 3 | POST | `/user/leader/shop/update` | 修改店铺信息 | Body: **request** (ShopErCodeRequest, JSON) |
 | 4 | GET | `/user/leader/getGroup/shop` | 通过leaderId团长店铺详情 | **leaderId** (Long) |
-| 5 | POST | `/user/leader/shop/makeQrCode` | 团长-我的店铺二维码,上传到服务器返回URL | **shopId** (Long) |
+| 5 | POST | `/user/leader/shop/makeQrCode` | 团长-我的店铺小程序码,上传到服务器返回URL | **shopId** (Long) |
 
 **MessageController**（`cn.com.shopgroup.user.controller.leader`）
 
@@ -406,6 +406,7 @@ mvn -pl gb-group-task spring-boot:run
 | 2 | GET | `/user/openid` | 根据code获取openid | **code** (String) |
 | 3 | GET | `/user/login` | openid自动登录 | **openid** (String) |
 | 4 | POST | `/user/reg` | 注册新用户 | Body: **request** (MemberRequest, JSON) |
+| 5 | POST | `/user/logout` | 退出登录(小程序调用): 清除服务端登录态, 小程序端需同步删除本地token | 无 |
 
 **MemberController**（`cn.com.shopgroup.user.controller.member`）
 
@@ -414,7 +415,7 @@ mvn -pl gb-group-task spring-boot:run
 | 1 | GET | `/user/member/info` | 根据 token 获取用户信息 | 无 |
 | 2 | GET | `/user/member/isleader` | 是否团长身份 | 无 |
 
-#### 8.2.2 gb-group-order（订单/退款/分账）— 47 个接口
+#### 8.2.2 gb-group-order（订单/退款/分账）— 51 个接口
 
 **OrderBusinessController**（`cn.com.shopgroup.order.controller`）
 
@@ -444,17 +445,11 @@ mvn -pl gb-group-task spring-boot:run
 | 2 | POST | `/order/group/get/groupActivity/list` | 用户首页-查询所有团购活动列表 | Body: **request** (MemberGroupListRequest, JSON) |
 | 3 | GET | `/order/group/groupActivity/count` | 团购数量（首页） | **leaderId** (Long); **catId** (Long) |
 | 4 | GET | `/order/group/groupActivity/info` | 团购详情(团长分享页面)---用户首页：团长更多好货也用 | **groupId** (Long) |
-| 5 | GET | `/order/group/groupActivity/shop` | 团长店铺详情 | **leaderId** (Long) |
-| 6 | GET | `/order/group/groupActivity/logs` | 晚上时间只生成固定跟团记录（锁定在19:00-20:00生成的订单）。 | **groupId** (Long) |
-| 7 | GET | `/order/group/groupActivity/logs2` | 团购记录(跟团记录), 滚动部分 | **id** (Long) |
-| 8 | POST | `/order/group/groupActivity/view` | 用户查看团购详情埋点上报（打开详情服务端自动埋点, 可显式调用; 60秒内同团购去重） | Body: **request** (MemberGroupViewRequest, JSON) |
-
-**LeaderMemberController**（`cn.com.shopgroup.order.controller.leader`）
-
-| 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
-| --- | --- | --- | --- | --- |
-| 1 | POST | `/order/leader/member/list` | 我的团员列表（手机号/昵称搜索, 分页；含消费/跟团次数/查看次数/最近动态） | **lid** (Header); Body: **request** (LeaderMemberListRequest, JSON) |
-| 2 | GET | `/order/leader/member/detail` | 团员详情（消费/退款/跟团次数/查看次数/动态, 动态=跟团下单+查看合并按天分组） | **lid** (Header); **memberId** (Long) |
+| 5 | POST | `/order/group/groupActivity/view` | 用户查看团购详情-显式埋点上报(分享等场景前端调用; 首页进入详情会自动埋点, 可不上报) | Body: **request** (MemberGroupViewRequest, JSON) |
+| 6 | GET | `/order/group/groupActivity/shop` | 团长店铺详情 | **leaderId** (Long) |
+| 7 | GET | `/order/group/groupActivity/logs` | 晚上时间只生成固定跟团记录（锁定在19:00-20:00生成的订单）。 | **groupId** (Long) |
+| 8 | GET | `/order/group/groupActivity/logs2` | 团购记录(跟团记录), 滚动部分 | **id** (Long) |
+| 9 | GET | `/order/group/order/records` | 真实跟团记录：基于支付成功订单数据 | **groupId** (Long); **limit** (Integer) |
 
 **MemberOrderController**（`cn.com.shopgroup.order.controller.group`）
 
@@ -464,16 +459,26 @@ mvn -pl gb-group-task spring-boot:run
 | 2 | POST | `/order/group/order/applyRefundList` | 用户售后订单列表（按订单状态筛选, 分页查询） | Body: **request** (MemberOrderRefundListRequest, JSON) |
 | 3 | GET | `/order/group/order/count` | 用户订单数量 | **pid** (Long) |
 | 4 | GET | `/order/group/order/info` | 用户订单详情 | **orderNo** (String) |
-| 5 | GET | `/order/group/order/makeErcode` | 用户二维码(ZXing二维码) | **orderNo** (String) |
+| 5 | GET | `/order/group/order/makeErcode` | 用户订单小程序码(微信小程序码, 扫码进入C端小程序对应订单页面) | **orderNo** (String) |
 | 6 | GET | `/order/group/order/receipt` | 用户订单收货 | **orderNo** (String); **point** (Long) |
 | 7 | POST | `/order/group/order/apply/refund` | 用户申请订单退款 | Body: **refundApplyRequest** (OrderRefundApplyRequest, JSON) |
-| 8 | GET | `/order/group/order/getPaidOrders` | 用户扫码-团长-店铺二维码进入到该用户在这个店铺下的待核销订单列表 | **shopId** (Long) |
+| 8 | GET | `/order/group/order/refund/reasonList` | 用户退款原因下拉列表(申请退款时"选择退款原因") | 无 |
+| 9 | GET | `/order/group/order/getPaidOrders` | 用户扫码-团长-店铺二维码进入到该用户在这个店铺下的待核销订单列表 | **shopId** (Long) |
+| 10 | GET | `/order/group/order/notAllReceiptList` | 用户端-查询还有商品未全部收货的订单列表(该用户在该团长/店铺下已支付, 且存在商品行收货数量小于购买数量的订单) | **leaderId** (Long); **shopId** (Long) |
+| 11 | POST | `/order/group/order/confirmShipping` | 用户点击确认收货组件后调用接口，更新订单已经操作按钮 | **orderNo** (String) |
 
 **WxOrderController**（`cn.com.shopgroup.order.controller.group`）
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
 | 1 | GET | `/order/group/wx/order` | 查询微信订单发货状态（查询订单状态枚举：(1) 待发货；(2) 已发货；(3) 确认收货；(4) 交易完成；(5) 已退款；(6) 资金待结算） | **orderNo** (String) |
+
+**LeaderMemberController**（`cn.com.shopgroup.order.controller.leader`）
+
+| 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
+| --- | --- | --- | --- | --- |
+| 1 | POST | `/order/leader/myMember/list` | 我的团员列表（支持手机号/昵称搜索，分页） | Body: **request** (LeaderMemberListRequest, JSON) |
+| 2 | GET | `/order/leader/myMember/detail` | 团员详情（消费/退款/跟团次数/查看次数/动态） | **memberId** (Long) |
 
 **OrderController**（`cn.com.shopgroup.order.controller.leader`）
 
@@ -485,7 +490,7 @@ mvn -pl gb-group-task spring-boot:run
 | 4 | GET | `/order/leader/order/status` | 查询订单状态数量 | **gid** (Long); **pid** (Long) |
 | 5 | POST | `/order/leader/order/scanQRCode` | 团长扫用户订单码接口 | Body: **request** (ScanQRCodeRequest, JSON) |
 | 6 | GET | `/order/leader/order/query` | 根据订单号查询订单 | **orderNo** (String) |
-| 7 | POST | `/order/leader/order/writeOff` | 核销（整单核销） | **orderNo** (String); **pid** (Long) |
+| 7 | POST | `/order/leader/order/writeOff` | 核销（整单核销） | **userToken** (String); **orderNo** (String); **pid** (Long) |
 | 8 | POST | `/order/leader/order/partWriteOff` | 部分核销订单 | Body: **request** (OrderVerifyRequest, JSON) |
 | 9 | GET | `/order/leader/order/send` | 团长端-查询微信发货 | **orderNo** (String) |
 | 10 | GET | `/order/leader/home/show/orders` | 团长控制台head部分-商品总数, 团购, 订单数量, 不考虑提货点 | 无 |
@@ -645,7 +650,7 @@ mvn -pl gb-group-task spring-boot:run
 | 4 | GET | `/task/order/refund` | 同步原始订单表和商户订单表的退款状态 | **orderNo** (String) |
 | 5 | GET | `/task/order/cash` | 提现 | **id** (int); **val** (int) |
 | 6 | GET | `/task/order/verify` | 自动收货 | 无 |
-| 7 | GET | `/task/order/backstock` | 库存恢复 | 无 |
+| 7 | GET | `/task/order/backstock` | 超时未支付订单自动取消并恢复库存(手动触发, 与定时任务同一套逻辑) | 无 |
 | 8 | GET | `/task/test/user` | 查询文章信息(联调测试接口) | **aId** (Long) |
 
 

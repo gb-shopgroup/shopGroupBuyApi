@@ -54,7 +54,7 @@ public class OrderController {
     @Resource
     private GbOrderBusinessInfoService businessService;
     @Resource
-    private WxMiniAccessTokenHelper helper;
+    private WxMiniAccessTokenHelper wxAccessTokenHelper;
     @Resource
     private GbOrgLeaderInfoService leaderInfoService;
 
@@ -170,7 +170,9 @@ public class OrderController {
 
     //核销（整单核销）
     @PostMapping("/leader/order/writeOff")
-    public JsonResult writeOff(@RequestParam("orderNo") String orderNo, @RequestParam("pid") Long pointId) {
+    public JsonResult writeOff(@RequestParam("userToken") String userToken,
+                               @RequestParam("orderNo") String orderNo,
+                               @RequestParam("pid") Long pointId) {
         log.info("[核销订单:/leader/order/writeOff] params orderNo:{},pointId:{}", orderNo, pointId);
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
@@ -228,7 +230,11 @@ public class OrderController {
         if (flag) {
             //核销成功后。同步订单商品数量全部收货（方便展示同步商品核销数量）
             int m = orderInfoService.updateGoodsNum(goodsList);
-            //核销成功后，//订单对应的团长的cashType[结算到账方式,0=支付时延迟到账型,1=核销时延迟到账型]
+            //核销成功后，订单对应的团长的cashType[结算到账方式,0=支付时延迟到账型,1=核销时延迟到账型]
+            int type = leaderInfo.getCashType().intValue();
+            if (type == 1 && orderInfo.getWxShipment().intValue() == 0) {
+                handleCalledWxUploadShippingInfo(orderInfo);
+            }
             return JsonResult.success("核销成功");
         } else {
             return JsonResult.success("核销失败");
@@ -243,6 +249,10 @@ public class OrderController {
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
             return JsonResult.fail("lid不存在");
+        }
+        GbOrgLeaderInfo leaderInfo = leaderInfoService.getLeaderInfo(leaderId);
+        if (ObjectUtils.isEmpty(leaderInfo)) {
+            return JsonResult.fail("团长信息有误");
         }
         // 从请求头中获取员工id
         Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
@@ -301,9 +311,32 @@ public class OrderController {
         businessService.updateBusinessOrderCheckStatus(orderInfo.getOrderNo());
         // 返回结果
         if (flag) {
+            //订单对应的团长的cashType[结算到账方式,0=支付时延迟到账型,1=核销时延迟到账型]
+            int type = leaderInfo.getCashType().intValue();
+            if (type == 1 && orderInfo.getWxShipment().intValue() == 0) {
+                handleCalledWxUploadShippingInfo(orderInfo);
+            }
             return JsonResult.success("核销成功");
         } else {
             return JsonResult.success("核销失败");
+        }
+    }
+
+    //调用微信发货
+    private void handleCalledWxUploadShippingInfo(GbOrderInfo orderInfo) {
+        String orderNo = orderInfo.getOrderNo();
+        GbOrderBusinessInfo orderBusinessInfo = businessService.getOrderBusinessInfo(orderNo);
+        if (ObjectUtils.isEmpty(orderBusinessInfo)) {
+            return;
+        }
+        // 再获取访问令牌
+        String accessToken = wxAccessTokenHelper.getAccessToken(false);
+        int flag = WxMiniProgramHelper.uploadShippingInfo(accessToken, orderBusinessInfo.getTransactionId(),
+                orderInfo.getGroupName(), orderInfo.getOpenid());
+        //返回1说明该订单已经调用过微信的发货
+        if (flag == 1) {
+            // 标记订单已调用微信发货(wx_shipment:0=未调用,1=已调用)
+            orderInfoService.updateWxShipment(orderNo);
         }
     }
 
@@ -326,7 +359,7 @@ public class OrderController {
             JsonResult.fail("订单已发货");
         }
         // 再获取访问令牌
-        String accessToken = helper.getAccessToken(false);
+        String accessToken = wxAccessTokenHelper.getAccessToken(false);
         // 订单发货参数
         String transactionId = orderInfo.getTransactionId();
         String goodsName = orderInfo.getGroupName();
@@ -336,10 +369,12 @@ public class OrderController {
         if (isSendOK == 1) {
             // 更新发货标识
             businessService.updateBusinessOrderSendStatus(orderNo);
+            // 标记订单已调用微信发货(wx_shipment:0=未调用,1=已调用)
+            orderInfoService.updateWxShipment(orderNo);
             return JsonResult.success("发货成功");
         } else {
             // 考虑 accessToken 失效问题
-            if (isSendOK == -1) helper.removeAccessToken();
+            if (isSendOK == -1) wxAccessTokenHelper.removeAccessToken();
             return JsonResult.success("发货失败, 请稍后再试！");
         }
     }

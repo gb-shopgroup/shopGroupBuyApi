@@ -674,6 +674,31 @@ public class GbOrderInfoService {
         return mapper.getPaidOrderInfoBy(memberId, shopId);
     }
 
+    // 用户端-查询还有商品未全部收货的订单列表(条件: 用户id, 团长id, 店铺id)
+    public List<GbOrderInfo> getNotAllReceiptOrderList(Long memberId, Long leaderId, Long shopId) {
+        return mapper.getNotAllReceiptOrderList(memberId, leaderId, shopId);
+    }
+
+    // 标记订单已调用微信发货(wx_shipment:0=未调用,1=已调用)
+    public Boolean updateWxShipment(String orderNo) {
+
+        LambdaUpdateWrapper<GbOrderInfo> updateWrapper = Wrappers.lambdaUpdate();
+        updateWrapper.eq(GbOrderInfo::getOrderNo, orderNo);
+        updateWrapper.set(GbOrderInfo::getWxShipment, 1);
+        int flag = mapper.update(updateWrapper);
+        return flag > 0 ? true : false;
+    }
+
+    // 根据订单号修改确认收货操作标记(click_confirm_flag:0=未操作,1=已操作)
+    public Boolean updateClickConfirmFlag(String orderNo, Integer flag) {
+
+        LambdaUpdateWrapper<GbOrderInfo> updateWrapper = Wrappers.lambdaUpdate();
+        updateWrapper.eq(GbOrderInfo::getOrderNo, orderNo);
+        updateWrapper.set(GbOrderInfo::getClickConfirmFlag, flag);
+        int result = mapper.update(updateWrapper);
+        return result > 0 ? true : false;
+    }
+
     public int updateGoodsNum(List<GbOrderGoodsInfo> goodsList) {
         if (CollectionUtils.isEmpty(goodsList)) {
             return 0;
