@@ -347,7 +347,7 @@ public class OrderService {
         }
         // 返回订单Id
         result.put("success", "1");
-        result.put("msg", String.valueOf(orderId));
+        result.put("msg", orderNo);
         return result;
     }
 
