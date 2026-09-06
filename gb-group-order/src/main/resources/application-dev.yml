@@ -26,10 +26,10 @@ spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/group_purchase?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-    username: root
-    password: 12345678
-    #username: group_purchase
-    #password: zK75tPdzX3fitMrx
+    #username: root
+    #password: 12345678
+    username: group_purchase
+    password: zK75tPdzX3fitMrx
     # Druid 连接池核心配置
     druid:
       # 空闲连接检测间隔（毫秒）, 建议小于MySQL wait_timeout, 默认值：60000 毫秒 = 60 秒
