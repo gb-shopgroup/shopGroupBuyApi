@@ -24,7 +24,7 @@
 
 ## 接口总览索引
 
-> 共 143 个接口，按下表序号定位到下方各模块接口详情；「功能说明」列为 `—` 表示源码无方法注释，可按入参 / 出参字段推断用途。
+> 共 150 个接口，按下表序号定位到下方各模块接口详情；「功能说明」列为 `—` 表示源码无方法注释，可按入参 / 出参字段推断用途。
 
 | 序号 | 模块 | 方式 | 路径 | 功能说明 |
 | --- | --- | --- | --- | --- |
@@ -131,46 +131,53 @@
 | 101 | goods | POST | `/goods/leader/goods/sku/save` | 注: 前端不再单独调用此接口, SKU已随添加/修改商品接口(addGoods/edit)一并处理, 此处保留兼容 |
 | 102 | goods | POST | `/goods/Leader/get/groupActivity/list` | 查询所有团购活动列表 |
 | 103 | goods | GET | `/goods/Leader/get/groupActivity/count` | 查询所有团购活动总数(筛选条件与列表接口一致, 保证分页总页数正确) |
-| 104 | goods | POST | `/goods/Leader/groupActivity/add` | 添加团购活动 |
-| 105 | goods | GET | `/goods/Leader/get/groupActivity/info` | 查询团购信息, 还要查询商品列表(价格以团购商品表冗余的团购价为准) |
-| 106 | goods | POST | `/goods/Leader/groupActivity/edit` | 修改团购活动, 团购进行中, 不允许修改 |
-| 107 | goods | POST | `/goods/Leader/groupActivity/close` | 这样就不需要修改的时候同步Redis缓存了, 只需要关闭修改完, 打开上线的时候更新一次即可 |
-| 108 | goods | GET | `/goods/Leader/get/groupActivity/cat` | 团购分类列表 |
-| 109 | goods | POST | `/goods/Leader/share/groupActivity/poster` | 分享团购海报生成1 |
-| 110 | goods | POST | `/goods/Leader/share/groupActivity/make/poster` | 分享团购活动海报（带有logo的海报） |
-| 111 | admin | GET | `/admin/business/list` | 分页查询团长收款账户列表(含累计额度) |
-| 112 | admin | GET | `/admin/business/count` | 查询收款账户总数 |
-| 113 | admin | GET | `/admin/business/info` | 查询收款账户详情 |
-| 114 | admin | POST | `/admin/business/add` | 添加团长收款账户(商户编号需唯一) |
-| 115 | admin | GET | `/admin/goods/list` | 分页查询商品列表 |
-| 116 | admin | GET | `/admin/goods/count` | 查询商品总数 |
-| 117 | admin | GET | `/admin/goods/info` | 查询商品详情 |
-| 118 | admin | GET | `/admin/goods/img` | 查询商品缩略图列表(最多3张) |
-| 119 | admin | GET | `/admin/group/list` | 分页查询团购活动列表 |
-| 120 | admin | GET | `/admin/group/count` | 查询团购活动总数 |
-| 121 | admin | GET | `/admin/group/info` | 查询团购活动详情 |
-| 122 | admin | GET | `/admin/leader/list` | 分页查询团长列表(可按手机号筛选) |
-| 123 | admin | GET | `/admin/leader/count` | 查询团长总数 |
-| 124 | admin | POST | `/admin/leader/add` | 添加团长(校验手机号/商户编号, 同步创建员工/店铺/收款账户) |
-| 125 | admin | GET | `/admin/leader/select` | 团长下拉选项列表(id/名称) |
-| 126 | admin | GET | `/admin/login/kaptcha` | 获取后台登录图形验证码(Base64图片, 5分钟有效) |
-| 127 | admin | POST | `/admin/login/submit` | 后台登录(验证码+账号密码, 返回token) |
-| 128 | admin | GET | `/admin/member/list` | 分页查询会员列表 |
-| 129 | admin | GET | `/admin/member/count` | 查询会员总数 |
-| 130 | admin | GET | `/admin/orderbusiness/list` | 分页查询订单列表 |
-| 131 | admin | GET | `/admin/orderbusiness/count` | 查询订单总数 |
-| 132 | admin | GET | `/admin/order/list` | 分页查询订单列表 |
-| 133 | admin | GET | `/admin/order/count` | 查询订单总数 |
-| 134 | admin | GET | `/admin/report/list` | 分页查询订单列表 |
-| 135 | admin | GET | `/admin/report/count` | 查询订单总数 |
-| 136 | task | GET | `/task/order/send` | 微信订单发货 |
-| 137 | task | GET | `/task/order/divide` | 订单分账 |
-| 138 | task | GET | `/task/order/query` | 查询订单 |
-| 139 | task | GET | `/task/order/refund` | 同步原始订单表和商户订单表的退款状态 |
-| 140 | task | GET | `/task/order/cash` | 提现 |
-| 141 | task | GET | `/task/order/verify` | 自动收货 |
-| 142 | task | GET | `/task/order/backstock` | 超时未支付订单自动取消并恢复库存(手动触发, 与定时任务同一套逻辑) |
-| 143 | task | GET | `/task/test/user` | 查询文章信息(联调测试接口) |
+| 104 | goods | GET | `/goods/Leader/groupActivity/tag/list` | 团购标签下拉列表(添加/编辑团购活动时选择标签, 仅返回启用status=1的标签) |
+| 105 | goods | POST | `/goods/Leader/groupActivity/add` | 添加团购活动 |
+| 106 | goods | GET | `/goods/Leader/get/groupActivity/info` | 查询团购信息, 还要查询商品列表(价格以团购商品表冗余的团购价为准) |
+| 107 | goods | POST | `/goods/Leader/groupActivity/edit` | 修改团购活动, 团购进行中, 不允许修改 |
+| 108 | goods | POST | `/goods/Leader/groupActivity/close` | 这样就不需要修改的时候同步Redis缓存了, 只需要关闭修改完, 打开上线的时候更新一次即可 |
+| 109 | goods | GET | `/goods/Leader/get/groupActivity/cat` | 团购分类列表 |
+| 110 | goods | POST | `/goods/Leader/share/groupActivity/poster` | 分享团购海报生成1 |
+| 111 | goods | POST | `/goods/Leader/share/groupActivity/make/poster` | 分享团购活动海报（带有logo的海报） |
+| 112 | admin | GET | `/admin/business/list` | 分页查询团长收款账户列表(含累计额度) |
+| 113 | admin | GET | `/admin/business/count` | 查询收款账户总数 |
+| 114 | admin | GET | `/admin/business/info` | 查询收款账户详情 |
+| 115 | admin | POST | `/admin/business/add` | 添加团长收款账户(商户编号需唯一) |
+| 116 | admin | GET | `/admin/goods/list` | 分页查询商品列表 |
+| 117 | admin | GET | `/admin/goods/count` | 查询商品总数 |
+| 118 | admin | GET | `/admin/goods/info` | 查询商品详情 |
+| 119 | admin | GET | `/admin/goods/img` | 查询商品缩略图列表(最多3张) |
+| 120 | admin | GET | `/admin/group/list` | 分页查询团购活动列表 |
+| 121 | admin | GET | `/admin/group/count` | 查询团购活动总数 |
+| 122 | admin | GET | `/admin/group/info` | 查询团购活动详情 |
+| 123 | admin | GET | `/admin/tag/list` | 分页查询团购标签列表(含停用, 支持名称模糊搜索) |
+| 124 | admin | GET | `/admin/tag/count` | 团购标签总数(筛选条件与列表接口一致, 供分页) |
+| 125 | admin | GET | `/admin/tag/info` | 查询团购标签详情 |
+| 126 | admin | POST | `/admin/tag/add` | 新增团购标签(名称必填/查重) |
+| 127 | admin | POST | `/admin/tag/edit` | 编辑团购标签(含启停, 未传字段保留原值) |
+| 128 | admin | POST | `/admin/tag/delete` | 删除团购标签(被团购活动使用中禁止删除) |
+| 129 | admin | GET | `/admin/leader/list` | 分页查询团长列表(可按手机号筛选) |
+| 130 | admin | GET | `/admin/leader/count` | 查询团长总数 |
+| 131 | admin | POST | `/admin/leader/add` | 添加团长(校验手机号/商户编号, 同步创建员工/店铺/收款账户) |
+| 132 | admin | GET | `/admin/leader/select` | 团长下拉选项列表(id/名称) |
+| 133 | admin | GET | `/admin/login/kaptcha` | 获取后台登录图形验证码(Base64图片, 5分钟有效) |
+| 134 | admin | POST | `/admin/login/submit` | 后台登录(验证码+账号密码, 返回token) |
+| 135 | admin | GET | `/admin/member/list` | 分页查询会员列表 |
+| 136 | admin | GET | `/admin/member/count` | 查询会员总数 |
+| 137 | admin | GET | `/admin/orderbusiness/list` | 分页查询订单列表 |
+| 138 | admin | GET | `/admin/orderbusiness/count` | 查询订单总数 |
+| 139 | admin | GET | `/admin/order/list` | 分页查询订单列表 |
+| 140 | admin | GET | `/admin/order/count` | 查询订单总数 |
+| 141 | admin | GET | `/admin/report/list` | 分页查询订单列表 |
+| 142 | admin | GET | `/admin/report/count` | 查询订单总数 |
+| 143 | task | GET | `/task/order/send` | 微信订单发货 |
+| 144 | task | GET | `/task/order/divide` | 订单分账 |
+| 145 | task | GET | `/task/order/query` | 查询订单 |
+| 146 | task | GET | `/task/order/refund` | 同步原始订单表和商户订单表的退款状态 |
+| 147 | task | GET | `/task/order/cash` | 提现 |
+| 148 | task | GET | `/task/order/verify` | 自动收货 |
+| 149 | task | GET | `/task/order/backstock` | 超时未支付订单自动取消并恢复库存(手动触发, 与定时任务同一套逻辑) |
+| 150 | task | GET | `/task/test/user` | 查询文章信息(联调测试接口) |
 
 ---
 
@@ -3808,7 +3815,7 @@ data 类型：无（接口仅返回操作结果，data 为 null）
 
 > 类路径：`cn.com.shopgroup.goods.controller.LeaderGroupManageController`
 
-> 接口数量：9
+> 接口数量：10
 
 #### 1. POST `/goods/Leader/get/groupActivity/list`
 
@@ -4110,6 +4117,34 @@ data 类型：`String`（基本类型，无子字段）
 | data | `Object` | 返回数据，类型：`String`（具体字段见下方表格） |
 
 data 类型：`String`（基本类型，无子字段）
+
+
+#### 10. GET `/goods/Leader/groupActivity/tag/list`
+
+**功能说明**：团购标签下拉列表(添加/编辑团购活动时选择标签, 仅返回启用status=1的标签)
+
+**入参**：无
+
+**出参（JsonResult 统一返回体）**
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| code | `Integer` | 状态码：200=成功，300=失败，400=无权限，500=错误 |
+| msg | `String` | 提示信息 |
+| data | `Object` | 返回数据，类型：`List<GbGroupTag>`（具体字段见下方表格） |
+
+data 类型：`List<GbGroupTag>`（数组，元素类型 `GbGroupTag`，字段说明见下）
+
+**GbGroupTag 字段**
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| tagId | `Long` | 否 | 标签id,主键自增 |
+| tagName | `String` | 否 | 标签名称 |
+| tagColor | `String` | 否 | 标签颜色,展示用 |
+| sortOrder | `Integer` | 否 | 排序,越小越靠前 |
+| status | `Byte` | 否 | 状态:1启用0停用 |
+| addTime | `Integer` | 否 | 添加时间 |
 
 
 ## 4. gb-group-admin（后台管理）
@@ -5053,6 +5088,176 @@ data 类型：`List<GbReportBusinessInfo>`（数组，元素类型 `GbReportBusi
 | data | `Object` | 返回数据（类型见下） |
 
 data 类型：`Object`（未能静态推断，以接口实际返回为准）
+
+
+### AdminGroupTagController
+
+> 类路径：`cn.com.shopgroup.controller.AdminGroupTagController`
+
+> 接口数量：6
+
+#### 1. GET `/admin/tag/list`
+
+**功能说明**：分页查询团购标签列表(含停用, 支持名称模糊搜索)
+
+**入参**
+
+| 参数 | 类型 | 位置 | 必填 | 说明 |
+| --- | --- | --- | --- | --- |
+| keyword | `String` | Query 参数 | 否 | 标签名称关键字(模糊) |
+| page | `int` | Query 参数 | 是 | 页码（从 1 开始） |
+| pageSize | `int` | Query 参数 | 是 | 每页条数（默认 10, 最大 100） |
+
+**出参（JsonResult 统一返回体）**
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| code | `Integer` | 状态码：200=成功，300=失败，400=无权限，500=错误 |
+| msg | `String` | 提示信息 |
+| data | `Object` | 返回数据，类型：`List<GbGroupTag>`（具体字段见下方表格） |
+
+data 类型：`List<GbGroupTag>`（数组，元素类型 `GbGroupTag`，字段说明见下）
+
+**GbGroupTag 字段**
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| tagId | `Long` | 否 | 标签id,主键自增 |
+| tagName | `String` | 否 | 标签名称 |
+| tagColor | `String` | 否 | 标签颜色,展示用 |
+| sortOrder | `Integer` | 否 | 排序,越小越靠前 |
+| status | `Byte` | 否 | 状态:1启用0停用 |
+| addTime | `Integer` | 否 | 添加时间 |
+
+#### 2. GET `/admin/tag/count`
+
+**功能说明**：团购标签总数(筛选条件与列表接口一致, 供分页计算总页数)
+
+**入参**
+
+| 参数 | 类型 | 位置 | 必填 | 说明 |
+| --- | --- | --- | --- | --- |
+| keyword | `String` | Query 参数 | 否 | 标签名称关键字(模糊) |
+
+**出参（JsonResult 统一返回体）**
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| code | `Integer` | 状态码：200=成功，300=失败，400=无权限，500=错误 |
+| msg | `String` | 提示信息 |
+| data | `Object` | 返回数据，类型：`Long`（标签总数） |
+
+data 类型：`Long`（基本类型，无子字段）
+
+#### 3. GET `/admin/tag/info`
+
+**功能说明**：查询团购标签详情(不存在时 msg 返回"未查询到标签信息")
+
+**入参**
+
+| 参数 | 类型 | 位置 | 必填 | 说明 |
+| --- | --- | --- | --- | --- |
+| tagId | `Long` | Query 参数 | 是 | 标签id |
+
+**出参（JsonResult 统一返回体）**
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| code | `Integer` | 状态码：200=成功，300=失败，400=无权限，500=错误 |
+| msg | `String` | 提示信息 |
+| data | `Object` | 返回数据，类型：`GbGroupTag`（具体字段见下方表格） |
+
+data 类型：`GbGroupTag`（字段说明见下）
+
+**GbGroupTag 字段**
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| tagId | `Long` | 否 | 标签id,主键自增 |
+| tagName | `String` | 否 | 标签名称 |
+| tagColor | `String` | 否 | 标签颜色,展示用 |
+| sortOrder | `Integer` | 否 | 排序,越小越靠前 |
+| status | `Byte` | 否 | 状态:1启用0停用 |
+| addTime | `Integer` | 否 | 添加时间 |
+
+#### 4. POST `/admin/tag/add`
+
+**功能说明**：新增团购标签(名称必填/查重; 名称重复时 msg 返回"标签名称已存在")
+
+**入参（请求体为 `GbGroupTag` 对象）**
+
+| 参数 | 类型 | 位置 | 必填 | 说明 |
+| --- | --- | --- | --- | --- |
+| request | `GbGroupTag` | Body | 是 | 请求体对象, 字段说明见下方表格 |
+
+**GbGroupTag 字段**
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| tagName | `String` | 是 | 标签名称 |
+| tagColor | `String` | 否 | 标签颜色,展示用 |
+| sortOrder | `Integer` | 否 | 排序,越小越靠前(默认0) |
+| status | `Byte` | 否 | 状态:1启用0停用(默认1启用) |
+
+**出参（JsonResult 统一返回体）**
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| code | `Integer` | 状态码：200=成功，300=失败，400=无权限，500=错误 |
+| msg | `String` | 提示信息 |
+| data | `Object` | 返回数据，类型：`String`（成功提示"添加成功"） |
+
+data 类型：`String`（基本类型，无子字段）
+
+#### 5. POST `/admin/tag/edit`
+
+**功能说明**：编辑团购标签(可修改名称/颜色/排序/状态启停; 未传字段保留原值; 名称查重排除自身)
+
+**入参（请求体为 `GbGroupTag` 对象）**
+
+| 参数 | 类型 | 位置 | 必填 | 说明 |
+| --- | --- | --- | --- | --- |
+| request | `GbGroupTag` | Body | 是 | 请求体对象, 字段说明见下方表格 |
+
+**GbGroupTag 字段**
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| tagId | `Long` | 是 | 标签id |
+| tagName | `String` | 是 | 标签名称 |
+| tagColor | `String` | 否 | 标签颜色,展示用 |
+| sortOrder | `Integer` | 否 | 排序,越小越靠前 |
+| status | `Byte` | 否 | 状态:1启用0停用(0停用后团长端下拉不再展示) |
+
+**出参（JsonResult 统一返回体）**
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| code | `Integer` | 状态码：200=成功，300=失败，400=无权限，500=错误 |
+| msg | `String` | 提示信息 |
+| data | `Object` | 返回数据，类型：`String`（成功提示"修改成功"） |
+
+data 类型：`String`（基本类型，无子字段）
+
+#### 6. POST `/admin/tag/delete`
+
+**功能说明**：删除团购标签(已被团购活动使用时禁止删除, 提示改为停用; 活动表已冗余 tag_name, 停用不影响历史活动展示)
+
+**入参**
+
+| 参数 | 类型 | 位置 | 必填 | 说明 |
+| --- | --- | --- | --- | --- |
+| tagId | `Long` | Query 参数 | 是 | 标签id |
+
+**出参（JsonResult 统一返回体）**
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| code | `Integer` | 状态码：200=成功，300=失败，400=无权限，500=错误 |
+| msg | `String` | 提示信息(被引用时: "该标签已被团购活动使用, 不可删除, 可改为停用") |
+| data | `Object` | 返回数据，类型：`String`（成功提示"删除成功"） |
+
+data 类型：`String`（基本类型，无子字段）
 
 
 ## 5. gb-group-task（定时任务）

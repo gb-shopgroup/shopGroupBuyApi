@@ -41,12 +41,11 @@ public class StaffController {
     @GetMapping("/leader/staff/list")
     public JsonResult staffList() {
 
-        // 从请求头中获取团长id
+         //从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
             return JsonResult.fail("lid不存在");
         }
-
         // 查询列表
         List<GbOrgStaffInfo> result = staffInfoService.getMiniLeaderStaffList(leaderId);
         log.info("/leader/staff/list leaderId:{},result:{}", leaderId, JSON.toJSONString(result));
@@ -54,7 +53,7 @@ public class StaffController {
             return JsonResult.success();
         }
         // 去掉列表中第一个元素，就是超级团长角色
-        result.remove(0);
+        //result.remove(0);
         List<StaffResponse> data = StaffResponse.getStaffResponseList(result);
         return JsonResult.success(data);
     }
@@ -62,7 +61,7 @@ public class StaffController {
     // 添加员工(校验用户存在且未绑定, 绑定提货点)
     @PostMapping("/leader/staff/add")
     public JsonResult addStaff(@Validated @RequestBody StaffRequest request) {
-
+        log.info("添加员工/leader/staff/add,req:{}",JSON.toJSONString(request));
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) return JsonResult.fail("lid不存在");

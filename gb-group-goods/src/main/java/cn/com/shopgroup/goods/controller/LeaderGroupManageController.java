@@ -22,7 +22,9 @@ import cn.com.shopgroup.goods.model.GbGoodsInfo;
 import cn.com.shopgroup.goods.model.GbGroupActivityGoods;
 import cn.com.shopgroup.goods.model.GbGroupActivityInfo;
 import cn.com.shopgroup.goods.model.GbGroupCategoryInfo;
+import cn.com.shopgroup.goods.model.GbGroupTag;
 import cn.com.shopgroup.goods.service.GbGoodsInfoService;
+import cn.com.shopgroup.goods.service.GbGroupTagService;
 import cn.com.shopgroup.goods.service.GbGroupActivityInfoService;
 import cn.com.shopgroup.goods.service.GbGroupCategoryInfoService;
 import cn.com.shopgroup.user.model.GbOrgShopInfo;
@@ -75,6 +77,9 @@ public class LeaderGroupManageController {
 
     @Autowired
     private GbGroupCategoryInfoService categoryService;
+
+    @Autowired
+    private GbGroupTagService tagService;
 
     @Autowired
     private GbGoodsInfoService goodsService;
@@ -130,6 +135,27 @@ public class LeaderGroupManageController {
         // 查询总数
         long total = activityInfoService.getMiniLeaderGroupCount(leaderId, catId, name, Optional.ofNullable(status).orElse(0));
         return JsonResult.success(total);
+    }
+
+    // 团购标签下拉列表(添加/编辑团购活动时选择标签)
+    @GetMapping("/groupActivity/tag/list")
+    public JsonResult getGroupTagList() {
+        log.info("团长端-团购标签下拉列表,开始");
+        return JsonResult.success(tagService.getEnabledTagList());
+    }
+
+    // 设置团购活动标签: 根据标签id补全标签名称(冗余), 便于列表/详情直接展示
+    private void fillGroupTagData(GbGroupActivityInfo data, Long tagId) {
+        Long fixTagId = tagId == null ? 0L : tagId;
+        data.setTagId(fixTagId);
+        String tagName = "";
+        if (fixTagId > 0) {
+            GbGroupTag tag = tagService.getTagById(fixTagId);
+            if (tag != null) {
+                tagName = tag.getTagName();
+            }
+        }
+        data.setTagName(tagName);
     }
 
     // 添加团购活动
@@ -236,6 +262,8 @@ public class LeaderGroupManageController {
         data.setEndTime(request.getEndTime());
         // 是否禁用,0上线1下线
         data.setIsClose((byte) 0);
+        // 团购标签
+        fillGroupTagData(data, request.getTagId());
 
         // 重新构建商品列表
         List<GbGroupActivityGoods> lists = new ArrayList<>();
@@ -408,6 +436,8 @@ public class LeaderGroupManageController {
 
         data.setStartTime(request.getStartTime());
         data.setEndTime(request.getEndTime());
+        // 团购标签
+        fillGroupTagData(data, request.getTagId());
 
         // 重新构建商品列表
         List<GbGroupActivityGoods> lists = new ArrayList<>();

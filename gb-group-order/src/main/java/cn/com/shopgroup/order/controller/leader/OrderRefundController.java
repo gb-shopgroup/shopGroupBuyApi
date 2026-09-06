@@ -178,6 +178,14 @@ public class OrderRefundController {
         }
         //标识订单商品售后状态不同意
         orderInfoService.updateOrderGoodsApplyStatus(orderNo, orderGoodsIds, 3);
+        // 审核拒绝: 扣回申请退款时累计到订单表refund_fee的金额, 避免退款统计虚增
+        int deductCent = 0;
+        for (OrderRefundGoodsRequest req : request.getRefundGoodsMap().values()) {
+            if (req.getRefundAmount() != null && req.getRefundAmount() > 0) {
+                deductCent += MoneyUtil.yuanToCent(req.getRefundAmount());
+            }
+        }
+        orderInfoService.deductMiniOrderRefundFee(orderNo, deductCent);
         //插入退货记录售后日志
         GbOrderGoodsRefundRecord refundRecord = new GbOrderGoodsRefundRecord();
         refundRecord.setOperateId(opId);
@@ -265,8 +273,8 @@ public class OrderRefundController {
 
             // 添加日志, 消息类型: 1=系统消息2=内部消息3=业务消息
             byte type = 2;
-            String oper = "通过了";
-            String content = opName + " " + oper + " 订单号(" + orderNo + ") 的退款订单。";
+            String opString = "通过了";
+            String content = opName + " " + opString + " 订单号(" + orderNo + ") 的退款订单。";
             messageService.addMiniLeaderMessageInfo(leaderId, opId, type, content);
             // 返回 成功标识
             transactionLog.setRemark("退款成功");

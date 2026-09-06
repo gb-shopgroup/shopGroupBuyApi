@@ -235,6 +235,9 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
         data.setStaffName(info.getStaffName());
         data.setIsCheck((byte) 1);
         data.setCheckRemark("");
+        // 团购标签
+        data.setTagId(info.getTagId() == null ? 0L : info.getTagId());
+        data.setTagName(info.getTagName() == null ? "" : info.getTagName());
         data.setAddTime(TimeUtils.getTimeStamp());
         mapper.insert(data);
         Long groupId = data.getGroupId();
@@ -269,6 +272,9 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
         updateWrapper.set(GbGroupActivityInfo::getStartTime, info.getStartTime());
         updateWrapper.set(GbGroupActivityInfo::getEndTime, info.getEndTime());
         updateWrapper.set(GbGroupActivityInfo::getStaffName, info.getStaffName());
+        // 团购标签
+        updateWrapper.set(GbGroupActivityInfo::getTagId, info.getTagId() == null ? 0L : info.getTagId());
+        updateWrapper.set(GbGroupActivityInfo::getTagName, info.getTagName() == null ? "" : info.getTagName());
         updateWrapper.eq(GbGroupActivityInfo::getGroupId, info.getGroupId());
         updateWrapper.eq(GbGroupActivityInfo::getLeaderId, leaderId);
         int flag = mapper.update(updateWrapper);

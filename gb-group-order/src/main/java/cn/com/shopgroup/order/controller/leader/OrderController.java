@@ -1,6 +1,7 @@
 package cn.com.shopgroup.order.controller.leader;
 
 import cn.com.shopgroup.common.utils.JsonResult;
+import cn.com.shopgroup.common.utils.MoneyUtil;
 import cn.com.shopgroup.common.wxmini.WxMiniAccessTokenHelper;
 import cn.com.shopgroup.common.wxmini.WxMiniProgramHelper;
 import cn.com.shopgroup.order.constants.OrderStatusEnum;
@@ -401,7 +402,10 @@ public class OrderController {
         if (!CollectionUtils.isEmpty(list)) {
             orderTotal = list.size();
             amountTotal = list.stream().mapToDouble(GbOrderInfo::getOrderPrice).sum();
-            refundAmountTotal = list.stream().mapToDouble(GbOrderInfo::getRefundFee).sum();
+            // refundFee 单位:分, 汇总前需转元
+            refundAmountTotal = list.stream()
+                    .mapToDouble(o -> MoneyUtil.centToYuan(o.getRefundFee()))
+                    .sum();
         }
         response.setAmountTotal(amountTotal);
         response.setOrderTotal(orderTotal);

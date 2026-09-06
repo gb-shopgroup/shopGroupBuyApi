@@ -34,6 +34,10 @@ public class GroupActResponse {
     private String info;
     // 虚拟订单数量
     private Integer virtual;
+    // 团购标签id
+    private Long tagId;
+    // 团购标签名称
+    private String tagName;
     // 实际订单数量
     private Integer order;
     // 是否禁用,0上线1下线
@@ -89,6 +93,9 @@ public class GroupActResponse {
         this.endTime = data.getEndTime();
         // 审核备注
         this.checkRemark = data.getCheckRemark();
+        // 团购标签
+        this.tagId = data.getTagId();
+        this.tagName = data.getTagName();
     }
 
     // 列表转换

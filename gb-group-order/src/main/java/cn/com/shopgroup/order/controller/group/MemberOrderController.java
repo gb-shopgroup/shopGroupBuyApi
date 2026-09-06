@@ -1,6 +1,7 @@
 package cn.com.shopgroup.order.controller.group;
 
 import cn.com.shopgroup.common.utils.JsonResult;
+import cn.com.shopgroup.common.utils.MoneyUtil;
 import cn.com.shopgroup.common.utils.TimeUtils;
 import cn.com.shopgroup.common.utils.TokenUtils;
 import cn.com.shopgroup.common.wxmini.WxMiniAccessTokenHelper;
@@ -393,25 +394,37 @@ public class MemberOrderController {
 
         Map<Long, OrderRefundGoodsRequest> goodsMap = refundApplyRequest.getRefundGoodsMap();
         StringBuilder sb = new StringBuilder();
+        // 本次申请退款的总金额(单位:元)
+        Double allRefundAmount = 0D;
         for (GbOrderGoodsInfo orderGoods : goodsList) {
             Long tempId = orderGoods.getId();
             Integer tempGoodNum = orderGoods.getGoodsNum(); // 订单商品数量
             String tempGoodsName = orderGoods.getGoodsName();
+            Integer canRefundNum = tempGoodNum - orderGoods.getRefundGoodsNum();
             if (goodsMap.containsKey(tempId)) {
                 OrderRefundGoodsRequest temp = goodsMap.get(tempId);
-                if (temp.getRefundNum().intValue() > tempGoodNum) {
+                if (temp.getRefundNum().intValue() > canRefundNum) {
                     return JsonResult.fail("申请退款订单商品数大于实际购买数量,请联系客服");
                 }
-                String decMsg = tempGoodsName + ",申请退数量:" + temp.getRefundNum() + ",退款金额:" + temp.getRefundAmount() + "|";
+                String decMsg = tempGoodsName + ",申请退数量:" + temp.getRefundNum() + ",退款金额:" + temp.getRefundAmount() + ";";
                 sb.append(decMsg);
+                // 累加各商品退款金额, 计算本次申请退款的总金额
+                allRefundAmount += temp.getRefundAmount();
                 //同时标记订单商品状态
                 orderGoods.setApplyRefund(1);
-                orderGoods.setReceiptNum(temp.getRefundNum());
+                orderGoods.setRefundGoodsNum(temp.getRefundNum());
             }
         }
         String refundGoodsMsg = sb.toString();
+        // 累加结果四舍五入精确到分, 避免浮点误差
+        allRefundAmount = MoneyUtil.centToYuan(MoneyUtil.yuanToCent(allRefundAmount));
+        // 申请退款总金额不能超过订单实付金额(payFee 单位:分), 防止超额退款
+        int payFee = orderInfo.getPayFee() == null ? 0 : orderInfo.getPayFee().intValue();
+        if (MoneyUtil.yuanToCent(allRefundAmount) > payFee) {
+            return JsonResult.fail("申请退款总金额大于订单实付金额, 请重新申请");
+        }
         // 申请退款 1 订单状态变成售后
-        Boolean flag = orderInfoService.miniRefundOrder(memberId, orderNo);
+        Boolean flag = orderInfoService.miniRefundOrder(memberId, orderNo,allRefundAmount);
         //订单商品变更
         int m = orderInfoService.updateOrderGoodsRefundByOrderNo(goodsList);
         if (flag) {
@@ -420,13 +433,14 @@ public class MemberOrderController {
             refundRecord.setRefundGoodsMsg(refundGoodsMsg);
             refundRecord.setOperateId(memberId);
             refundRecord.setOperateName(memberName);
-            refundRecord.setIsAgree(1);
+            refundRecord.setIsAgree(0);
             refundRecord.setOrderNo(orderNo);
             refundRecord.setActionReason(refundApplyRequest.getActionReason());
             refundRecord.setExtraReason(refundApplyRequest.getExtraReason());
             refundRecord.setAddTime(TimeUtils.getTimeStamp());
             refundRecordService.addRefundRecord(refundRecord);
-            return JsonResult.success("已申请退款");
+            // 返回本次申请退款的总金额, 供前端展示
+            return JsonResult.success("已申请退款", allRefundAmount);
         } else {
             return JsonResult.fail("申请退款失败");
         }

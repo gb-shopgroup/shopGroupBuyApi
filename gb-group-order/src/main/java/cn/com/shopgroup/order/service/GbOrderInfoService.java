@@ -1,5 +1,6 @@
 package cn.com.shopgroup.order.service;
 
+import cn.com.shopgroup.common.utils.MoneyUtil;
 import cn.com.shopgroup.common.utils.TimeUtils;
 import cn.com.shopgroup.order.constants.OrderStatusEnum;
 import cn.com.shopgroup.order.http.response.GroupOrderRecordResponse;
@@ -269,13 +270,31 @@ public class GbOrderInfoService {
     }
 
 
-    public Boolean miniRefundOrder(Long memberId, String orderNo) {
+    public Boolean miniRefundOrder(Long memberId, String orderNo, Double allRefundAmount) {
 
         LambdaUpdateWrapper<GbOrderInfo> updateWrapper = Wrappers.lambdaUpdate();
         updateWrapper.eq(GbOrderInfo::getOrderNo, orderNo);
         updateWrapper.eq(GbOrderInfo::getMemberId, memberId);
         updateWrapper.set(GbOrderInfo::getStatus, OrderStatusEnum.APPLY_REFUND.getCode());
         updateWrapper.set(GbOrderInfo::getRefundTime, TimeUtils.getTimeStamp());
+        // 本次申请退款总金额(元)转分后, 累计维护到订单表refund_fee
+        if (allRefundAmount != null && allRefundAmount > 0) {
+            int addRefundFee = MoneyUtil.yuanToCent(allRefundAmount);
+            updateWrapper.setSql("refund_fee = refund_fee + " + addRefundFee);
+        }
+        int flag = mapper.update(updateWrapper);
+        return flag > 0 ? true : false;
+    }
+
+    // 审核拒绝退款时, 回退订单表refund_fee中累计的本次申请退款金额(单位:分), 防止退款统计虚增
+    public Boolean deductMiniOrderRefundFee(String orderNo, Integer deductRefundFee) {
+        if (orderNo == null || deductRefundFee == null || deductRefundFee <= 0) {
+            return false;
+        }
+        LambdaUpdateWrapper<GbOrderInfo> updateWrapper = Wrappers.lambdaUpdate();
+        updateWrapper.eq(GbOrderInfo::getOrderNo, orderNo);
+        // 累计金额不足时置0, 避免出现负数
+        updateWrapper.setSql("refund_fee = IF(refund_fee >= " + deductRefundFee + ", refund_fee - " + deductRefundFee + ", 0)");
         int flag = mapper.update(updateWrapper);
         return flag > 0 ? true : false;
     }

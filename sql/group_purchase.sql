@@ -849,3 +849,28 @@ CREATE TABLE `gb_sys_user_info` (
   UNIQUE KEY `uk_user_name` (`user_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='系统用户信息表';
 
+-- group_purchase.gb_group_tag definition
+-- 团购标签配置表(添加/编辑团购活动时选择的标签)
+
+CREATE TABLE `gb_group_tag` (
+  `tag_id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '标签id,主键自增',
+  `tag_name` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '标签名称',
+  `tag_color` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '标签颜色,前端展示用',
+  `sort_order` int unsigned NOT NULL DEFAULT '0' COMMENT '排序,数值越小越靠前',
+  `status` tinyint unsigned NOT NULL DEFAULT '1' COMMENT '状态,0=停用,1=启用',
+  `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '创建时间,秒级时间戳',
+  PRIMARY KEY (`tag_id`),
+  KEY `idx_status_sort` (`status`,`sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='团购标签配置表';
+
+-- 预设团购标签数据
+INSERT INTO `gb_group_tag` (`tag_name`,`tag_color`,`sort_order`,`status`,`add_time`) VALUES
+('超快回复', '#FF6B35', 1, 1, UNIX_TIMESTAMP()),
+('超多回头客', '#2E9BE6', 2, 1, UNIX_TIMESTAMP()),
+('热门团购', '#FF3B30', 3, 1, UNIX_TIMESTAMP());
+
+-- 团购活动表新增标签字段(添加/编辑团购活动时选择的标签)
+ALTER TABLE `gb_group_activity_info`
+  ADD COLUMN `tag_id` int unsigned NOT NULL DEFAULT '0' COMMENT '团购标签id,0=未选择',
+  ADD COLUMN `tag_name` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '团购标签名称,冗余展示';
+

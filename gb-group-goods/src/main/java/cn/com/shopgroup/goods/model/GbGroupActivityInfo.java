@@ -86,6 +86,12 @@ public class GbGroupActivityInfo {
     // 添加时间
     @TableField("add_time")
     private Integer addTime;
+    // 团购标签id,0未选择
+    @TableField("tag_id")
+    private Long tagId;
+    // 团购标签名称,冗余展示
+    @TableField("tag_name")
+    private String tagName;
 
     // 团购商品列表
     // 不是订单表里面的字段哦
