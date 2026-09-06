@@ -227,25 +227,61 @@ FIELD_RE = re.compile(
     r"private\s+([\w<>\[\],\s.]+?)\s+(\w+)\s*(?:=|;)")
 
 
+# 注解中的字段说明: @ApiModelProperty(value="...") / @ApiParam 等
+ANNOT_DESC_RE = [
+    re.compile(r"@ApiModelProperty\s*\(\s*value\s*=\s*\"([^\"]+)\""),
+    re.compile(r"@ApiParam\s*\(\s*(?:value\s*=\s*)?\"([^\"]+)\""),
+]
+
+
 def parse_class_fields(src):
-    """解析类的字段列表：[(类型, 字段名, 注释, 必填)]"""
+    """解析类的字段列表：[(类型, 字段名, 注释, 必填)]
+
+    字段说明提取优先级：
+      1) 字段上方的 // 行注释 或 /** Javadoc */（限定在本字段与上一个字段/类体之间, 避免串取类注释）
+      2) 注解中的说明（@ApiModelProperty(value=...) / 校验注解 message）
+      3) 字段声明同行的行尾 // 注释
+    """
     fields = []
+    class_brace = src.find("{")  # 类体起点, 排除类注释与类注解
+    prev_start = class_brace if class_brace != -1 else 0
     for m in FIELD_RE.finditer(src):
         ann_part = m.group(1)
         ftype = simplify_type(m.group(2))
         fname = m.group(3)
         if ftype in ("static",) or fname.startswith("serialVersionUID"):
             continue
-        # 从字段声明所在行的行首向前取 400 字符, 避免截断在行中间
+        # 注释提取区间: 上一个字段(或类体)之后 ~ 当前字段行首; 超出 400 字符时截取尾部(行对齐)
         line_start = src.rfind("\n", 0, m.start()) + 1
-        before = src[max(0, line_start - 400):line_start]
+        before = src[prev_start:line_start]
+        if len(before) > 400:
+            cut = len(before) - 400
+            nl = before.find("\n", cut)
+            before = before[nl + 1:] if nl != -1 else before[cut:]
         comment = extract_field_comment(before)
+        # 无独立注释时, 从字段注解中提取说明
+        if not comment:
+            for desc_re in ANNOT_DESC_RE:
+                mm = desc_re.search(ann_part)
+                if mm:
+                    comment = mm.group(1).strip()
+                    break
         if not comment:
             mm = re.search(r"@(?:NotNull|NotBlank|NotEmpty|Size|Min|Max|Email|Pattern|Valid)\([^)]*message\s*=\s*\"([^\"]+)\"", ann_part)
             if mm:
                 comment = mm.group(1)
+        # 仍无说明时, 提取字段声明同行的行尾 // 注释
+        if not comment:
+            eol = src.find("\n", m.end())
+            if eol == -1:
+                eol = len(src)
+            tail = src[m.end():eol]
+            tm = re.search(r"//\s*(.*?)\s*$", tail)
+            if tm and tm.group(1).strip():
+                comment = tm.group(1).strip()
         required = bool(re.search(r"@(NotNull|NotBlank|NotEmpty|Email|Pattern|Min|Max|Size)\b", ann_part))
         fields.append((ftype, fname, comment, required))
+        prev_start = m.start()
     return fields
 
 

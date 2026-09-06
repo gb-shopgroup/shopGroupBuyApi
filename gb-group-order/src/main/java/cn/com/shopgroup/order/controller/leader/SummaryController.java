@@ -1,3 +1,4 @@
+/*
 package cn.com.shopgroup.order.controller.leader;
 
 import cn.com.shopgroup.common.utils.JsonResult;
@@ -516,16 +517,6 @@ public class SummaryController {
         response.getLists().add(new SummaryOrderGoodsSkuResponse(skuIds, skuNames, tempNum));
     }
 
-    //根据团购活动id统计订单数（实时，团长段=端有需求时使用）
-    @PostMapping("/get/groupActivity/totalOrder")
-    public JsonResult getSumOfGroupActivityOrder(@RequestParam("groupId") Long groupId) {
-        Integer total = 0;
-        if (groupId == null || groupId.intValue() == 0) {
-            return JsonResult.success(total);
-        }
-        total = orderInfoService.getSumOfGroupActivityOrder(groupId);
-        return JsonResult.success(total);
-    }
-
 
 }
+*/

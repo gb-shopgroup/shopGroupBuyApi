@@ -10,20 +10,23 @@ import cn.com.shopgroup.order.http.request.MemberOrderListRequest;
 import cn.com.shopgroup.order.http.request.MemberOrderRefundListRequest;
 import cn.com.shopgroup.order.http.request.OrderRefundApplyRequest;
 import cn.com.shopgroup.order.http.request.OrderRefundGoodsRequest;
+import cn.com.shopgroup.order.http.response.OrderRefundRecordResponse;
 import cn.com.shopgroup.order.http.response.OrderResponse;
 import cn.com.shopgroup.order.model.GbOrderGoodsInfo;
 import cn.com.shopgroup.order.model.GbOrderGoodsRefundRecord;
-import cn.com.shopgroup.order.model.GbRefundReason;
 import cn.com.shopgroup.order.model.GbOrderInfo;
+import cn.com.shopgroup.order.model.GbRefundReason;
 import cn.com.shopgroup.order.service.GbOrderGoodsRefundRecordService;
 import cn.com.shopgroup.order.service.GbOrderInfoService;
 import cn.com.shopgroup.order.service.GbRefundReasonService;
 import cn.com.shopgroup.user.model.GbMemberInfo;
 import cn.com.shopgroup.user.model.GbOrgPointInfo;
 import cn.com.shopgroup.user.model.GbOrgPointStaff;
+import cn.com.shopgroup.user.model.GbOrgShopInfo;
 import cn.com.shopgroup.user.service.GbMemberInfoService;
 import cn.com.shopgroup.user.service.GbOrgMessageInfoService;
 import cn.com.shopgroup.user.service.GbOrgPointInfoService;
+import cn.com.shopgroup.user.service.GbOrgShopInfoService;
 import com.alibaba.fastjson2.JSON;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -38,13 +41,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.Resource;
+import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import javax.imageio.ImageIO;
 
 //用户端订单
 @RestController
@@ -74,6 +77,8 @@ public class MemberOrderController {
 
     @Resource
     private WxMiniAccessTokenHelper helper;
+    @Resource
+    private GbOrgShopInfoService shopInfoService;
 
     // 用户订单列表（按订单状态/商品名称筛选, 分页查询）
     @PostMapping("/group/order/list")
@@ -124,7 +129,7 @@ public class MemberOrderController {
         if (userId == null || StringUtils.isEmpty(userId) || userId.matches("^[0-9]+$") == false) {
             return JsonResult.fail("用户不存在");
         }
-        Long memberId = 0l;
+        Long memberId = 0L;
         try {
             memberId = Long.parseLong(userId);
         } catch (NumberFormatException e) {
@@ -435,6 +440,19 @@ public class MemberOrderController {
         return JsonResult.success(reasonList);
     }
 
+    // 申请售后记录查询
+    @GetMapping("/group/order/refund/recodes")
+    public JsonResult getRefundRecords(@RequestParam("orderNo") String orderNo) {
+        log.info("申请售后记录查询,orderNo:{}", orderNo);
+        List<GbOrderGoodsRefundRecord> recordList = refundRecordService.getRefundRecordListByOrderNo(orderNo);
+        log.info("申请售后记录查询,返回recordList:{}", JSON.toJSONString(recordList));
+        if (CollectionUtils.isEmpty(recordList)) {
+            return JsonResult.success();
+        }
+        List<OrderRefundRecordResponse> result = OrderRefundRecordResponse.getOrderRefundRecordResponseList(recordList);
+        return JsonResult.success(result);
+    }
+
 
     /**
      * 用户扫码-团长-店铺二维码进入到该用户在这个店铺下的待核销订单列表
@@ -442,46 +460,44 @@ public class MemberOrderController {
      * @param shopId 店铺id
      * @return
      */
-    @GetMapping("/group/order/getPaidOrders")
-    public JsonResult getPaidOrders(@RequestParam("shopId") Long shopId) {
-
-        // 查询用户信息
-        String token = TokenUtils.getToken();
-        if (token == null || token.length() == 0) {
-            JsonResult.fail("请登录后操作");
-        }
-        String userId = TokenUtils.parseToken(token);
-        if (StringUtils.isEmpty(userId) || userId.matches("^[0-9]+$") == false) {
-            JsonResult.fail("用户不存在");
-        }
-        Long memberId = 0L;
-        try {
-            memberId = Long.parseLong(userId);
-        } catch (NumberFormatException e) {
-            return JsonResult.fail("用户不存在");
-        }
-        if (memberId == 0) {
-            return JsonResult.fail("请先登录");
-        }
-        // 查询订单信息
-        List<GbOrderInfo> list = orderInfoService.getPaidOrderInfoBy(memberId, shopId);
-        if (CollectionUtils.isEmpty(list)) {
-            return JsonResult.success();
-        }
-        List<OrderResponse> data = OrderResponse.getOrderResponseList(list);
-        return JsonResult.success(data);
-    }
+//    @GetMapping("/group/order/getPaidOrders")
+//    public JsonResult getPaidOrders(@RequestParam("shopId") Long shopId) {
+//
+//        // 查询用户信息
+//        String token = TokenUtils.getToken();
+//        if (token == null || token.length() == 0) {
+//            JsonResult.fail("请登录后操作");
+//        }
+//        String userId = TokenUtils.parseToken(token);
+//        if (StringUtils.isEmpty(userId) || userId.matches("^[0-9]+$") == false) {
+//            JsonResult.fail("用户不存在");
+//        }
+//        Long memberId = 0L;
+//        try {
+//            memberId = Long.parseLong(userId);
+//        } catch (NumberFormatException e) {
+//            return JsonResult.fail("用户不存在");
+//        }
+//        if (memberId == 0) {
+//            return JsonResult.fail("请先登录");
+//        }
+//        // 查询订单信息
+//        List<GbOrderInfo> list = orderInfoService.getPaidOrderInfoBy(memberId, shopId);
+//        if (CollectionUtils.isEmpty(list)) {
+//            return JsonResult.success();
+//        }
+//        List<OrderResponse> data = OrderResponse.getOrderResponseList(list);
+//        return JsonResult.success(data);
+//    }
 
     /**
      * 用户端-查询还有商品未全部收货的订单列表(该用户在该团长/店铺下已支付, 且存在商品行收货数量小于购买数量的订单)
      *
-     * @param leaderId 团长ID
-     * @param shopId   店铺ID
+     * @param shopId 店铺ID
      * @return
      */
     @GetMapping("/group/order/notAllReceiptList")
-    public JsonResult notAllReceiptOrderList(@RequestParam(value = "leaderId") Long leaderId,
-                                             @RequestParam(value = "shopId") Long shopId) {
+    public JsonResult notAllReceiptOrderList(@RequestParam(value = "shopId") Long shopId) {
         // 查询用户信息
         String token = TokenUtils.getToken();
         if (token == null || token.length() == 0) {
@@ -500,6 +516,11 @@ public class MemberOrderController {
         if (memberId == 0) {
             return JsonResult.fail("用户不存在");
         }
+        GbOrgShopInfo shopInfo = shopInfoService.getByShopId(shopId);
+        if (ObjectUtils.isEmpty(shopInfo)) {
+            return JsonResult.fail("店铺信息不可用");
+        }
+        Long leaderId = shopInfo.getLeaderId();
         // 查询还有商品未全部收货的订单列表
         List<GbOrderInfo> list = orderInfoService.getNotAllReceiptOrderList(memberId, leaderId, shopId);
         if (CollectionUtils.isEmpty(list)) {

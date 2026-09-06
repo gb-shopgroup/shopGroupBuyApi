@@ -22,7 +22,7 @@ public class GbOrderGoodsRefundRecordServiceImpl implements GbOrderGoodsRefundRe
 
         LambdaQueryWrapper<GbOrderGoodsRefundRecord> queryWrapper = Wrappers.lambdaQuery();
         queryWrapper.eq(GbOrderGoodsRefundRecord::getOrderNo, orderNo);
-        queryWrapper.orderByDesc(GbOrderGoodsRefundRecord::getId);
+        queryWrapper.orderByAsc(GbOrderGoodsRefundRecord::getId);
         List<GbOrderGoodsRefundRecord> result = mapper.selectList(queryWrapper);
         return result == null ? new ArrayList<>() : result;
     }

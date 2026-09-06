@@ -13,7 +13,7 @@ public class LeaderOrderApplyRefundRequest {
     //团活动Id
     private Long groupId;
     //先不考虑
-    //private Long pointId;
+    private Long pointId;
 
     private Integer page;
 

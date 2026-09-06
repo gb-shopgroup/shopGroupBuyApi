@@ -12,8 +12,8 @@ public class LeaderOrderListRequest {
     private Integer status;
     //团活动Id
     private Long groupId;
-    //先不考虑
-    //private Long pointId;
+    //自提点id
+    private Long pointId;
 
     private Integer page;
 

@@ -108,11 +108,6 @@ public class OrderRefundController {
             opName = staffInfo.getStaffName();
             opId = staffInfo.getStaffId();
         }
-        // 操作人员
-        GbOrgStaffInfo staffInfo = staffService.getStaffInfo(staffId);
-        if (ObjectUtils.isEmpty(staffInfo)) {
-            return JsonResult.fail("staffId=" + staffId + ",没查询到操作人员");
-        }
         // 审核结果 1 同意 2 拒绝
         Integer approveStatus = approveRequest.getStatus();
         String reason = approveRequest.getReason();

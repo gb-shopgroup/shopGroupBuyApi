@@ -2,6 +2,11 @@ package cn.com.shopgroup.order.service;
 
 import cn.com.shopgroup.common.utils.TimeUtils;
 import cn.com.shopgroup.order.constants.OrderStatusEnum;
+import cn.com.shopgroup.order.http.response.GroupOrderRecordResponse;
+import cn.com.shopgroup.order.http.response.LeaderMemberDetailResponse;
+import cn.com.shopgroup.order.http.response.LeaderMemberListResponse;
+import cn.com.shopgroup.order.http.response.MemberDynamicGroup;
+import cn.com.shopgroup.order.http.response.MemberDynamicItem;
 import cn.com.shopgroup.order.mapper.GbOrderGoodsInfoMapper;
 import cn.com.shopgroup.order.mapper.GbOrderInfoMapper;
 import cn.com.shopgroup.order.model.GbGroupViewLog;
@@ -21,15 +26,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
-import cn.com.shopgroup.order.http.response.GroupOrderRecordResponse;
-import cn.com.shopgroup.order.http.response.LeaderMemberDetailResponse;
-import cn.com.shopgroup.order.http.response.LeaderMemberListResponse;
-import cn.com.shopgroup.order.http.response.MemberDynamicGroup;
-import cn.com.shopgroup.order.http.response.MemberDynamicItem;
-
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -38,10 +36,8 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.TimeZone;
 import java.util.stream.Collectors;
 
 @Service
@@ -636,6 +632,20 @@ public class GbOrderInfoService {
     }
 
 
+    // (团长端首页)商品统计汇总: 商品种类总数 + 待核销总件数
+    public Map<String, Object> getSummaryGoodsTotal(Long leaderId, Long pointId, String keyword) {
+
+        return mapper.getSummaryGoodsTotal(leaderId, pointId, keyword);
+    }
+
+
+    // (团长端首页)商品维度统计分页列表
+    public List<Map<String, Object>> getSummaryGoodsPageList(Long leaderId, Long pointId, String keyword, int offset, int limit) {
+
+        return mapper.getSummaryPointGoodsPageList(leaderId, pointId, keyword, offset, limit);
+    }
+
+
     public List<Map<String, Object>> getSummaryPointOrderGoodsSkuList(Long leaderId, Long pointId, Long goodsId, Integer startTime, Integer endTime) {
 
         return mapper.getSummaryPointOrderGoodsSkuList(leaderId, pointId, goodsId, startTime, endTime);
@@ -720,7 +730,7 @@ public class GbOrderInfoService {
         for (GbOrderGoodsInfo item : goodsList) {
             LambdaUpdateWrapper<GbOrderGoodsInfo> updateGoodsWrapper = Wrappers.lambdaUpdate();
             updateGoodsWrapper.eq(GbOrderGoodsInfo::getId, item.getId());
-            updateGoodsWrapper.set(GbOrderGoodsInfo::getApplyRefund, item.getApplyRefund());
+            updateGoodsWrapper.set(GbOrderGoodsInfo::getApplyRefund, 1);
             updateGoodsWrapper.setSql("refund_goods_num = refund_goods_num + {0}", Math.abs(item.getRefundGoodsNum()));
             goodsMapper.update(updateGoodsWrapper);
         }
@@ -833,53 +843,69 @@ public class GbOrderInfoService {
     }
 
     public List<GbOrderInfo> getMemberApplyRefundOrderList(Long memberId, Integer status, int page, int pageSize) {
-        LambdaQueryWrapper<GbOrderInfo> queryWrapper = Wrappers.lambdaQuery();
-        queryWrapper.eq(GbOrderInfo::getMemberId, memberId);
-        queryWrapper.eq(GbOrderInfo::getStatus, OrderStatusEnum.APPLY_REFUND);
-        queryWrapper.orderByDesc(GbOrderInfo::getId);
+        // 参数防御: 避免 limit 偏移量出现负数, pageSize 限制上限
+        page = Math.max(page, 1);
+        pageSize = Math.min(Math.max(pageSize, 1), 100);
+
+        // 1. 按售后(审核)状态定位订单:
+        //    商品行售后状态(0 无 1 待审核 2 同意 3 不同意)
+        //    status 不传: 查询该用户所有存在售后记录(1/2/3)的订单
+        //    status 传 1/2/3: 查询包含对应售后状态商品行的订单(已退款/已拒绝等历史售后订单也能查到)
+        QueryWrapper<GbOrderInfo> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("member_id", memberId);
+        String applyScope = (status != null && status > 0)
+                ? "apply_refund = " + status
+                : "apply_refund in (1, 2, 3)";
+        queryWrapper.inSql("order_no",
+                "select order_no from gb_order_goods_info where " + applyScope
+                        + " and order_no in (select order_no from gb_order_info where member_id = " + memberId + ")");
+        queryWrapper.orderByDesc("id");
         queryWrapper.last("limit " + (page - 1) * pageSize + "," + pageSize);
         List<GbOrderInfo> orderList = mapper.selectList(queryWrapper);
         if (CollectionUtils.isEmpty(orderList)) {
             return new ArrayList<>();
         }
+
         // 2. 批量查询本页订单的商品信息, 按 orderNo 关联
         List<String> orderNos = orderList.stream()
                 .map(GbOrderInfo::getOrderNo)
                 .collect(Collectors.toList());
-
-        LambdaQueryWrapper<GbOrderGoodsInfo> queryWrapper2 = Wrappers.lambdaQuery();
-        queryWrapper2.in(GbOrderGoodsInfo::getOrderNo, orderNos);
-        if (status != null) {
-            queryWrapper2.eq(GbOrderGoodsInfo::getApplyRefund, status);
+        LambdaQueryWrapper<GbOrderGoodsInfo> goodsWrapper = Wrappers.lambdaQuery();
+        goodsWrapper.in(GbOrderGoodsInfo::getOrderNo, orderNos);
+        if (status != null && status > 0) {
+            // 指定售后状态时, 仅返回该状态的售后商品行; 不传状态则返回整单商品行
+            goodsWrapper.eq(GbOrderGoodsInfo::getApplyRefund, status);
         }
-        queryWrapper2.orderByDesc(GbOrderGoodsInfo::getId);
-        List<GbOrderGoodsInfo> goodsList = goodsMapper.selectList(queryWrapper2);
+        goodsWrapper.orderByDesc(GbOrderGoodsInfo::getId);
+        List<GbOrderGoodsInfo> goodsList = goodsMapper.selectList(goodsWrapper);
         if (CollectionUtils.isEmpty(goodsList)) {
             return new ArrayList<>();
         }
-        Map<Long, List<GbOrderGoodsInfo>> goodsMap = new HashMap<>();
+
+        // 3. 按 orderNo 组装订单商品列表
+        Map<String, List<GbOrderGoodsInfo>> goodsMap = new HashMap<>();
         for (GbOrderGoodsInfo item : goodsList) {
-            Long tempId = item.getId();
-            if (goodsMap.containsKey(tempId)) {
-                goodsMap.get(tempId).add(item);
+            String orderNo = item.getOrderNo();
+            if (goodsMap.containsKey(orderNo)) {
+                goodsMap.get(orderNo).add(item);
             } else {
                 List<GbOrderGoodsInfo> tempList = new ArrayList<>();
                 tempList.add(item);
-                goodsMap.put(tempId, tempList);
+                goodsMap.put(orderNo, tempList);
             }
         }
         List<GbOrderInfo> result = new ArrayList<>();
         for (GbOrderInfo item : orderList) {
-            Long tempId = item.getId();
-            if (goodsMap.containsKey(tempId)) {
-                item.setGoodsInfoList(goodsMap.get(tempId));
+            String orderNo = item.getOrderNo();
+            if (goodsMap.containsKey(orderNo)) {
+                item.setGoodsInfoList(goodsMap.get(orderNo));
                 result.add(item);
             }
         }
         return result;
     }
 
-    public List<GbOrderInfo> getLeaderOrderList(Long leaderId, Long groupId, String keyword,
+    public List<GbOrderInfo> getLeaderOrderList(Long leaderId, Long groupId, Long pointId, String keyword,
                                                 Integer status, int page, int pageSize) {
         // 参数防御: 避免 limit 偏移量出现负数, pageSize 限制上限
         page = Math.max(page, 1);
@@ -896,6 +922,9 @@ public class GbOrderInfoService {
             LambdaQueryWrapper<GbOrderInfo> queryWrapper = buildLeaderOrderQueryWrapper(leaderId, groupId, status, null);
             if (isPhone) {
                 queryWrapper.like(GbOrderInfo::getMobile, trimKeyword);
+            }
+            if (pointId != null && pointId > 0) {
+                queryWrapper.eq(GbOrderInfo::getPointId, pointId);
             }
             queryWrapper.orderByDesc(GbOrderInfo::getId);
             queryWrapper.last("limit " + (page - 1) * pageSize + "," + pageSize);
@@ -915,6 +944,9 @@ public class GbOrderInfoService {
                 return new ArrayList<>();
             }
             LambdaQueryWrapper<GbOrderInfo> queryWrapper = buildLeaderOrderQueryWrapper(leaderId, groupId, status, orderNoList);
+            if (pointId != null && pointId > 0) {
+                queryWrapper.eq(GbOrderInfo::getPointId, pointId);
+            }
             queryWrapper.orderByDesc(GbOrderInfo::getId);
             queryWrapper.last("limit " + (page - 1) * pageSize + "," + pageSize);
             result = mapper.selectList(queryWrapper);
@@ -1297,6 +1329,20 @@ public class GbOrderInfoService {
             group.getItems().add(new MemberDynamicItem(timeLabel, entry.action, entry.content));
         }
         return new ArrayList<>(groupMap.values());
+    }
+
+    public List<GbOrderInfo> getAllByLeaderIdAndPointId(Long leaderId, Long pointId) {
+        // 团长首页 head 订单统计: 查询该团长的有效订单(排除已取消),
+        // pointId 有值时按提货点过滤
+        LambdaQueryWrapper<GbOrderInfo> queryWrapper = Wrappers.lambdaQuery();
+        queryWrapper.eq(GbOrderInfo::getLeaderId, leaderId);
+        queryWrapper.ne(GbOrderInfo::getStatus, OrderStatusEnum.CANCELED.getCode());
+        if (pointId != null && pointId > 0) {
+            queryWrapper.eq(GbOrderInfo::getPointId, pointId);
+        }
+        queryWrapper.orderByDesc(GbOrderInfo::getId);
+        List<GbOrderInfo> orderList = mapper.selectList(queryWrapper);
+        return orderList == null ? new ArrayList<>() : orderList;
     }
 
     /**

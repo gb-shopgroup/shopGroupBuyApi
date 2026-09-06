@@ -10,7 +10,7 @@ import java.math.BigDecimal;
 
 // 订单交易流水表
 @Data
-@TableName("order_transaction_log")
+@TableName("gb_order_transaction_log")
 public class OrderTransactionLog {
     // 主键自增
     @TableId(type = IdType.AUTO)

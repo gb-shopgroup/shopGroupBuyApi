@@ -9,9 +9,11 @@ import cn.com.shopgroup.order.http.request.LeaderOrderListRequest;
 import cn.com.shopgroup.order.http.request.OrderVerifyGoodsRequest;
 import cn.com.shopgroup.order.http.request.OrderVerifyRequest;
 import cn.com.shopgroup.order.http.request.ScanQRCodeRequest;
+import cn.com.shopgroup.order.http.response.LeaderHomeGoodsSummaryResponse;
 import cn.com.shopgroup.order.http.response.LeaderHomeShowDataResponse;
 import cn.com.shopgroup.order.http.response.OrderResponse;
 import cn.com.shopgroup.order.http.response.OrderStatusResponse;
+import cn.com.shopgroup.order.http.response.SummaryOrderGoodsResponse;
 import cn.com.shopgroup.order.model.GbOrderBusinessInfo;
 import cn.com.shopgroup.order.model.GbOrderGoodsInfo;
 import cn.com.shopgroup.order.model.GbOrderInfo;
@@ -37,6 +39,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.Resource;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -76,7 +79,7 @@ public class OrderController {
         String keyword = request.getKeyword();
         Integer status = request.getStatus();
         // 查询订单列表
-        List<GbOrderInfo> result = orderInfoService.getLeaderOrderList(leaderId, groupId, keyword, status, page, pageSize);
+        List<GbOrderInfo> result = orderInfoService.getLeaderOrderList(leaderId, groupId, request.getPointId(),keyword, status, page, pageSize);
         List<OrderResponse> data = OrderResponse.getOrderResponseList(result);
         return JsonResult.success(data);
     }
@@ -170,8 +173,7 @@ public class OrderController {
 
     //核销（整单核销）
     @PostMapping("/leader/order/writeOff")
-    public JsonResult writeOff(@RequestParam("userToken") String userToken,
-                               @RequestParam("orderNo") String orderNo,
+    public JsonResult writeOff(@RequestParam("orderNo") String orderNo,
                                @RequestParam("pid") Long pointId) {
         log.info("[核销订单:/leader/order/writeOff] params orderNo:{},pointId:{}", orderNo, pointId);
         // 从请求头中获取团长id
@@ -379,9 +381,9 @@ public class OrderController {
         }
     }
 
-    // 团长控制台head部分-商品总数, 团购, 订单数量, 不考虑提货点
+    // 团长首页订单汇总(head部分): 返回有效订单总数/订单总金额/退款总金额; pointId 传 0 或不传表示不区分提货点, 传具体值则按提货点过滤
     @GetMapping("/leader/home/show/orders")
-    public JsonResult homeShowOrderTotal() {
+    public JsonResult homeShowOrderTotal(@RequestParam("pointId") Long pointId) {
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
@@ -395,7 +397,7 @@ public class OrderController {
         // 订单数量
         Double refundAmountTotal = 0D;
         // 订单总数（取消除外）
-        List<GbOrderInfo> list = orderInfoService.getAllByLeaderId(leaderId);
+        List<GbOrderInfo> list = orderInfoService.getAllByLeaderIdAndPointId(leaderId,pointId);
         if (!CollectionUtils.isEmpty(list)) {
             orderTotal = list.size();
             amountTotal = list.stream().mapToDouble(GbOrderInfo::getOrderPrice).sum();
@@ -406,6 +408,70 @@ public class OrderController {
         response.setRefundAmountTotal(refundAmountTotal);
         // 返回
         return JsonResult.success(response);
+    }
+
+    // 团长端订单-商品统计: 返回商品种类总数/待核销总件数 + 每个商品的件数统计(含已核销/未核销), 支持商品名称搜索与分页
+    @GetMapping("/leader/home/order/goodsSummary")
+    public JsonResult homeGoodsSummary(@RequestParam(value = "pointId", defaultValue = "0") Long pointId,
+                                       @RequestParam(value = "keyword", required = false) String keyword,
+                                       @RequestParam(value = "page", defaultValue = "1") Integer page,
+                                       @RequestParam(value = "pageSize", defaultValue = "10") Integer pageSize) {
+        // 从请求头中获取团长id
+        Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
+        if (leaderId == 0) {
+            return JsonResult.fail("lid不存在");
+        }
+        // 请求参数矫正
+        int currentPage = Optional.ofNullable(page).orElse(1);
+        int size = Optional.ofNullable(pageSize).map(s -> Math.min(s, 100)).orElse(10);
+        int offset = (currentPage - 1) * size;
+
+        // 商品种类总数 + 待核销总件数(不受分页影响)
+        Map<String, Object> totalMap = orderInfoService.getSummaryGoodsTotal(leaderId, pointId, keyword);
+        long goodsTotal = 0l;
+        long unVerifyTotal = 0l;
+        if (totalMap != null && !totalMap.isEmpty()) {
+            goodsTotal = totalMap.get("goods_total") == null ? 0L : ((Number) totalMap.get("goods_total")).longValue();
+            unVerifyTotal = totalMap.get("unverify_total") == null ? 0L : ((Number) totalMap.get("unverify_total")).longValue();
+        }
+
+        // 商品维度统计列表(分页)
+        List<Map<String, Object>> results = orderInfoService.getSummaryGoodsPageList(leaderId, pointId, keyword, offset, size);
+        List<SummaryOrderGoodsResponse> itemList = new ArrayList<>();
+        if (results != null) {
+            for (Map<String, Object> item : results) {
+                SummaryOrderGoodsResponse resp = new SummaryOrderGoodsResponse();
+                resp.setId(((Number) item.get("goods_id")).longValue());
+                resp.setName((String) item.get("goods_name"));
+                resp.setUnit((String) item.get("goods_unit"));
+                long numTotal = ((Number) item.get("num_total")).longValue();
+                long unVerifyNum = ((Number) item.get("unverify_num")).longValue();
+                resp.setTotal(numTotal);          // 总件数
+                resp.setNum2(unVerifyNum);        // 未核销件数
+                resp.setNum1(numTotal - unVerifyNum); // 已核销件数
+                itemList.add(resp);
+            }
+        }
+        // 组装返回
+        LeaderHomeGoodsSummaryResponse response = new LeaderHomeGoodsSummaryResponse();
+        response.setGoodsTotal(goodsTotal);
+        response.setUnVerifyTotal(unVerifyTotal);
+        response.setPage(currentPage);
+        response.setPageSize(size);
+        response.setList(itemList);
+        // 返回
+        return JsonResult.success(response);
+    }
+
+    // 根据团购活动id统计订单数（实时统计，团长端有需求时使用）
+    @PostMapping("/get/groupActivity/totalOrder")
+    public JsonResult getSumOfGroupActivityOrder(@RequestParam("groupId") Long groupId) {
+        Integer total = 0;
+        if (groupId == null || groupId.intValue() == 0) {
+            return JsonResult.success(total);
+        }
+        total = orderInfoService.getSumOfGroupActivityOrder(groupId);
+        return JsonResult.success(total);
     }
 
 }

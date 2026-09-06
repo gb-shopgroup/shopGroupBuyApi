@@ -25,7 +25,7 @@ public class GbOrderGoodsRefundRecord {
     // 操作人姓名
     @TableField("operate_name")
     private String operateName;
-    //状态 0 待审核 1 同意 3 2同意
+    //状态 0 待审核 1 同意 2不同意
     @TableField("is_agree")
     private Integer isAgree;
     // 申请原因

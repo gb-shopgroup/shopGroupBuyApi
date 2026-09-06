@@ -22,10 +22,8 @@ public class ShopRequest {
     @ApiModelProperty(value = "店铺信息介绍")
     private String shopInfo;
     // 店铺logo
-    @TableField("店铺logo")
     private String shopLogo;
     //店铺二维码图,用户扫码查看待核销订单使用
-    @TableField("店铺二维码图")
     private String shopCodeUrl;
 
 }

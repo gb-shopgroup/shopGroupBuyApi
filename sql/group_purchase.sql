@@ -12,7 +12,7 @@ CREATE TABLE `gb_article_info` (
   `is_close` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '是否禁用',
   `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '添加时间',
   PRIMARY KEY (`article_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='文章信息表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='文章信息表';
 
 -- group_purchase.gb_focus_info definition
 
@@ -25,7 +25,7 @@ CREATE TABLE `gb_focus_info` (
   `is_close` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '是否禁用',
   `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '添加时间',
   PRIMARY KEY (`focus_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='轮播图信息表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='轮播图信息表';
 
 -- group_purchase.gb_goods_category_info definition
 
@@ -36,7 +36,7 @@ CREATE TABLE `gb_goods_category_info` (
   `is_close` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '是否禁用',
   `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '添加时间',
   PRIMARY KEY (`cat_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='商品分类信息表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='商品分类信息表';
 
 -- group_purchase.gb_goods_image_info definition
 
@@ -46,7 +46,7 @@ CREATE TABLE `gb_goods_image_info` (
   `goods_type` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '图片类型,1主图, 2 banner图',
   `goods_img` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '图片地址',
   PRIMARY KEY (`img_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=52 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='商品图片表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='商品图片表';
 
 -- group_purchase.gb_goods_info definition
 
@@ -71,7 +71,7 @@ CREATE TABLE `gb_goods_info` (
   `check_remark` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '审核备注',
   `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '添加时间',
   PRIMARY KEY (`goods_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=21 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='商品信息表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='商品信息表';
 
 -- group_purchase.gb_goods_package_info definition
 
@@ -87,7 +87,7 @@ CREATE TABLE `gb_goods_package_info` (
   `is_close` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '是否禁用',
   `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '添加时间',
   PRIMARY KEY (`pack_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=26 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='商品包装信息表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='商品包装信息表';
 
 -- group_purchase.gb_goods_restock_info definition
 
@@ -139,7 +139,7 @@ CREATE TABLE `gb_goods_spec_info` (
   `is_close` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '是否禁用',
   `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '添加时间',
   PRIMARY KEY (`spec_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='商品规格信息表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='商品规格信息表';
 
 -- group_purchase.gb_goods_spec_value definition
 
@@ -152,7 +152,7 @@ CREATE TABLE `gb_goods_spec_value` (
   `is_close` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '是否禁用',
   `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '添加时间',
   PRIMARY KEY (`val_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='商品规格值表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='商品规格值表';
 
 -- group_purchase.gb_goods_stock_log definition
 
@@ -211,7 +211,7 @@ CREATE TABLE `gb_group_activity_info` (
   `check_remark` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '审核备注',
   `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '添加时间',
   PRIMARY KEY (`group_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='团购活动信息表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='团购活动信息表';
 
 -- group_purchase.gb_group_category_info definition
 
@@ -222,7 +222,7 @@ CREATE TABLE `gb_group_category_info` (
   `is_close` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '是否禁用',
   `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '添加时间',
   PRIMARY KEY (`cat_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='团购分类信息表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='团购分类信息表';
 
 -- group_purchase.gb_group_collection_activity definition
 
@@ -313,7 +313,7 @@ CREATE TABLE `gb_image_library_info` (
   `leader_id` int unsigned NOT NULL DEFAULT '0' COMMENT '团长id,外键',
   `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '添加时间',
   PRIMARY KEY (`img_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=70 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='图片库信息表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='图片库信息表';
 
 -- group_purchase.gb_member_address_info definition
 
@@ -345,7 +345,7 @@ CREATE TABLE `gb_member_blacklist` (
   `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '添加时间',
   PRIMARY KEY (`id`),
   KEY `idx_leader_id_ member_id` (`leader_id`,`member_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='黑名单信息表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='黑名单信息表';
 
 -- group_purchase.gb_member_info definition
 
@@ -364,7 +364,7 @@ CREATE TABLE `gb_member_info` (
   `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '添加时间',
   PRIMARY KEY (`member_id`),
   UNIQUE KEY `uk_openid` (`openid`)
-) ENGINE=InnoDB AUTO_INCREMENT=117 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='用户/会员信息表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='用户/会员信息表';
 
 -- group_purchase.gb_member_message_info definition
 
@@ -453,7 +453,7 @@ CREATE TABLE `gb_order_goods_info` (
   `update_time` int unsigned NOT NULL DEFAULT '0' COMMENT '更改时间',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_order_no` (`order_no`)
-) ENGINE=InnoDB AUTO_INCREMENT=2090894370887929858 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='订单商品信息表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='订单商品信息表';
 
 -- group_purchase.gb_order_goods_refund_record definition
 
@@ -469,7 +469,7 @@ CREATE TABLE `gb_order_goods_refund_record` (
   `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '添加时间',
   PRIMARY KEY (`id`),
   KEY `idx_order_no` (`order_no`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='订单退款记录信息表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='订单退款记录信息表';
 
 -- group_purchase.gb_refund_reason definition
 
@@ -482,7 +482,7 @@ CREATE TABLE `gb_refund_reason` (
   `update_time` int unsigned NOT NULL DEFAULT '0' COMMENT '更新时间,秒级时间戳',
   PRIMARY KEY (`id`),
   KEY `idx_status_sort` (`status`,`sort`)
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='退款原因配置表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='退款原因配置表';
 
 -- group_purchase.gb_order_info definition
 
@@ -535,7 +535,7 @@ CREATE TABLE `gb_order_info` (
   UNIQUE KEY `uk_order_no` (`order_no`),
   KEY `idx_leader_id` (`leader_id`),
   KEY `idx_shop_id` (`shop_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='订单信息表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='订单信息表';
 
 -- group_purchase.gb_org_business_info definition
 
@@ -560,7 +560,7 @@ CREATE TABLE `gb_org_business_info` (
   `check_cust_id` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '商户支付ID',
   `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '添加时间',
   PRIMARY KEY (`bus_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='团长分账户信息表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='团长分账户信息表';
 
 -- group_purchase.gb_org_cash_bank_info definition
 
@@ -624,7 +624,7 @@ CREATE TABLE `gb_org_leader_info` (
   `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '添加时间',
   PRIMARY KEY (`leader_id`),
   UNIQUE KEY `uk_openid` (`openid`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='团长信息表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='团长信息表';
 
 -- group_purchase.gb_org_message_info definition
 
@@ -637,7 +637,7 @@ CREATE TABLE `gb_org_message_info` (
   `is_read` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '是否阅读',
   `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '添加时间',
   PRIMARY KEY (`msg_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=52 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='团长消息表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='团长消息表';
 
 -- group_purchase.gb_org_point_info definition
 
@@ -658,7 +658,7 @@ CREATE TABLE `gb_org_point_info` (
   `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '添加时间',
   PRIMARY KEY (`point_id`),
   KEY `idx_leader_id` (`leader_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='自提点信息表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='自提点信息表';
 
 -- group_purchase.gb_org_point_region definition
 
@@ -690,7 +690,7 @@ CREATE TABLE `gb_org_shop_info` (
   `shop_info` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci COMMENT '店铺介绍',
   PRIMARY KEY (`id`),
   KEY `idx_leader_id` (`leader_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='团长店铺信息表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='团长店铺信息表';
 
 -- group_purchase.gb_org_staff_info definition
 
@@ -709,7 +709,7 @@ CREATE TABLE `gb_org_staff_info` (
   PRIMARY KEY (`staff_id`),
   UNIQUE KEY `uk_openid` (`openid`),
   KEY `idx_leader_id` (`leader_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='员工信息表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='员工信息表';
 
 -- group_purchase.gb_region_area_info definition
 

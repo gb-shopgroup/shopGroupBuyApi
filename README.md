@@ -135,7 +135,7 @@ Maven 依赖仓库使用阿里云镜像（`https://maven.aliyun.com/repository/p
 
 ### 4.5 gb-group-order — 订单 / 支付 / 分账服务
 
-覆盖：下单、订单查询、核销（整单 / 部分核销）、退款（申请 / 审批 / 回调）、微信发货、易宝支付发起与回调、团长数据汇总、报表查询，以及团长端「我的团员」（含团购查看埋点，数据表 `gb_group_view_log`）等。**51 个接口**。
+覆盖：下单、订单查询、核销（整单 / 部分核销）、退款（申请 / 审批 / 回调）、微信发货、易宝支付发起与回调、团长数据汇总、报表查询，以及团长端「我的团员」（含团购查看埋点，数据表 `gb_group_view_log`）等。**45 个接口**。
 
 ### 4.6 gb-group-admin — 平台管理后台服务
 
@@ -304,7 +304,7 @@ mvn -pl gb-group-task spring-boot:run
 | `page` / `pageSize` | 页码（从 1 开始）/ 每页条数 |
 | `start` / `end` | 开始时间 / 结束时间（如 yyyy-MM-dd） |
 
-- **接口数量统计**：user 44 个、order 51 个、goods 21 个、admin 25 个、task 8 个，合计 **149 个**。
+- **接口数量统计**：user 44 个、order 45 个、goods 21 个、admin 25 个、task 8 个，合计 **143 个**。
 - **详细版接口文档**（含每个接口的完整入参 / 出参字段说明，参数含义、必填、嵌套字段均已细化）见根目录 **`API接口文档.md`**，可通过 `python3 generate_api_doc.py` 扫描各模块 `*Controller.java` 重新生成。下方为接口总览清单。
 
 ### 8.2 接口清单
@@ -375,9 +375,9 @@ mvn -pl gb-group-task spring-boot:run
 | --- | --- | --- | --- | --- |
 | 1 | GET | `/user/leader/shop/info` | 查看店铺信息 | 无 |
 | 2 | POST | `/user/leader/shop/save` | 修改店铺信息 | Body: **request** (ShopRequest, JSON) |
-| 3 | POST | `/user/leader/shop/update` | 修改店铺信息 | Body: **request** (ShopErCodeRequest, JSON) |
+| 3 | POST | `/user/leader/shop/update` | 更新店铺码图片地址（保存店铺二维码上传后的访问URL） | Body: **request** (ShopErCodeRequest, JSON) |
 | 4 | GET | `/user/leader/getGroup/shop` | 通过leaderId团长店铺详情 | **leaderId** (Long) |
-| 5 | POST | `/user/leader/shop/makeQrCode` | 团长-我的店铺小程序码,上传到服务器返回URL | **shopId** (Long) |
+| 5 | POST | `/user/leader/shop/makeQrCode` | 团长-我的店铺二维码,上传到服务器返回URL | **shopId** (Long) |
 
 **MessageController**（`cn.com.shopgroup.user.controller.leader`）
 
@@ -415,7 +415,7 @@ mvn -pl gb-group-task spring-boot:run
 | 1 | GET | `/user/member/info` | 根据 token 获取用户信息 | 无 |
 | 2 | GET | `/user/member/isleader` | 是否团长身份 | 无 |
 
-#### 8.2.2 gb-group-order（订单/退款/分账）— 51 个接口
+#### 8.2.2 gb-group-order（订单/退款/分账）— 45 个接口
 
 **OrderBusinessController**（`cn.com.shopgroup.order.controller`）
 
@@ -463,8 +463,8 @@ mvn -pl gb-group-task spring-boot:run
 | 6 | GET | `/order/group/order/receipt` | 用户订单收货 | **orderNo** (String); **point** (Long) |
 | 7 | POST | `/order/group/order/apply/refund` | 用户申请订单退款 | Body: **refundApplyRequest** (OrderRefundApplyRequest, JSON) |
 | 8 | GET | `/order/group/order/refund/reasonList` | 用户退款原因下拉列表(申请退款时"选择退款原因") | 无 |
-| 9 | GET | `/order/group/order/getPaidOrders` | 用户扫码-团长-店铺二维码进入到该用户在这个店铺下的待核销订单列表 | **shopId** (Long) |
-| 10 | GET | `/order/group/order/notAllReceiptList` | 用户端-查询还有商品未全部收货的订单列表(该用户在该团长/店铺下已支付, 且存在商品行收货数量小于购买数量的订单) | **leaderId** (Long); **shopId** (Long) |
+| 9 | GET | `/order/group/order/refund/recodes` | 申请售后记录查询 | **orderNo** (String) |
+| 10 | GET | `/order/group/order/notAllReceiptList` | 用户端-查询还有商品未全部收货的订单列表(该用户在该团长/店铺下已支付, 且存在商品行收货数量小于购买数量的订单) | **shopId** (Long) |
 | 11 | POST | `/order/group/order/confirmShipping` | 用户点击确认收货组件后调用接口，更新订单已经操作按钮 | **orderNo** (String) |
 
 **WxOrderController**（`cn.com.shopgroup.order.controller.group`）
@@ -490,10 +490,12 @@ mvn -pl gb-group-task spring-boot:run
 | 4 | GET | `/order/leader/order/status` | 查询订单状态数量 | **gid** (Long); **pid** (Long) |
 | 5 | POST | `/order/leader/order/scanQRCode` | 团长扫用户订单码接口 | Body: **request** (ScanQRCodeRequest, JSON) |
 | 6 | GET | `/order/leader/order/query` | 根据订单号查询订单 | **orderNo** (String) |
-| 7 | POST | `/order/leader/order/writeOff` | 核销（整单核销） | **userToken** (String); **orderNo** (String); **pid** (Long) |
+| 7 | POST | `/order/leader/order/writeOff` | 核销（整单核销） | **orderNo** (String); **pid** (Long) |
 | 8 | POST | `/order/leader/order/partWriteOff` | 部分核销订单 | Body: **request** (OrderVerifyRequest, JSON) |
 | 9 | GET | `/order/leader/order/send` | 团长端-查询微信发货 | **orderNo** (String) |
-| 10 | GET | `/order/leader/home/show/orders` | 团长控制台head部分-商品总数, 团购, 订单数量, 不考虑提货点 | 无 |
+| 10 | GET | `/order/leader/home/show/orders` | 团长首页订单汇总(head部分): 返回有效订单总数/订单总金额/退款总金额; pointId 传 0 或不传表示不区分提货点, 传具体值则按提货点过滤 | **pointId** (Long) |
+| 11 | GET | `/order/leader/home/order/goodsSummary` | 团长端订单-商品统计: 返回商品种类总数/待核销总件数 + 每个商品的件数统计(含已核销/未核销), 支持商品名称搜索与分页 | **pointId** (Long); **keyword** (String); **page** (Integer); **pageSize** (Integer) |
+| 12 | POST | `/order/get/groupActivity/totalOrder` | 根据团购活动id统计订单数（实时统计，团长端有需求时使用） | **groupId** (Long) |
 
 **OrderRefundController**（`cn.com.shopgroup.order.controller.leader`）
 
@@ -507,19 +509,6 @@ mvn -pl gb-group-task spring-boot:run
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
 | 1 | POST | `/order/leader/refund/notify` | 退款结果回调通知(占位接口) | 无 |
-
-**SummaryController**（`cn.com.shopgroup.order.controller.leader`）
-
-| 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
-| --- | --- | --- | --- | --- |
-| 1 | GET | `/order/leader/summary/order` | (团长)汇总订单数量, 已支付, 未退款, 区分已核销/未核销的数量 | **start** (String); **end** (String) |
-| 2 | GET | `/order/leader/summary/goods` | (团长)汇总订单商品数量, 已支付, 未退款, 区分已核销/未核销的数量 | **start** (String); **end** (String) |
-| 3 | GET | `/order/leader/summary/point` | (团长)汇总订单商品数量, 已支付, 未退款, 区分已核销/未核销的数量, 增加提货点分组 | **start** (String); **end** (String) |
-| 4 | GET | `/order/leader/summary/sku` | (团长)汇总订单商品"sku"/"包装"数量, 已支付, 未退款, 不区分是否核销 | **gid** (Long); **start** (String); **end** (String) |
-| 5 | GET | `/order/leader/summary/pointsku` | (团长)汇总订单商品"sku"/"包装"数量, 已支付, 未退款, 不区分是否核销, 增加提货点分组 | **gid** (Long); **start** (String); **end** (String) |
-| 6 | GET | `/order/leader/summary/pointgoods` | (店员)指定 提货点id 汇总订单商品数量, 已支付, 未退款, 区分已核销/未核销的数量 | **pid** (Long); **start** (String); **end** (String) |
-| 7 | GET | `/order/leader/summary/pointgoodssku` | (店员)指定提货点, 进行汇总订单商品"sku"/"包装"数量, 已支付, 未退款, 不区分是否核销 | **pid** (Long); **gid** (Long); **start** (String); **end** (String) |
-| 8 | POST | `/order/get/groupActivity/totalOrder` | 根据团购活动id统计订单数（实时，团长段=端有需求时使用） | **groupId** (Long) |
 
 **OrderPaymentController**（`cn.com.shopgroup.order.controller.payment`）
 
