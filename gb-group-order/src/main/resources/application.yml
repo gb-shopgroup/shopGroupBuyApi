@@ -7,6 +7,10 @@ spring:
   profiles:
     # 启动时通过 --spring.profiles.active=dev|test|prod 或 SPRING_PROFILES_ACTIVE 环境变量切换环境，默认 dev
     active: ${spring.profiles.active:dev}
+  autoconfigure:
+    # 仅使用 RedisTemplate，不用 Spring Data Redis Repository，关闭其自动扫描(消除 Multiple Spring Data modules 提示)
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
   http:
     encoding:
       force-response: true
@@ -28,6 +32,8 @@ mybatis-plus:
 logging:
   level:
     com.gbshop.group: INFO
+    # 表为复合主键、实体无 @TableId，MyBatis-Plus 启动提示非错误，调低级别消除
+    com.baomidou.mybatisplus.core.injector.DefaultSqlInjector: error
 
 # mybatis输出sql日志
 mybatis:

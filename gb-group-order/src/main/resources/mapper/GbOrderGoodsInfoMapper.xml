@@ -14,6 +14,7 @@
         <result column="receipt_num" property="receiptNum"/>
         <result column="apply_refund" property="applyRefund"/>
         <result column="refund_goods_num" property="refundGoodsNum"/>
+        <result column="refund_num" property="refundNum"/>
         <result column="goods_unit" property="goodsUnit"/>
         <result column="goods_img" property="goodsImg"/>
         <result column="goods_type" property="goodsType"/>
@@ -29,7 +30,7 @@
 
     <sql id="Base_Column_List">
         id
-        ,order_no, item_id, goods_id, goods_name, goods_price, goods_num, receipt_num, apply_refund,refund_goods_num,goods_unit, goods_img,
+        ,order_no, item_id, goods_id, goods_name, goods_price, goods_num, receipt_num, apply_refund,refund_goods_num,refund_num,goods_unit, goods_img,
         goods_type, pack_id, pack_name, pack_num, sku_ids, sku_names, sku_id,add_time,update_time
     </sql>
 

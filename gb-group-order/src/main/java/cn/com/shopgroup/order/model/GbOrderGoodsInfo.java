@@ -33,9 +33,12 @@ public class GbOrderGoodsInfo {
     //售后（退款）状态 0 无 1 待审核 2 同意 3 不同意
     @TableField("apply_refund")
     private Integer applyRefund;
-    //退货数量
+    //退货退款数量(退已收货部分, 申请累计, 含待审核/已同意/不同意)
     @TableField("refund_goods_num")
     private Integer refundGoodsNum;
+    //退款数量(退待收货部分, 申请累计, 含待审核/已同意/不同意)
+    @TableField("refund_num")
+    private Integer refundNum;
     // 商品单位
     @TableField("goods_unit")
     private String goodsUnit;

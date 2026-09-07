@@ -5,7 +5,7 @@ import cn.com.shopgroup.common.utils.MoneyUtil;
 import cn.com.shopgroup.common.utils.TimeUtils;
 import cn.com.shopgroup.common.wxmini.WxMiniAccessTokenHelper;
 import cn.com.shopgroup.common.wxmini.WxMiniProgramHelper;
-import cn.com.shopgroup.common.yeepay.YeepayUtils;
+import cn.com.shopgroup.yeepay.YeePayUtils;
 import cn.com.shopgroup.goods.service.GbGoodsInfoService;
 import cn.com.shopgroup.goods.service.GbGoodsSkuInfoService;
 import cn.com.shopgroup.order.model.GbOrderBusinessInfo;
@@ -119,7 +119,7 @@ public class TaskController {
         Double amount2 = MoneyUtil.centToYuan(orderInfo.getBusFee());
 
         // 开始分账
-        Map<String, String> res = YeepayUtils.divide(orderNo, merchantNo, amount, remark, amount2, remark2);
+        Map<String, String> res = YeePayUtils.divide(orderNo, merchantNo, amount, remark, amount2, remark2);
 
         // 分账结果
         if (Integer.parseInt(res.get("success")) == 0) {
@@ -146,7 +146,7 @@ public class TaskController {
         }
 
         // 查询订单
-        Map<String, String> res = YeepayUtils.query(orderNo, orderInfo.getMerchantNo());
+        Map<String, String> res = YeePayUtils.query(orderNo, orderInfo.getMerchantNo());
         if (Integer.parseInt(res.get("success")) == 0) {
             log.warn("查询订单失败：订单号 = " + orderNo + " , 原因：" + res.get("data"));
             return "error";
@@ -181,7 +181,7 @@ public class TaskController {
         String merchantNo = orderInfo.getMerchantNo();
         // 分转元
         double amount = MoneyUtil.centToYuan(orderInfo.getOrderFee());
-        Map<String, String> res = YeepayUtils.refund(merchantNo, orderNo, String.valueOf(amount));
+        Map<String, String> res = YeePayUtils.refund(merchantNo, orderNo, String.valueOf(amount));
 
         // 查看是否成功
         if (Integer.parseInt(res.get("success")) == 0) {
@@ -226,7 +226,7 @@ public class TaskController {
         }
 
         // 申请提现
-        Map<String, String> res = YeepayUtils.cash(merchantNo, amount, bankNo);
+        Map<String, String> res = YeePayUtils.cash(merchantNo, amount, bankNo);
 
         // 结果
         if (Integer.parseInt(res.get("success")) == 0) {

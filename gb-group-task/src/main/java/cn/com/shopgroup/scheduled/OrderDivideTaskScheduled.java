@@ -4,7 +4,7 @@ import cn.com.shopgroup.common.cache.RedisConstant;
 import cn.com.shopgroup.common.cache.RedisHelper;
 import cn.com.shopgroup.common.utils.MoneyUtil;
 import cn.com.shopgroup.common.utils.TimeUtils;
-import cn.com.shopgroup.common.yeepay.YeepayUtils;
+import cn.com.shopgroup.yeepay.YeePayUtils;
 import cn.com.shopgroup.order.model.GbOrderBusinessInfo;
 import cn.com.shopgroup.service.BusinessOrderService;
 import lombok.extern.slf4j.Slf4j;
@@ -76,7 +76,7 @@ public class OrderDivideTaskScheduled {
             double amount2 = MoneyUtil.centToYuan(item.getBusFee());
 
             // 开始分账
-            Map<String, String> res = YeepayUtils.divide(orderNo, merchantNo, amount, remark, amount2, remark2);
+            Map<String, String> res = YeePayUtils.divide(orderNo, merchantNo, amount, remark, amount2, remark2);
 
             // 分账结果
             if (Integer.parseInt(res.get("success")) == 0) {

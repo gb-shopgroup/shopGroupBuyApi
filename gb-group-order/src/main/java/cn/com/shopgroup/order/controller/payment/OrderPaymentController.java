@@ -11,8 +11,6 @@ import cn.com.shopgroup.common.utils.MoneyUtil;
 import cn.com.shopgroup.common.utils.TimeUtils;
 import cn.com.shopgroup.common.wxmini.WxMiniAccessTokenHelper;
 import cn.com.shopgroup.common.wxmini.WxMiniProgramHelper;
-import cn.com.shopgroup.common.yeepay.YeepayConfig;
-import cn.com.shopgroup.common.yeepay.YeepayUtils;
 import cn.com.shopgroup.goods.service.GbGroupActivityInfoService;
 import cn.com.shopgroup.order.constants.OrderStatusEnum;
 import cn.com.shopgroup.order.constants.PaymentStatusEnum;
@@ -26,6 +24,8 @@ import cn.com.shopgroup.user.model.GbOrgBusinessInfo;
 import cn.com.shopgroup.user.model.GbOrgLeaderInfo;
 import cn.com.shopgroup.user.service.GbOrgBusinessInfoService;
 import cn.com.shopgroup.user.service.GbOrgLeaderInfoService;
+import cn.com.shopgroup.yeepay.YeePayConfig;
+import cn.com.shopgroup.yeepay.YeePayUtils;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.yeepay.yop.sdk.utils.DigitalEnvelopeUtils;
@@ -76,7 +76,7 @@ public class OrderPaymentController {
     private OrderTransactionLogService transactionLogService;
     // 支付回调
     @Resource
-    private YeepayConfig yeepayConfig;
+    private YeePayConfig yeepayConfig;
     @Resource
     private WxMiniAccessTokenHelper tokenHelper;
     //订单支付时间 15分钟，900秒；
@@ -145,8 +145,7 @@ public class OrderPaymentController {
         String userIp = IpUtils.getClientIp();
 
         // 调用易宝支付
-        String notifyUrl = yeepayConfig.getUrl();
-        Map<String, String> result = YeepayUtils.pay(notifyUrl, merchantNo, openid, userIp, orderNo, goodsName, orderAmount);
+        Map<String, String> result = YeePayUtils.pay(merchantNo, openid, userIp, orderNo, goodsName, orderAmount);
         String success = result.get("success");
         String data = result.get("data");
         //插入交易流水表

@@ -83,8 +83,12 @@ upload-config:
   domain: https://test.api.shopgroup.com.cn/image # 公有文件访问域名
   domain2: https://test.api.shopgroup.com.cn/access # 私有文件访问域名
 
-# 易宝支付回调
+# 易宝支付环境配置(随激活环境 application-dev/test/prod.yml 不同取值)
 pay-config:
-  url: https://test.api.shopgroup.com.cn/order/payment/order/notify
+  parent-merchant-no: 10093559201 # 易宝父商户号(如需测试环境沙箱商户号请在此替换)
+  wx-app-id: wx959de27ff559b753 # 微信小程序appId(如需测试环境沙箱appId请在此替换)
+  pay-notify-url: https://test.api.shopgroup.com.cn/order/payment/order/notify # 支付回调地址(易宝回调到订单服务)
+  refund-notify-url: https://test.api.shopgroup.com.cn/order/leader/refund/notify # 退款结果通知地址
+  mer-notify-url: https://test.api.shopgroup.com.cn/admin/leader/notify # 添加收款商户结果通知地址
 
 

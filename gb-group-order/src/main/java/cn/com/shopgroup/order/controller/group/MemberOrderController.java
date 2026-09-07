@@ -9,10 +9,12 @@ import cn.com.shopgroup.common.wxmini.WxMiniProgramHelper;
 import cn.com.shopgroup.order.constants.OrderStatusEnum;
 import cn.com.shopgroup.order.http.request.MemberOrderListRequest;
 import cn.com.shopgroup.order.http.request.MemberOrderRefundListRequest;
+import cn.com.shopgroup.order.http.request.MemberOrderRefundRequest;
 import cn.com.shopgroup.order.http.request.OrderRefundApplyRequest;
 import cn.com.shopgroup.order.http.request.OrderRefundGoodsRequest;
 import cn.com.shopgroup.order.http.response.OrderRefundRecordResponse;
 import cn.com.shopgroup.order.http.response.OrderResponse;
+import cn.com.shopgroup.order.http.response.RefundOrderInfoResponse;
 import cn.com.shopgroup.order.model.GbOrderGoodsInfo;
 import cn.com.shopgroup.order.model.GbOrderGoodsRefundRecord;
 import cn.com.shopgroup.order.model.GbOrderInfo;
@@ -45,6 +47,7 @@ import javax.annotation.Resource;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -346,7 +349,7 @@ public class MemberOrderController {
         }
     }
 
-    // 用户申请订单退款
+    // 用户申请订单退款。refundFlag: 1=退款(退"待收货"部分, 可退量=购买数-收货数-已申请退款数), 2=退货退款(退"已收货"部分, 可退量=收货数-已申请退货退款数); 申请成功后订单refund_fee与对应商品行退款/退货退款数量先占坑累计(可退量会相应扣减), 待团长审核: 同意=保留占坑并转正式退款, 不同意=自动恢复申请前(扣回订单refund_fee、回退商品行数量、售后状态置不同意); 出参data为本次申请退款总金额(单位:元)
     @PostMapping("/group/order/apply/refund")
     public JsonResult orderApplyRefund(@Validated @RequestBody OrderRefundApplyRequest refundApplyRequest) {
         log.info("[用户申请订单退款操作],params->{}", JSON.toJSONString(refundApplyRequest));
@@ -396,25 +399,74 @@ public class MemberOrderController {
         StringBuilder sb = new StringBuilder();
         // 本次申请退款的总金额(单位:元)
         Double allRefundAmount = 0D;
+        //    退款(1): 可退"待收货(尚未收货)"部分 = 购买数量 - 收货数量 - 已申请退款数量
+        //    退货退款(2): 可退"已收货"部分 = 收货数量 - 已申请退货退款数量
+        int isReturnGoods = Optional.ofNullable(refundApplyRequest.getRefundFlag()).orElse(0).intValue();
+        if (isReturnGoods != 1 && isReturnGoods != 2) {
+            return JsonResult.fail("退款类型不正确");
+        }
+        // 本次申请实际处理的商品行数, 用于校验申请退款的商品都属于该订单
+        int handledCount = 0;
+        // 收集本次申请的商品行(仅这些行会累加退款/退货退款数量, 避免误加未申请的行)
+        List<GbOrderGoodsInfo> applyGoodsList = new ArrayList<>();
         for (GbOrderGoodsInfo orderGoods : goodsList) {
             Long tempId = orderGoods.getId();
-            Integer tempGoodNum = orderGoods.getGoodsNum(); // 订单商品数量
             String tempGoodsName = orderGoods.getGoodsName();
-            Integer canRefundNum = tempGoodNum - orderGoods.getRefundGoodsNum();
-            if (goodsMap.containsKey(tempId)) {
-                OrderRefundGoodsRequest temp = goodsMap.get(tempId);
-                if (temp.getRefundNum().intValue() > canRefundNum) {
-                    return JsonResult.fail("申请退款订单商品数大于实际购买数量,请联系客服");
+            // 总购买数
+            int goodsNum = orderGoods.getGoodsNum() == null ? 0 : orderGoods.getGoodsNum();
+            // 已收货数
+            int receiptNum = orderGoods.getReceiptNum() == null ? 0 : orderGoods.getReceiptNum();
+            // 退货退款数(退已收货部分, 申请累计)
+            int refundedGoodNum = orderGoods.getRefundGoodsNum() == null ? 0 : orderGoods.getRefundGoodsNum();
+            // 退款数(退待收货部分, 申请累计)
+            int refundedNum = orderGoods.getRefundNum() == null ? 0 : orderGoods.getRefundNum();
+            int canRefundNum = 0;
+            if (isReturnGoods == 2) {
+                // 退货退款: "已收货"但未申请退货退款的剩余数量
+                if (receiptNum - refundedGoodNum > 0) {
+                    canRefundNum = receiptNum - refundedGoodNum;
                 }
-                String decMsg = tempGoodsName + ",申请退数量:" + temp.getRefundNum() + ",退款金额:" + temp.getRefundAmount() + ";";
-                sb.append(decMsg);
-                // 累加各商品退款金额, 计算本次申请退款的总金额
-                allRefundAmount += temp.getRefundAmount();
-                //同时标记订单商品状态
-                orderGoods.setApplyRefund(1);
-                orderGoods.setRefundGoodsNum(temp.getRefundNum());
+            } else if (isReturnGoods == 1) {
+                // 退款: "待收货(尚未收货)"但未申请退款的剩余数量
+                if (goodsNum - receiptNum - refundedNum > 0) {
+                    canRefundNum = goodsNum - receiptNum - refundedNum;
+                }
+            }
+            // 本次申请范围外的商品行不参与校验
+            if (!goodsMap.containsKey(tempId)) {
+                continue;
+            }
+            OrderRefundGoodsRequest temp = goodsMap.get(tempId);
+            Integer applyNum = temp.getRefundNum();
+            if (applyNum == null || applyNum <= 0) {
+                return JsonResult.fail("商品名称"+tempGoodsName+"申请退数量必须大于0，请核对后再提交");
+            }
+            if (canRefundNum <= 0) {
+                return JsonResult.fail("商品名称"+tempGoodsName+"已无可退数量，请核对后再提交");
+            }
+            if (applyNum > canRefundNum) {
+                return JsonResult.fail("商品名称"+tempGoodsName+"申请退数量大于可退数量，请核对后再提交");
+            }
+            handledCount++;
+            // 加入本次申请商品行集合(后续仅这些行累加退款/退货退款数量)
+            applyGoodsList.add(orderGoods);
+            String decMsg = tempGoodsName + ",申请退数量:" + applyNum + ",退款金额:" + temp.getRefundAmount() + ";";
+            sb.append(decMsg);
+            // 累加各商品退款金额, 计算本次申请退款的总金额
+            allRefundAmount += temp.getRefundAmount();
+            // 同时标记订单商品售后状态待审核(内存值, 供下方累加使用)
+            orderGoods.setApplyRefund(1);
+            if (isReturnGoods == 1) {
+                orderGoods.setRefundNum(applyNum);
+            } else {
+                orderGoods.setRefundGoodsNum(applyNum);
             }
         }
+        // 申请退款的商品必须全部属于该订单
+        if (handledCount != goodsMap.size()) {
+            return JsonResult.fail("申请退款的商品信息与订单不一致，请重新提交");
+        }
+
         String refundGoodsMsg = sb.toString();
         // 累加结果四舍五入精确到分, 避免浮点误差
         allRefundAmount = MoneyUtil.centToYuan(MoneyUtil.yuanToCent(allRefundAmount));
@@ -423,10 +475,11 @@ public class MemberOrderController {
         if (MoneyUtil.yuanToCent(allRefundAmount) > payFee) {
             return JsonResult.fail("申请退款总金额大于订单实付金额, 请重新申请");
         }
-        // 申请退款 1 订单状态变成售后
-        Boolean flag = orderInfoService.miniRefundOrder(memberId, orderNo,allRefundAmount);
-        //订单商品变更
-        int m = orderInfoService.updateOrderGoodsRefundByOrderNo(goodsList);
+
+        // 申请退款 1 订单状态变成售后, 订单refund_fee累加本次申请金额(占坑)
+        Boolean flag = orderInfoService.miniRefundOrder(memberId, orderNo, allRefundAmount);
+        // 订单商品变更: 仅本次申请的商品行累加退款/退货退款数量(占坑); 审核同意保留, 审核拒绝时回退
+        orderInfoService.updateOrderGoodsRefundByOrderNo(applyGoodsList, isReturnGoods);
         if (flag) {
             //记录申请售后日志
             GbOrderGoodsRefundRecord refundRecord = new GbOrderGoodsRefundRecord();
@@ -435,6 +488,9 @@ public class MemberOrderController {
             refundRecord.setOperateName(memberName);
             refundRecord.setIsAgree(0);
             refundRecord.setOrderNo(orderNo);
+            // 落库本次申请的类型与金额(单位:分), 团长端审核未回传类型/金额时, 拒绝流程据此兜底恢复
+            refundRecord.setRefundFlag(isReturnGoods);
+            refundRecord.setRefundAmount(MoneyUtil.yuanToCent(allRefundAmount));
             refundRecord.setActionReason(refundApplyRequest.getActionReason());
             refundRecord.setExtraReason(refundApplyRequest.getExtraReason());
             refundRecord.setAddTime(TimeUtils.getTimeStamp());
@@ -444,6 +500,7 @@ public class MemberOrderController {
         } else {
             return JsonResult.fail("申请退款失败");
         }
+
     }
 
     // 用户退款原因下拉列表(申请退款时"选择退款原因")
@@ -468,48 +525,7 @@ public class MemberOrderController {
     }
 
 
-    /**
-     * 用户扫码-团长-店铺二维码进入到该用户在这个店铺下的待核销订单列表
-     *
-     * @param shopId 店铺id
-     * @return
-     */
-//    @GetMapping("/group/order/getPaidOrders")
-//    public JsonResult getPaidOrders(@RequestParam("shopId") Long shopId) {
-//
-//        // 查询用户信息
-//        String token = TokenUtils.getToken();
-//        if (token == null || token.length() == 0) {
-//            JsonResult.fail("请登录后操作");
-//        }
-//        String userId = TokenUtils.parseToken(token);
-//        if (StringUtils.isEmpty(userId) || userId.matches("^[0-9]+$") == false) {
-//            JsonResult.fail("用户不存在");
-//        }
-//        Long memberId = 0L;
-//        try {
-//            memberId = Long.parseLong(userId);
-//        } catch (NumberFormatException e) {
-//            return JsonResult.fail("用户不存在");
-//        }
-//        if (memberId == 0) {
-//            return JsonResult.fail("请先登录");
-//        }
-//        // 查询订单信息
-//        List<GbOrderInfo> list = orderInfoService.getPaidOrderInfoBy(memberId, shopId);
-//        if (CollectionUtils.isEmpty(list)) {
-//            return JsonResult.success();
-//        }
-//        List<OrderResponse> data = OrderResponse.getOrderResponseList(list);
-//        return JsonResult.success(data);
-//    }
-
-    /**
-     * 用户端-查询还有商品未全部收货的订单列表(该用户在该团长/店铺下已支付, 且存在商品行收货数量小于购买数量的订单)
-     *
-     * @param shopId 店铺ID
-     * @return
-     */
+    //用户端-查询还有商品未全部收货的订单列表(该用户在该团长/店铺下已支付, 且存在商品行收货数量小于购买数量的订单)
     @GetMapping("/group/order/notAllReceiptList")
     public JsonResult notAllReceiptOrderList(@RequestParam(value = "shopId") Long shopId) {
         // 查询用户信息
@@ -569,5 +585,34 @@ public class MemberOrderController {
         orderInfoService.updateClickConfirmFlag(orderNo, 1);
         return JsonResult.success();
     }
+
+    // 用户点击申请退货后调用接口
+    @PostMapping("/group/order/applyRefund/orderInfo")
+    public JsonResult applyRefundOrderInfo(@Validated @RequestBody MemberOrderRefundRequest request) {
+        log.info("用户点击申请退货后查询订单信息req:{}", JSON.toJSONString(request));
+        // 查询用户信息
+        String token = TokenUtils.getToken();
+        if (token == null || token.length() == 0) {
+            return JsonResult.fail("token不存在");
+        }
+        String userId = TokenUtils.parseToken(token);
+        if (userId == null || StringUtils.isEmpty(userId) || userId.matches("^[0-9]+$") == false) {
+            return JsonResult.fail("用户不存在");
+        }
+        Long memberId = 117L;
+        try {
+            memberId = Long.parseLong(userId);
+            if (memberId == 0) {
+                return JsonResult.fail("用户不存在");
+            }
+        } catch (NumberFormatException e) {
+            return JsonResult.fail("用户不存在");
+        }
+
+        // 查询订单信息
+        RefundOrderInfoResponse result = orderInfoService.getApplyRefundOrderInfo(memberId, request.getOrderNo(), request.getRefundFlag());
+        return JsonResult.success(result);
+    }
+
 
 }

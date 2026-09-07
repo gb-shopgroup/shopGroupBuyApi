@@ -1,9 +1,9 @@
-package cn.com.shopgroup.common.yeepay;
+package cn.com.shopgroup.yeepay;
 
 import lombok.Data;
 
 @Data
-public class YeepayDivideOrderItem {
+public class YeePayDivideOrderItem {
 
 
     private String ledgerNo = "";
@@ -17,11 +17,11 @@ public class YeepayDivideOrderItem {
 
     private String ledgerType = "MERCHANT2MERCHANT";
 
-    public YeepayDivideOrderItem(){
+    public YeePayDivideOrderItem(){
 
     }
 
-    public YeepayDivideOrderItem(String no, double fee, String desc){
+    public YeePayDivideOrderItem(String no, double fee, String desc){
 
         this.ledgerNo = no;
         this.amount = String.valueOf(fee);

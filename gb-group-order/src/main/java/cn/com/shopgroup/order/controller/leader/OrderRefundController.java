@@ -4,7 +4,7 @@ import cn.com.shopgroup.common.utils.CustomIdGenerator;
 import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.MoneyUtil;
 import cn.com.shopgroup.common.utils.TimeUtils;
-import cn.com.shopgroup.common.yeepay.YeepayUtils;
+import cn.com.shopgroup.yeepay.YeePayUtils;
 import cn.com.shopgroup.goods.service.GbGoodsInfoService;
 import cn.com.shopgroup.goods.service.GbGoodsSkuInfoService;
 import cn.com.shopgroup.order.constants.PaymentStatusEnum;
@@ -38,6 +38,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -87,7 +88,7 @@ public class OrderRefundController {
         return JsonResult.success(total);
     }
 
-    //售后订单审核（同意/不同意）
+    //售后订单审核（同意/不同意）。status: 1=同意, 2=不同意; 每单一行key=订单号, value.refundGoodsMap为本次申请的订单商品行(行内refundNum/refundAmount为本次申请值); 同意=保留申请时占坑的金额与数量, 订单转售后处理并通知退款; 不同意=自动恢复申请前(扣回订单refund_fee本次金额、按行回退商品退款/退货退款数量、商品售后状态置不同意); 团长端旧版本未回传refundFlag/金额时后端按该订单最近一笔售后记录兜底恢复
     @PostMapping("/leader/refund/approve")
     public JsonResult approveRefundOrder(@Validated @RequestBody OrderApproveRequest approveRequest) {
         log.info("团长管理-审核退款订单处理.../order/refund/approve,参数:{}", JSON.toJSONString(approveRequest));
@@ -130,23 +131,41 @@ public class OrderRefundController {
             if (CollectionUtils.isEmpty(goodsList)) {
                 return JsonResult.fail("该订单未查询到商品信息");
             }
-            // 订单商品处理
+            // 订单商品处理: 仅校验本次审核的申请商品, 数量不能超过对应退款类型的剩余可退数量
             Map<Long, OrderRefundGoodsRequest> refundGoodsMap = refundInfoRequest.getRefundGoodsMap();
+            int isReturnGoods = refundInfoRequest.getRefundFlag() == null ? 0 : refundInfoRequest.getRefundFlag();
             for (GbOrderGoodsInfo goods : goodsList) {
-                //未核销商品数量
                 Long orderGoodsId = goods.getId();
-                Integer goodNum = goods.getGoodsNum(); // 订单商品数量
-                Integer refundedNum = goods.getRefundGoodsNum();// 已退货数量
-                //如果购买数量小于退货数量，有误，返回；
-                int remainRefundNum = goodNum.intValue() - refundedNum.intValue();
-                if (remainRefundNum <= 0) {
-                    return JsonResult.fail("申请退货商品数量大于总购买订单商品数目，审核失败");
+                // 非本次审核的商品行不参与校验
+                if (!refundGoodsMap.containsKey(orderGoodsId)) {
+                    continue;
                 }
-                if (refundGoodsMap.containsKey(orderGoodsId)) {
-                    OrderRefundGoodsRequest temp = refundGoodsMap.get(orderGoodsId);
-                    if (temp.getRefundNum() > remainRefundNum) {
-                        return JsonResult.fail("申请退货商品数量大于总购买订单商品数目，审核失败");
-                    }
+                OrderRefundGoodsRequest temp = refundGoodsMap.get(orderGoodsId);
+                if (temp.getRefundNum() == null || temp.getRefundNum() <= 0) {
+                    return JsonResult.fail("申请退货商品数量不合法，审核失败");
+                }
+                int goodsNum = goods.getGoodsNum() == null ? 0 : goods.getGoodsNum(); // 订单商品数量
+                int receiptNum = goods.getReceiptNum() == null ? 0 : goods.getReceiptNum(); // 收货数量
+                // 退款数(退待收货部分, 申请累计)
+                int refundNum = goods.getRefundNum() == null ? 0 : goods.getRefundNum();
+                // 退货退款数(退已收货部分, 申请累计)
+                int refundGoodsNum = goods.getRefundGoodsNum() == null ? 0 : goods.getRefundGoodsNum();
+                int remainRefundNum;
+                if (isReturnGoods == 1) {
+                    // 退款(未收货部分)的剩余可退数量
+                    remainRefundNum = goodsNum - receiptNum - refundNum;
+                } else if (isReturnGoods == 2) {
+                    // 退货退款(已收货部分)的剩余可退数量
+                    remainRefundNum = receiptNum - refundGoodsNum;
+                } else {
+                    // 兼容旧版本客户端(未传退款类型): 按原口径 购买数量-退货退款数量 校验
+                    remainRefundNum = goodsNum - refundGoodsNum;
+                }
+                if (remainRefundNum < 0) {
+                    remainRefundNum = 0;
+                }
+                if (temp.getRefundNum() > remainRefundNum) {
+                    return JsonResult.fail("申请退货商品数量大于实际可退数量，审核失败");
                 }
             }
 
@@ -165,10 +184,10 @@ public class OrderRefundController {
         return JsonResult.success("审核成功");
     }
 
-    //拒绝（不同意）处理
+    //拒绝（不同意）处理: 把订单refund_fee与商品行退款/退货退款数量恢复为本次申请前
     public void handleRefuse(Long leaderId, Long opId, String opName, OrderRefundInfoRequest request, String reason) {
         String orderNo = request.getOrderNo();
-        // 拒绝退款
+        // 拒绝退款(记录操作人/拒绝原因)
         orderInfoService.editMiniLeaderRefundOrder(orderNo, opName, reason);
         //拒绝请求过来的订单商品
         List<Long> orderGoodsIds = new ArrayList<>();
@@ -178,20 +197,57 @@ public class OrderRefundController {
         }
         //标识订单商品售后状态不同意
         orderInfoService.updateOrderGoodsApplyStatus(orderNo, orderGoodsIds, 3);
-        // 审核拒绝: 扣回申请退款时累计到订单表refund_fee的金额, 避免退款统计虚增
+        // ---------- 恢复申请前状态(申请时订单refund_fee与商品行数量均已占坑) ----------
+        // 本次申请类型/金额优先取审核请求回传值; 旧版本团长端可能未回传, 则按该订单最近一笔售后申请记录兜底
+        int isReturnGoods = request.getRefundFlag() == null ? 0 : request.getRefundFlag();
         int deductCent = 0;
         for (OrderRefundGoodsRequest req : request.getRefundGoodsMap().values()) {
             if (req.getRefundAmount() != null && req.getRefundAmount() > 0) {
                 deductCent += MoneyUtil.yuanToCent(req.getRefundAmount());
             }
         }
+        if ((isReturnGoods != 1 && isReturnGoods != 2) || deductCent <= 0) {
+            List<GbOrderGoodsRefundRecord> recordList = refundRecordService.getRefundRecordListByOrderNo(orderNo);
+            for (int i = recordList.size() - 1; i >= 0; i--) {
+                GbOrderGoodsRefundRecord record = recordList.get(i);
+                if ((isReturnGoods != 1 && isReturnGoods != 2)
+                        && record.getRefundFlag() != null
+                        && (record.getRefundFlag() == 1 || record.getRefundFlag() == 2)) {
+                    isReturnGoods = record.getRefundFlag();
+                }
+                if (deductCent <= 0 && record.getRefundAmount() != null && record.getRefundAmount() > 0) {
+                    deductCent = record.getRefundAmount();
+                }
+                if ((isReturnGoods == 1 || isReturnGoods == 2) && deductCent > 0) {
+                    break;
+                }
+            }
+        }
+        // 1. 恢复订单退费: 扣回订单refund_fee中本次申请占坑的金额(不足时置0)
         orderInfoService.deductMiniOrderRefundFee(orderNo, deductCent);
+        // 2. 恢复商品数量: 回退商品行本次申请累计的退款/退货退款数量, 否则占坑导致无法再次申请/数量虚高
+        if (isReturnGoods == 1 || isReturnGoods == 2) {
+            Map<Long, Integer> refundNumMap = new HashMap<>();
+            for (Map.Entry<Long, OrderRefundGoodsRequest> entry : request.getRefundGoodsMap().entrySet()) {
+                OrderRefundGoodsRequest req = entry.getValue();
+                if (req.getRefundNum() != null && req.getRefundNum() > 0) {
+                    refundNumMap.put(entry.getKey(), req.getRefundNum());
+                }
+            }
+            orderInfoService.deductOrderGoodsRefundByOrderNo(refundNumMap, isReturnGoods);
+        } else {
+            // 类型仍未知(历史脏数据): 仅恢复金额, 商品数量需人工核对或团长端升级后重试
+            log.warn("审核拒绝恢复: 订单{}未获取到退款类型, 仅回退订单refund_fee, 商品行退款数量未回退", orderNo);
+        }
         //插入退货记录售后日志
         GbOrderGoodsRefundRecord refundRecord = new GbOrderGoodsRefundRecord();
         refundRecord.setOperateId(opId);
         refundRecord.setOperateName(opName);
         refundRecord.setIsAgree(2);//不同意
         refundRecord.setOrderNo(orderNo);
+        if (isReturnGoods == 1 || isReturnGoods == 2) {
+            refundRecord.setRefundFlag(isReturnGoods);
+        }
         refundRecord.setActionReason(reason);
         refundRecord.setAddTime(TimeUtils.getTimeStamp());
         refundRecordService.addRefundRecord(refundRecord);
@@ -212,7 +268,7 @@ public class OrderRefundController {
         String orderNo = orderInfo.getOrderNo();
         // 订单金额, 分转元
         double amount = MoneyUtil.centToYuan(orderInfo.getPayFee());
-        Map<String, String> res = YeepayUtils.refund(merchantNo, orderNo, String.valueOf(amount));
+        Map<String, String> res = YeePayUtils.refund(merchantNo, orderNo, String.valueOf(amount));
         //插入交易流水表
         OrderTransactionLog transactionLog = new OrderTransactionLog();
         transactionLog.setOrderNo(orderNo);
@@ -233,6 +289,7 @@ public class OrderRefundController {
             // 同步原始订单表和商户订单表的退款状态
             orderBusinessInfoService.editMiniLeaderOrderBusinessRefundStatus(orderNo);
             // 退款成功, 按实际退款数量回补库存(商品总库存 + SKU库存), 支持部分退款
+            // 注: 商品行的退款/退货退款数量与订单refund_fee已在用户申请时累计占坑, 审核同意后不再重复累加
             List<GbOrderGoodsInfo> goodsList = orderInfoService.getOrderGoodsList(orderNo);
             for (GbOrderGoodsInfo goods : goodsList) {
                 OrderRefundGoodsRequest refundGoods = request.getRefundGoodsMap().get(goods.getId());

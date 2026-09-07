@@ -16,7 +16,8 @@ public class OrderGoodsReponse {
     private Integer goodsNum;
     private Integer receiptNum;
     private Integer applyRefund;
-    private Integer refundGoodsNum;//商品退数量
+    private Integer refundGoodsNum;//退货退款数量(退已收货部分, 申请累计)
+    private Integer refundNum;//退款数量(退待收货部分, 申请累计)
     private String goodsUnit;
     private String goodsInfo;
     // SKU信息(订单商品冗余字段, 用户选择规格时输出, 供前端识别规格)
@@ -37,6 +38,7 @@ public class OrderGoodsReponse {
         this.receiptNum = goods.getReceiptNum();
         this.applyRefund = goods.getApplyRefund();
         this.refundGoodsNum = goods.getRefundGoodsNum();
+        this.refundNum = goods.getRefundNum();
         this.goodsUnit = goods.getGoodsUnit();
         // 输出订单冗余的SKU结构化字段
         this.skuId = goods.getSkuId();

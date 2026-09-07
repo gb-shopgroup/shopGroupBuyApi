@@ -90,6 +90,12 @@ upload-config:
   domain: https://shopgroup.obs.cn-north-9.myhuaweicloud.com # 公有文件访问域名
   domain2: https://api.shopgroup.com.cn/image/access # 私有文件访问域名
 
-# 易宝支付回调
+# 易宝支付环境配置(随激活环境 application-dev/test/prod.yml 不同取值)
 pay-config:
-  url: https://api.shopgroup.com.cn/group/order/notify
+  url: https://api.shopgroup.com.cn/order/payment/order/notify # 支付回调地址(易宝回调到订单服务)
+  parent-merchant-no: 10093520300 # 易宝父商户号
+  wx-app-id: wx959de27ff559b753 # 微信小程序appId
+  pay-notify-url: https://api.shopgroup.com.cn/order/payment/order/notify # 支付结果通知(未传notifyUrl时的兜底地址)
+  refund-notify-url: https://api.shopgroup.com.cn/order/leader/refund/notify # 退款结果通知地址
+  mer-notify-url: https://api.shopgroup.com.cn/admin/leader/notify # 添加收款商户结果通知地址
+

@@ -8,6 +8,8 @@ import cn.com.shopgroup.order.http.response.LeaderMemberDetailResponse;
 import cn.com.shopgroup.order.http.response.LeaderMemberListResponse;
 import cn.com.shopgroup.order.http.response.MemberDynamicGroup;
 import cn.com.shopgroup.order.http.response.MemberDynamicItem;
+import cn.com.shopgroup.order.http.response.RefundOrderGoodsResponse;
+import cn.com.shopgroup.order.http.response.RefundOrderInfoResponse;
 import cn.com.shopgroup.order.mapper.GbOrderGoodsInfoMapper;
 import cn.com.shopgroup.order.mapper.GbOrderInfoMapper;
 import cn.com.shopgroup.order.model.GbGroupViewLog;
@@ -25,6 +27,7 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.ObjectUtils;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
@@ -39,6 +42,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -742,7 +746,7 @@ public class GbOrderInfoService {
         return 1;
     }
 
-    public int updateOrderGoodsRefundByOrderNo(List<GbOrderGoodsInfo> goodsList) {
+    public int updateOrderGoodsRefundByOrderNo(List<GbOrderGoodsInfo> goodsList, int isReturnGoods) {
         if (CollectionUtils.isEmpty(goodsList)) {
             return 0;
         }
@@ -750,7 +754,12 @@ public class GbOrderInfoService {
             LambdaUpdateWrapper<GbOrderGoodsInfo> updateGoodsWrapper = Wrappers.lambdaUpdate();
             updateGoodsWrapper.eq(GbOrderGoodsInfo::getId, item.getId());
             updateGoodsWrapper.set(GbOrderGoodsInfo::getApplyRefund, 1);
-            updateGoodsWrapper.setSql("refund_goods_num = refund_goods_num + {0}", Math.abs(item.getRefundGoodsNum()));
+            if (isReturnGoods == 1) {
+                updateGoodsWrapper.setSql("refund_num = refund_num + {0}", Math.abs(item.getRefundNum()));
+            }
+            if (isReturnGoods == 2) {
+                updateGoodsWrapper.setSql("refund_goods_num = refund_goods_num + {0}", Math.abs(item.getRefundGoodsNum()));
+            }
             goodsMapper.update(updateGoodsWrapper);
         }
         //后续需要逻辑再改成具体条数
@@ -769,6 +778,47 @@ public class GbOrderInfoService {
         }
     }
 
+    /**
+     * 累计订单商品的已退款数(refund_num): 仅在审核同意且退款成功后调用
+     * 与申请数量(refund_goods_num)区分: refund_goods_num 提交申请即累加(含待审核/被拒),
+     * 这里累加的是真正退款成功的数量
+     *
+     * @param goodsRefundNumMap key=订单商品id, value=本次退款成功数量
+     */
+    /**
+     * 审核拒绝时回退商品行本次申请累计的退款/退货退款数量
+     * 与订单refund_fee扣回配套: 申请时数量与费用已占坑, 拒绝则按本次申请量回退, 否则占坑导致无法再次申请/统计虚高
+     *
+     * @param refundNumMap  key=订单商品id, value=本次申请数量(审核拒绝时从请求回传)
+     * @param isReturnGoods 1=退款(退待收货部分, 回退refund_num) 2=退货退款(退已收货部分, 回退refund_goods_num)
+     */
+    public int deductOrderGoodsRefundByOrderNo(Map<Long, Integer> refundNumMap, int isReturnGoods) {
+        if (refundNumMap == null || refundNumMap.isEmpty() || (isReturnGoods != 1 && isReturnGoods != 2)) {
+            return 0;
+        }
+        for (Map.Entry<Long, Integer> entry : refundNumMap.entrySet()) {
+            LambdaUpdateWrapper<GbOrderGoodsInfo> updateGoodsWrapper = Wrappers.lambdaUpdate();
+            updateGoodsWrapper.eq(GbOrderGoodsInfo::getId, entry.getKey());
+            int refundNum = entry.getValue() == null ? 0 : Math.abs(entry.getValue());
+            if (refundNum <= 0) {
+                continue;
+            }
+            if (isReturnGoods == 1) {
+                // 扣减不足时置0, 避免出现负数
+                updateGoodsWrapper.setSql("refund_num = IF(refund_num >= " + refundNum + ", refund_num - " + refundNum + ", 0)");
+            } else {
+                updateGoodsWrapper.setSql("refund_goods_num = IF(refund_goods_num >= " + refundNum + ", refund_goods_num - " + refundNum + ", 0)");
+            }
+            goodsMapper.update(updateGoodsWrapper);
+        }
+        return 1;
+    }
+
+    /**
+     * 审核同意某批退款后判断订单商品是否全部退款完成:
+     * 每个商品行必须已同意(apply_refund=2)且 退款数量(refund_num) + 退货退款数量(refund_goods_num) >= 购买数量
+     * 0=全部退完, 1=还有未退完/未同意的商品
+     */
     public int getOrderGoodsStatus(String orderNo) {
         LambdaQueryWrapper<GbOrderGoodsInfo> queryWrapper2 = Wrappers.lambdaQuery();
         queryWrapper2.eq(GbOrderGoodsInfo::getOrderNo, orderNo);
@@ -776,10 +826,13 @@ public class GbOrderInfoService {
         List<GbOrderGoodsInfo> goodsList = goodsMapper.selectList(queryWrapper2);
         if (!CollectionUtils.isEmpty(goodsList)) {
             for (GbOrderGoodsInfo goods : goodsList) {
-                int goodsNum = goods.getGoodsNum().intValue();
-                int refundNum = goods.getRefundGoodsNum();
-                if (goodsNum != refundNum) {
-                    //只要该订单下最少有一个订单商品没有完全退，那么不改主订单状态
+                int goodsNum = goods.getGoodsNum() == null ? 0 : goods.getGoodsNum();
+                // 退款数量(退待收货部分, 申请累计)
+                int refundNum = goods.getRefundNum() == null ? 0 : goods.getRefundNum();
+                // 退货退款数量(退已收货部分, 申请累计)
+                int refundGoodsNum = goods.getRefundGoodsNum() == null ? 0 : goods.getRefundGoodsNum();
+                // 商品行未同意售后 或 申请数量未覆盖购买数量 -> 还有未退完的商品, 不改主订单状态
+                if (goods.getApplyRefund() == null || goods.getApplyRefund() != 2 || refundNum + refundGoodsNum < goodsNum) {
                     return 1;
                 }
             }
@@ -1362,6 +1415,72 @@ public class GbOrderInfoService {
         queryWrapper.orderByDesc(GbOrderInfo::getId);
         List<GbOrderInfo> orderList = mapper.selectList(queryWrapper);
         return orderList == null ? new ArrayList<>() : orderList;
+    }
+
+    /**
+     * 用户端-申请退款/退货前查询订单与可申请商品(快照)
+     * 退款类型标识 refundFlag: 1=退款(仅退款, 商品未收货--仅退一次，数量待收货总数) 2=退货退款(商品已收货后退回)
+     * - 退款(1): 只返回商品中"待收货"(购买数量-收货数量>0)的商品行
+     * - 退货退款(2): 只返回商品中"已收货"(收货数量>0)的商品行
+     * 订单不存在/不属于该用户/没有符合退款类型的商品时返回 null
+     */
+    public RefundOrderInfoResponse getApplyRefundOrderInfo(Long memberId, String orderNo, Integer refundFlag) {
+        if (memberId == null || memberId <= 0 || StringUtils.isEmpty(orderNo)) {
+            return null;
+        }
+        // 1. 校验订单归属(用户id+订单号, 与申请退款接口同口径)
+        GbOrderInfo orderInfo = getMiniOrderInfo(memberId, orderNo);
+        if (ObjectUtils.isEmpty(orderInfo)) {
+            return null;
+        }
+        // 2. 查询该订单的商品明细
+        List<GbOrderGoodsInfo> goodsList = getOrderGoodsList(orderNo);
+        if (CollectionUtils.isEmpty(goodsList)) {
+            return null;
+        }
+        // 3. 按退款类型过滤商品并计算每件商品的可退数量
+        //    商品行口径: goods_num=购买数量, receipt_num=收货数量(已核销/确认收货),
+        //    refund_num=退款数量(退待收货部分, 申请累计), refund_goods_num=退货退款数量(退已收货部分, 申请累计)
+        //    退款(1): 可退"待收货(尚未收货)"部分 = 购买数量 - 收货数量 - 已申请退款数量
+        //    退货退款(2): 可退"已收货"部分 = 收货数量 - 已申请退货退款数量
+        int isReturnGoods = Optional.ofNullable(refundFlag).orElse(0).intValue();
+        List<RefundOrderGoodsResponse> refundGoods = new ArrayList<>();
+        for (GbOrderGoodsInfo goods : goodsList) {
+            // 总购买数
+            int goodsNum = goods.getGoodsNum() == null ? 0 : goods.getGoodsNum();
+            //已收货数
+            int receiptNum = goods.getReceiptNum() == null ? 0 : goods.getReceiptNum();
+            //退货退款数（退已收货数）
+            int refundedGoodNum = goods.getRefundGoodsNum() == null ? 0 : goods.getRefundGoodsNum();
+            //退款数（退支付待收货）
+            int refundedNum = goods.getRefundNum() == null ? 0 : goods.getRefundNum();
+            int canRefundNum = 0;
+            if (isReturnGoods == 2) {
+                // 退货退款: 只查询"已经收货"的商品(收货数量>0), 已收货但未退部分可退
+                if (receiptNum - refundedGoodNum > 0) {
+                    canRefundNum = receiptNum - refundedGoodNum;
+                }
+            }
+            if (isReturnGoods == 1) {
+                // 退款: 只查询"待收货(尚未收货)"的商品(收货数量<购买数量), 待收货未退部分可退
+                int m = goodsNum - receiptNum - refundedNum;
+                if (m > 0) {
+                    canRefundNum = m;
+                }
+            }
+            // 该部分已退完(可退数量<=0)的商品不参与本次申请
+            if (canRefundNum <= 0) {
+                continue;
+            }
+            refundGoods.add(new RefundOrderGoodsResponse(goods, canRefundNum));
+        }
+        if (refundGoods.isEmpty()) {
+            return null;
+        }
+        // 4. 组装响应: 订单信息 + 可退款商品列表(含各商品可退数量)
+        RefundOrderInfoResponse data = new RefundOrderInfoResponse(orderInfo);
+        data.setRefundGoods(refundGoods);
+        return data;
     }
 
     /**

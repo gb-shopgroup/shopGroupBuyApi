@@ -73,3 +73,12 @@ spring:
     #username: xxxxxxxxxxx
     ###password: 12345678
     database: 2
+
+# 易宝支付环境配置(随激活环境 application-dev/test/prod.yml 不同取值)
+pay-config:
+  url: https://test.shopgroup.com.cn/order/payment/order/notify # 支付回调地址
+  parent-merchant-no: 10093520300 # 易宝父商户号(如需测试环境沙箱商户号请在此替换)
+  wx-app-id: wx959de27ff559b753 # 微信小程序appId(如需测试环境沙箱appId请在此替换)
+  pay-notify-url: https://test.shopgroup.com.cn/order/payment/order/notify # 支付结果通知(未传notifyUrl时的兜底地址)
+  refund-notify-url: https://test.shopgroup.com.cn/leader/refund/notify # 退款结果通知地址
+  mer-notify-url: https://test.shopgroup.com.cn/admin/leader/notify # 添加收款商户结果通知地址

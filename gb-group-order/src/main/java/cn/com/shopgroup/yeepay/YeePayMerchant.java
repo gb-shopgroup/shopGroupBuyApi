@@ -1,9 +1,9 @@
-package cn.com.shopgroup.common.yeepay;
+package cn.com.shopgroup.yeepay;
 
 import lombok.Data;
 
 @Data
-public class YeepayMerchant {
+public class YeePayMerchant {
 
 
     private String receiverName = "";
