@@ -98,7 +98,7 @@ public class LeaderPointController {
         data.setPointImg(request.getImg());
         data.setLongitude(request.getLon());
         data.setLatitude(request.getLat());
-        //如果不传默认50公里
+        //如果不传默认20公里
         Integer pointScope = Optional.ofNullable(request.getScope()).orElse(20);
         data.setPointScope(pointScope);
         data.setPointInfo(request.getInfo());

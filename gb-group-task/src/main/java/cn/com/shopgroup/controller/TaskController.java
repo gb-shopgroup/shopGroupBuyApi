@@ -244,25 +244,25 @@ public class TaskController {
         }
     }
 
-    // 自动收货
+    // 自动完成收货(手动触发, 与定时任务同一套逻辑): 已分账核销、核销满7天仍未完成收货的订单自动完成
     @GetMapping("/task/order/verify")
     public String verify() {
 
-        // 当前时间(结束时间)
-        int endTime = TimeUtils.getTimeStamp();
+        // 当前时间
+        int nowTime = TimeUtils.getTimeStamp();
 
-        // 7天时间(开始时间)
-        int startTime = endTime - 600000;
+        // 核销完成时间截止点(核销时间早于当前时间-7天)
+        int verifyEndTime = nowTime - 7 * 24 * 60 * 60;
 
         // 先查询订单
-        List<Map<String, String>> orderNos = taskOrderService.getUnReceiptOrderIds(startTime, endTime);
+        List<Map<String, String>> orderNos = taskOrderService.getUnReceiptOrderIds(verifyEndTime);
         // 在修改订单
         if (CollectionUtil.isNotEmpty(orderNos)) {
             for (Map<String, String> item : orderNos) {
 
                 String orderNo = item.get("orderNo");
-                taskOrderService.receiptOrder(orderNo, endTime);
-                log.info("自动完成收货============ orderNo = " + orderNo + ", receiptTime = " + endTime);
+                taskOrderService.receiptOrder(orderNo, nowTime);
+                log.info("自动完成收货============ orderNo = " + orderNo + ", receiptTime = " + nowTime);
             }
         }
 

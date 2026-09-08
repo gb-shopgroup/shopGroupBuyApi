@@ -4,6 +4,7 @@ import cn.com.shopgroup.common.utils.TimeUtils;
 import cn.com.shopgroup.goods.service.GbGoodsInfoService;
 import cn.com.shopgroup.goods.service.GbGoodsSkuInfoService;
 import cn.com.shopgroup.order.constants.OrderStatusEnum;
+import cn.com.shopgroup.order.mapper.GbOrderGoodsInfoMapper;
 import cn.com.shopgroup.order.mapper.GbOrderInfoMapper;
 import cn.com.shopgroup.order.model.GbOrderGoodsInfo;
 import cn.com.shopgroup.order.model.GbOrderInfo;
@@ -11,6 +12,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.util.LinkedHashMap;
@@ -26,24 +28,54 @@ public class TaskOrderService {
     private GbOrderInfoMapper mapper;
 
     @Resource
+    private GbOrderGoodsInfoMapper goodsMapper;
+
+    @Resource
     private GbGoodsInfoService goodsService;
 
     @Resource
     private GbGoodsSkuInfoService skuService;
 
-    // 查询未收货订单id, 定时任务需要"已经分账核销但用户未主动收货的订单"自动收货掉
-    public List<Map<String, String>> getUnReceiptOrderIds(int startTime, int endTime){
+    // 查询待系统自动完成收货的订单, 定时任务需要"已分账核销但核销满7天仍未完成收货"的订单自动收货掉
+    // verifyEndTime: 核销时间截止点(当前时间-7天), 核销时间早于该值的未完成订单才会被查询出来
+    public List<Map<String, String>> getUnReceiptOrderIds(int verifyEndTime){
 
-        return mapper.getUnReceiptOrderIds(startTime, endTime);
+        return mapper.getUnReceiptOrderIds(verifyEndTime);
     }
 
-    // 修改订单收货时间, 系统替用户收货
+    /**
+     * 系统自动完成收货(一个订单一次事务):
+     * 把"已分账且已核销、但7天内未主动确认收货"的订单补成真实完成态, 与店员整单核销/用户主动收货后的数据口径保持一致:
+     * 1) 订单主表: 待收货(1)/部分收货(2) -> 已收货(3), 补齐收货时间/确认收货标记/更新时间(条件更新防误伤退款/售后/取消单)
+     * 2) 订单商品表: 把未收足的商品行收货数量补足为"可收货数量"(购买数-已申请退款/退货退款占坑数), 避免退款部分被重复核销
+     */
+    @Transactional(rollbackFor = Exception.class)
     public void receiptOrder(String orderNo, Integer receiptTime){
 
+        // 1. 抢占式更新订单主状态: 仅"待收货/部分收货"(未完成态)的订单才会被置为已收货,
+        //    由 status in (1,2) + 置3 承担防重(处理过/全退/售后中的单不命中), 不再要求 receipt_time=0,
+        //    避免"已主动确认收货(2且receipt_time>0)但商品未核销完"的订单永久无法自动完成
         LambdaUpdateWrapper<GbOrderInfo> updateWrapper = Wrappers.lambdaUpdate();
         updateWrapper.eq(GbOrderInfo::getOrderNo, orderNo);
+        updateWrapper.in(GbOrderInfo::getStatus, OrderStatusEnum.PREPAID.getCode(), OrderStatusEnum.PART_RECEIVED.getCode());
+        updateWrapper.set(GbOrderInfo::getStatus, OrderStatusEnum.RECEIVED.getCode());
         updateWrapper.set(GbOrderInfo::getReceiptTime, receiptTime);
-        mapper.update(null, updateWrapper);
+        updateWrapper.set(GbOrderInfo::getClickConfirmFlag, 1);
+        updateWrapper.set(GbOrderInfo::getUpdateTime, receiptTime);
+        int flag = mapper.update(null, updateWrapper);
+        if (flag <= 0) {
+            // 订单已退款/售后/取消或已被处理过, 跳过(不重复回补商品行)
+            log.info("自动完成收货跳过(订单状态不允许或已处理): orderNo={}", orderNo);
+            return;
+        }
+
+        // 2. 同步订单商品: 未收足的商品行收货数量补足为可收货数量(购买数-退款/退货退款占坑数, 下限0、上限购买数)
+        LambdaUpdateWrapper<GbOrderGoodsInfo> goodsWrapper = Wrappers.lambdaUpdate();
+        goodsWrapper.eq(GbOrderGoodsInfo::getOrderNo, orderNo);
+        goodsWrapper.setSql("receipt_num = LEAST(goods_num, GREATEST(goods_num - IFNULL(refund_num, 0) - IFNULL(refund_goods_num, 0), 0))");
+        goodsWrapper.apply("goods_num - IFNULL(refund_num, 0) - IFNULL(refund_goods_num, 0) > receipt_num");
+        goodsWrapper.set(GbOrderGoodsInfo::getUpdateTime, receiptTime);
+        goodsMapper.update(null, goodsWrapper);
     }
 
     // 查询未支付的订单, 用于返回商品库存

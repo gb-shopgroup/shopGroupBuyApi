@@ -213,18 +213,21 @@ public interface GbOrderInfoMapper extends BaseMapper<GbOrderInfo> {
     List<Map<String, Object>> getSummaryPointOrderGoodsPackList(Long leaderId, Long pointId, Long goodsId, int startTime, int endTime);
 
 
-    // (定时任务)查询已分账核销(verify_time>0)但未记录收货时间的订单, 用于系统自动收货
+    // (定时任务)查询"已分账且已核销、但核销完成满7天仍未完成(系统/用户未确认收货)"的订单, 用于系统自动完成收货
+    // 条件: 分账(is_divide=1) + 已核销(verify_time>0)
+    //       + 仍处待收货/部分收货(status in 1,2, 排除已退款/售后/已取消; 含已主动确认收货但仍待完成的2态订单)
+    //       + 核销时间早于(当前时间-7天), 以核销时间为准(天然可自愈, 任务中断后仍能补处理, 且不受下单时间窗口滑出影响)
     @Select({
             "SELECT o.`order_no` AS orderNo",
             "FROM `gb_order_info` AS o",
             "JOIN `gb_order_business_info` AS b ON o.`id` = b.`order_id`",
             "WHERE b.`is_divide` = 1",
             "  AND o.`verify_time` > 0",
-            "  AND o.`receipt_time` = 0",
-            "  AND o.`add_time` BETWEEN #{startTime} AND #{endTime}",
+            "  AND o.`status` IN (1, 2)",
+            "  AND o.`verify_time` <= #{verifyEndTime}",
             "ORDER BY o.`id` ASC"
     })
-    List<Map<String, String>> getUnReceiptOrderIds(int startTime, int endTime);
+    List<Map<String, String>> getUnReceiptOrderIds(int verifyEndTime);
 
 
     // (定时任务)查询超时未支付(pay_time=0)且仍为待支付(status=0)的订单商品, 用于自动取消订单并回滚库存

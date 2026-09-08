@@ -73,7 +73,7 @@ public class OrderRefundController {
     @Resource
     private GbGoodsSkuInfoService skuService;
 
-    // 退款订单数量
+    // 退款订单数量: 订单中存在商品发生过退款(部分退/整单全退, 审核同意)即计入
     @GetMapping("/leader/refund/count")
     public JsonResult refundOrderCount(@RequestParam("gid") Long groupId, @RequestParam("pid") Long pointId) {
         log.info("退款订单数量 /leader/refund/count groupId:{},pointId:{}",groupId,pointId);
@@ -84,7 +84,7 @@ public class OrderRefundController {
         }
 
         // 查询总数
-        Long total = orderInfoService.getMiniLeaderOrderCount(leaderId, groupId, pointId, 4);
+        Long total = orderInfoService.getMiniLeaderRefundOrderCount(leaderId, groupId, pointId);
         return JsonResult.success(total);
     }
 
@@ -253,6 +253,8 @@ public class OrderRefundController {
         refundRecordService.addRefundRecord(refundRecord);
         // 同步分账订单表, 核销之后的订单才能分账, 这样只要不核销订单, 就可以随时退款
         businessService.updateBusinessOrderCheckStatus(request.getOrderNo());
+        // 3. 恢复订单主状态: 拒绝并不产生真实退款, 该订单无其它待审核售后时从售后(5)恢复为申请前状态, 否则订单一直卡在售后
+        orderInfoService.restoreOrderStatusAfterRefundReview(request.getOrderNo());
 
         // 添加日志, 消息类型: 1=系统消息2=内部消息3=业务消息
         Byte type = 2;
@@ -324,6 +326,9 @@ public class OrderRefundController {
             if (flag == 0) {
                 //改订单商品状态 全部商品都退了为退款
                 orderInfoService.editMiniLeaderRefundOrder(orderNo);
+            } else {
+                // 仅部分商品退款成功: 剩余商品继续正常流转, 订单从售后(5)恢复为申请前状态(该订单无其它待审核售后时)
+                orderInfoService.restoreOrderStatusAfterRefundReview(orderNo);
             }
             // 同步分账订单表, 核销之后的订单才能分账, 这样只要不核销订单, 就可以随时退款
             businessService.updateBusinessOrderCheckStatus(request.getOrderNo());

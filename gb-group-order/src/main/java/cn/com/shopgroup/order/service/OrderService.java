@@ -92,9 +92,16 @@ public class OrderService {
         result.put("msg", "");
 
         GbMemberInfo memberInfo = memberService.getMemberInfo(memberId);
+        log.info("下单时查询用户信息,memberId:{}，info:{}", memberId, JSON.toJSONString(memberInfo));
         if (ObjectUtils.isEmpty(memberInfo)) {
             result.put("msg", "用户不存在");
             return result;
+        }
+        Long memberLeaderId = memberInfo.getLeaderId();
+        //绑定关系判断
+        if (memberLeaderId == null || memberLeaderId.intValue() <= 0) {
+            //绑定这个用户的团长
+            handleBindLeaderId(memberInfo, request.getGroupId());
         }
 
         Long groupId = request.getGroupId();
@@ -355,6 +362,15 @@ public class OrderService {
         return result;
     }
 
+    //给新用户绑定团长
+    private void handleBindLeaderId(GbMemberInfo memberInfo, Long groupId) {
+        GbGroupActivityInfo groupActivityInfo = groupService.getMiniGroupActivityInfo(groupId);
+        if (ObjectUtils.isEmpty(groupActivityInfo)) {
+            return;
+        }
+        memberService.updateMemberBindLeader(memberInfo.getMemberId(), groupActivityInfo.getLeaderId());
+    }
+
     // 回补订单商品库存(商品总库存 + SKU库存), 用于下单扣减失败或订单写入失败时的补偿
     private void restoreOrderStock(List<GbOrderGoodsInfo> goodsList) {
         for (GbOrderGoodsInfo item : goodsList) {
@@ -404,7 +420,7 @@ public class OrderService {
     }
 
 
-    // 生成核销码(订单编号), 只考虑每个团长下能够"唯一性"就行了
+    // 生成核销码 只考虑每个团长下能够"唯一性"就行了
     // 避免相同时间不同用户下单生成相同订单编号
     public String createOrderCode(Long leaderId) {
 

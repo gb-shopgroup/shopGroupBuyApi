@@ -102,5 +102,12 @@ public class GbMemberInfoServiceImpl implements GbMemberInfoService {
         return flag > 0 ? true : false;
     }
 
+    @Override
+    public int updateMemberBindLeader(Long memberId, Long leaderId) {
+        LambdaUpdateWrapper<GbMemberInfo> updateWrapper = Wrappers.lambdaUpdate();
+        updateWrapper.set(GbMemberInfo::getLeaderId, leaderId);
+        updateWrapper.eq(GbMemberInfo::getMemberId, memberId);
+        return mapper.update(updateWrapper);
+    }
 
 }

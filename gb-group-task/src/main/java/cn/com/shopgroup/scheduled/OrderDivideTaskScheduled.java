@@ -37,28 +37,34 @@ public class OrderDivideTaskScheduled {
     @Scheduled(cron = "0 0,30 20-23 * * ?")
     public void execute() {
 
-        // 从redis中获取页码page
-        int pageSize = limit;
-        Boolean isExist = redisHelper.hasKey(RedisConstant.RedisLeaderOrderDividePageKey);
+        // 是否为本轮分账第一次执行(redis 中还没有分页记录)
+        boolean firstRound = !Boolean.TRUE.equals(redisHelper.hasKey(RedisConstant.RedisLeaderOrderDividePageKey));
+
+        // 从redis中获取页码page(首次从1开始, 每天20:00~23:30共8轮)
         long page = redisHelper.increment(RedisConstant.RedisLeaderOrderDividePageKey);
-        if (isExist == false) {
 
-            // 设置页码有效期5小时
-            redisHelper.expire(RedisConstant.RedisLeaderOrderDividePageKey, RedisConstant.RedisLeaderOrderDividePageExpired, TimeUnit.SECONDS);
-
-            // 查询总数量并缓存起来5小时
-            long total = service.getUnDivideBusinessOrderCount();
+        // 待分账总数量: 首轮现查并缓存(有效期5小时), 后续轮复用同一缓存, 保证8轮分页步长一致, 总量变化时不重复/遗漏
+        long total;
+        Object cacheTotal = redisHelper.getCacheObject(RedisConstant.RedisLeaderOrderDivideTotalKey);
+        if (cacheTotal != null) {
+            total = Long.parseLong(cacheTotal.toString());
+        } else {
+            total = service.getUnDivideBusinessOrderCount();
             redisHelper.setCacheObject(RedisConstant.RedisLeaderOrderDivideTotalKey, total, RedisConstant.RedisLeaderOrderDividePageExpired, TimeUnit.SECONDS);
+        }
 
-            // 如果一共800条记录, 执行8次定时任务, 则每次任务至少执行100条记录
-            pageSize = (int) Math.ceil(total / taskNum);
-            // 每次执行最少 200 条记录
-            pageSize = pageSize > limit ? pageSize : limit;
+        if (firstRound) {
+            // 设置页码有效期5小时(覆盖当天分账轮次窗口)
+            redisHelper.expire(RedisConstant.RedisLeaderOrderDividePageKey, RedisConstant.RedisLeaderOrderDividePageExpired, TimeUnit.SECONDS);
 
             // 分账任务开始
             log.info("待分账的订单任务执行开始：====================== " + TimeUtils.getNowTime() + " ======================");
             log.info("待分账的订单任务执行开始：总数量 = " + total);
         }
+
+        // 分页步长: 若一共800条记录, 执行8次定时任务, 则每次任务至少执行100条记录; 每轮最少200条
+        int pageSize = (int) Math.ceil(total * 1.0 / taskNum);
+        pageSize = pageSize > limit ? pageSize : limit;
 
         // 查询待分账的订单
         List<GbOrderBusinessInfo> dataList = service.getUnDivideBusinessOrderList((int) page, pageSize);

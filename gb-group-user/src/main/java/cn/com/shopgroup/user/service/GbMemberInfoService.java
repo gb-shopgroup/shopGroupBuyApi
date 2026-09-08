@@ -6,22 +6,25 @@ import java.util.List;
 
 public interface GbMemberInfoService {
 
-   List<GbMemberInfo> getAdminMemberList(int page, int pageSize);
+    List<GbMemberInfo> getAdminMemberList(int page, int pageSize);
 
 
-   Long getAdminMemberCount();
+    Long getAdminMemberCount();
 
-   GbMemberInfo getMemberInfo(Long memberId);
-
-
-   GbMemberInfo getMemberInfoByMobile(String mobile) ;
-
-   Long addMiniMember(GbMemberInfo data) ;
+    GbMemberInfo getMemberInfo(Long memberId);
 
 
-   GbMemberInfo getMiniMemberById(Long memberId);
+    GbMemberInfo getMemberInfoByMobile(String mobile);
 
-   GbMemberInfo getMiniMemberByOpenId(String openId) ;
+    Long addMiniMember(GbMemberInfo data);
 
-   Boolean updateMemberErcode(Long memberId, String ercode) ;
+
+    GbMemberInfo getMiniMemberById(Long memberId);
+
+    GbMemberInfo getMiniMemberByOpenId(String openId);
+
+    Boolean updateMemberErcode(Long memberId, String ercode);
+
+    int updateMemberBindLeader(Long memberId, Long leaderId);
+
 }

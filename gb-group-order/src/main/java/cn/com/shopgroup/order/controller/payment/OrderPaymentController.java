@@ -79,8 +79,8 @@ public class OrderPaymentController {
     private YeePayConfig yeepayConfig;
     @Resource
     private WxMiniAccessTokenHelper tokenHelper;
-    //订单支付时间 15分钟，900秒；
-    private static final int limitPayOrderTime = 900;
+    //订单支付时间30分钟，900秒；
+    private static final int limitPayOrderTime = 1800;
 
     // 发起支付
     @GetMapping("/order/pay")
@@ -199,7 +199,7 @@ public class OrderPaymentController {
     // 支付回调
     @PostMapping("/order/notify")
     public String notifyPay(HttpServletRequest req) {
-
+        log.info("易宝支付回调-order/payment//order/notify req:{}", JSON.toJSONString(req));
         // 获取响应数据(密文)
         final String contentTypeStr = req.getContentType();
         if (!StringUtils.startsWith(contentTypeStr, "application/x-www-form-urlencoded")) {
@@ -273,6 +273,7 @@ public class OrderPaymentController {
 
         // 修改订单记录, 添加支付完成标识, 同时元转分操作
         int payPrice = MoneyUtil.yuanToCent(Double.parseDouble(payAmount));
+        log.info("支付回调更新订单信息......");
         orderInfoService.miniPayOrder(orderNo, channelTrxId, payPrice);
 
         // 订单查询填充”订单收款账户信息表“ 数据表

@@ -40,11 +40,12 @@ public class BusinessOrderService {
         return result == null ? new ArrayList<>() : result;
     }
 
-    // 同步发货标识
+    // 同步发货标识(CAS: 仅未发货的订单更新成功, 防止定时/手动重复调用微信发货后重复落库)
     public boolean updateBusinessOrderSendStatus(String orderNo){
 
         LambdaUpdateWrapper<GbOrderBusinessInfo> updateWrapper = Wrappers.lambdaUpdate();
         updateWrapper.eq(GbOrderBusinessInfo::getOrderNo, orderNo);
+        updateWrapper.eq(GbOrderBusinessInfo::getIsSend, 0); // 未发货
         updateWrapper.set(GbOrderBusinessInfo::getIsSend, 1);
         updateWrapper.set(GbOrderBusinessInfo::getSendTime, TimeUtils.getTimeStamp());
         updateWrapper.set(GbOrderBusinessInfo::getCommStatus, 1); // 已发货
@@ -63,25 +64,26 @@ public class BusinessOrderService {
         return result == null ? new ArrayList<>() : result;
     }
 
-    // 同步解冻标识
+    // 同步解冻标识(CAS: 仅未解冻的订单更新成功, 防止已解冻/已分账订单被重复回调时把commStatus倒退覆盖)
     public boolean updateBusinessOrderFreezeStatus(String orderNo){
 
         LambdaUpdateWrapper<GbOrderBusinessInfo> updateWrapper = Wrappers.lambdaUpdate();
         updateWrapper.eq(GbOrderBusinessInfo::getOrderNo, orderNo);
+        updateWrapper.eq(GbOrderBusinessInfo::getIsUnfreeze, 0); // 未解冻
         updateWrapper.set(GbOrderBusinessInfo::getIsUnfreeze, 1); // 已解冻
         updateWrapper.set(GbOrderBusinessInfo::getUnfreezeTime, TimeUtils.getTimeStamp()); // 解冻时间
         updateWrapper.set(GbOrderBusinessInfo::getCommStatus, 2); // 已解冻
-        return true;
+        int flag = mapper.update(updateWrapper);
+        return flag > 0 ? true : false;
     }
 
-    // 查询待分账订单数量, 总的数量
+    // 查询待分账订单数量, 与 getUnDivideBusinessOrderList 同口径: 已解冻(核销)未分账且未退款的订单
     public long getUnDivideBusinessOrderCount(){
 
         LambdaQueryWrapper<GbOrderBusinessInfo> queryWrapper = Wrappers.lambdaQuery();
         queryWrapper.eq(GbOrderBusinessInfo::getIsDivide, 0);   // 未分账
         queryWrapper.lt(GbOrderBusinessInfo::getCommStatus, 5); // 未退款
-        //queryWrapper.eq(GbOrderBusinessInfo::getIsUnfreeze, 1); // 已解冻
-        //queryWrapper.orderByAsc(GbOrderBusinessInfo::getOrderId);
+        queryWrapper.eq(GbOrderBusinessInfo::getIsUnfreeze, 1); // 已解冻(已核销)
         return mapper.selectCount(queryWrapper);
     }
 
@@ -98,11 +100,12 @@ public class BusinessOrderService {
         return result == null ? new ArrayList<>() : result;
     }
 
-    // 同步分账标识
+    // 同步分账标识(CAS: 仅未分账的订单更新成功, 防止定时/手动重复触发对同一订单重复分账)
     public Boolean updateBusinessOrderDivideStatus(String orderNo, String status, String no){
 
         LambdaUpdateWrapper<GbOrderBusinessInfo> updateWrapper = Wrappers.lambdaUpdate();
         updateWrapper.eq(GbOrderBusinessInfo::getOrderNo, orderNo);
+        updateWrapper.eq(GbOrderBusinessInfo::getIsDivide, 0); // 未分账
         updateWrapper.set(GbOrderBusinessInfo::getIsDivide, 1); // 已分账
         updateWrapper.set(GbOrderBusinessInfo::getDivideStatus, status); // 分账状态
         updateWrapper.set(GbOrderBusinessInfo::getDivideTime, TimeUtils.getTimeStamp()); // 分账时间

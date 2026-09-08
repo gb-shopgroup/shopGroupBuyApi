@@ -94,7 +94,6 @@ public class MemberGroupController {
         // 查询列表(flag 1、团长团查询 2 用户端查询) -7 不做任何处理，填充参数
         List<GbGroupActivityInfo> result = groupActivityInfoService.getMiniLeaderGroupList(2, leaderId, request.getCatId(), activityName, -7, page, pageSize);
         List<MemberHomeGroupActResponse> data = MemberHomeGroupActResponse.getGroupActResponseList(result);
-        // g
         fillGroupLogList(data);
         for (MemberHomeGroupActResponse item : data) {
             item.setOrder(this.getRedisOrderTotal(item.getId(), item.getVirtual()));
@@ -118,12 +117,12 @@ public class MemberGroupController {
     }
 
     // 团购数量（首页）
-    @GetMapping("/group/groupActivity/count")
+/*    @GetMapping("/group/groupActivity/count")
     public JsonResult groupCount(@RequestParam("leaderId") Long leaderId, @RequestParam("catId") Long catId) {
 
         long total = groupActivityInfoService.getMiniGroupActivityCount(leaderId, catId);
         return JsonResult.success(total);
-    }
+    }*/
 
     // 团购详情(团长分享页面)---用户首页：团长更多好货也用
     @GetMapping("/group/groupActivity/info")

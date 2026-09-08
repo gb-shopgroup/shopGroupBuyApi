@@ -402,6 +402,25 @@ public class GbOrderInfoService {
         return mapper.selectCount(queryWrapper);
     }
 
+    /**
+     * 退款订单数量统计(团长端 /leader/refund/count):
+     * 只要订单中存在商品发生过退款(审核同意)即计入, 不要求整单全部退完:
+     *   1) 整单已退款: status=4(含历史老数据商品行未标售后状态的全退单)
+     *   2) 仅部分商品退款成功: 订单主状态已恢复流转(1/2/3), 但商品行售后状态 apply_refund=2 保留
+     * 注: 不限制 verify_time=0, 已核销后退货退款成功的订单同样计入; 售后待审核(apply_refund=1)/被拒(apply_refund=3)未产生真实退款, 不计入
+     */
+    public Long getMiniLeaderRefundOrderCount(Long leaderId, Long groupId, Long pointId) {
+
+        QueryWrapper<GbOrderInfo> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("leader_id", leaderId);
+        if (groupId > 0) queryWrapper.eq("group_id", groupId);
+        if (pointId > 0) queryWrapper.eq("point_id", pointId);
+        // status=4(整单全退) 或 存在商品行已同意退款(部分退成功)
+        queryWrapper.and(w -> w.eq("status", OrderStatusEnum.REFUNDED.getCode())
+                .or().inSql("order_no", "select order_no from gb_order_goods_info where apply_refund = 2"));
+        return mapper.selectCount(queryWrapper);
+    }
+
 
     public Long getMiniLeaderOrderTotal(Long leaderId, Long groupId, Long pointId, int startTime, int endTime) {
 
@@ -602,6 +621,60 @@ public class GbOrderInfoService {
         updateWrapper.set(GbOrderInfo::getRefundReason, reason);
         int flag = mapper.update(updateWrapper);
         return flag > 0 ? true : false;
+    }
+
+    /**
+     * 售后审核结束(拒绝退款 / 仅部分商品退款成功)后, 把仍停留在售后(5)的订单恢复为正常流转状态:
+     * 前提: 订单状态仍为售后(5) 且 该订单已无待审核售后(apply_refund=1)的商品行, 避免打断仍在途的其它售后申请
+     * 规则: 按用户确认收货时间(receipt_time)与商品行核销/退款完整度推算申请前状态
+     *   1) receipt_time=0(未确认过收货): 恢复待收货(1), 用户可继续核销/确认收货; 已分账核销满7天的由定时任务自动完成
+     *   2) receipt_time>0(确认过收货): 每行 核销量(receipt_num)+已退未收货量(refund_num)+已退已收货量(refund_goods_num) >= 购买量
+     *      => 全部商品已处理完, 恢复已提货(3); 否则恢复部分收货(2), 剩余部分继续核销并由定时任务自动完成
+     */
+    public void restoreOrderStatusAfterRefundReview(String orderNo) {
+        if (orderNo == null) {
+            return;
+        }
+        GbOrderInfo orderInfo = getOrderInfoByOrderNo(orderNo);
+        if (orderInfo == null || orderInfo.getStatus() == null
+                || orderInfo.getStatus().intValue() != OrderStatusEnum.APPLY_REFUND.getCode()) {
+            return;
+        }
+        List<GbOrderGoodsInfo> goodsList = getOrderGoodsList(orderNo);
+        if (CollectionUtils.isEmpty(goodsList)) {
+            return;
+        }
+        // 该订单还有商品行售后待审核: 订单继续停留在售后, 待最后一笔审核结束再恢复
+        for (GbOrderGoodsInfo goods : goodsList) {
+            if (goods.getApplyRefund() != null && goods.getApplyRefund().intValue() == 1) {
+                return;
+            }
+        }
+        int targetStatus;
+        int receiptTime = orderInfo.getReceiptTime() == null ? 0 : orderInfo.getReceiptTime();
+        if (receiptTime > 0) {
+            boolean allFinished = true;
+            for (GbOrderGoodsInfo goods : goodsList) {
+                int goodsNum = goods.getGoodsNum() == null ? 0 : goods.getGoodsNum();
+                int receiptNum = goods.getReceiptNum() == null ? 0 : goods.getReceiptNum();
+                int refundNum = goods.getRefundNum() == null ? 0 : goods.getRefundNum();
+                int refundGoodsNum = goods.getRefundGoodsNum() == null ? 0 : goods.getRefundGoodsNum();
+                if (receiptNum + refundNum + refundGoodsNum < goodsNum) {
+                    allFinished = false;
+                    break;
+                }
+            }
+            targetStatus = allFinished ? OrderStatusEnum.RECEIVED.getCode() : OrderStatusEnum.PART_RECEIVED.getCode();
+        } else {
+            targetStatus = OrderStatusEnum.PREPAID.getCode();
+        }
+        // CAS 更新: 仅当订单仍处售后(5)时恢复, 避免覆盖已全退置退款(4)或并发审核已恢复过的订单
+        LambdaUpdateWrapper<GbOrderInfo> updateWrapper = Wrappers.lambdaUpdate();
+        updateWrapper.eq(GbOrderInfo::getOrderNo, orderNo);
+        updateWrapper.eq(GbOrderInfo::getStatus, OrderStatusEnum.APPLY_REFUND.getCode());
+        updateWrapper.set(GbOrderInfo::getStatus, targetStatus);
+        updateWrapper.set(GbOrderInfo::getUpdateTime, TimeUtils.getTimeStamp());
+        mapper.update(updateWrapper);
     }
 
 
