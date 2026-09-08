@@ -381,7 +381,10 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
             if (point == null || point.getLongitude() == null || point.getLatitude() == null) {
                 continue;
             }
-            if (distanceKm(longitude, latitude, point.getLongitude(), point.getLatitude()) < 20.0) {
+            //自提点设置的自提范围,单位：公里
+            double allowScope = point.getPointScope();
+            double distance = distanceKm(longitude, latitude, point.getLongitude(), point.getLatitude());
+            if (distance < allowScope) {
                 nearIds.add(item.getGroupId());
             }
         }
