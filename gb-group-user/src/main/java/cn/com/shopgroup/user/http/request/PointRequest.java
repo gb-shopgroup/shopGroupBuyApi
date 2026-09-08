@@ -1,6 +1,5 @@
 package cn.com.shopgroup.user.http.request;
 
-import com.baomidou.mybatisplus.annotation.TableField;
 import lombok.Data;
 
 import javax.validation.constraints.NotNull;
@@ -10,7 +9,6 @@ public class PointRequest {
 
     // 自提点Id
     private Long id;
-
     // 自提点名称
     @NotNull(message = "名称不能为空")
     private String name;
@@ -24,14 +22,14 @@ public class PointRequest {
     // 纬度,精度为10米级
     private Double lat;
     // 自提范围,单位：公里
-    private Byte scope;
+    private Integer scope;
     // 自提说明,给c端用户看的
     private String info;
     //联系人
-    @TableField("person")
     private String person;
     //联系电话
-    @TableField("phone")
     private String phone;
+    //团长id
+    private Long leaderId;
 
 }

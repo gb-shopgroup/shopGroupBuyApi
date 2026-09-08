@@ -1,7 +1,6 @@
 package cn.com.shopgroup.user.controller.leader;
 
 import cn.com.shopgroup.common.cache.RedisConstant;
-import cn.com.shopgroup.common.cache.RedisHelper;
 import cn.com.shopgroup.common.config.UploadConfig;
 import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.TimeUtils;
@@ -15,6 +14,7 @@ import cn.com.shopgroup.user.utils.RequestParamsUtils;
 import com.alibaba.fastjson2.JSON;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.ObjectUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,8 +26,8 @@ import org.springframework.web.bind.annotation.RestController;
 import javax.annotation.Resource;
 import java.io.File;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/user/leader/point")
@@ -41,36 +41,44 @@ public class LeaderPointController {
     private UploadConfig uploadConfig;
 
     @Resource
-    private RedisHelper redisHelper;
-
-    @Resource
     private WxMiniAccessTokenHelper helper;
 
-    // 查询提货点列表
+    // 团长端-查询提货点列表
     @GetMapping("/list")
-    public JsonResult pointList() {
-        log.info("[get] /user/leader/point/list");
+    public JsonResult pointList(@RequestParam("name") String name) {
+        log.info("[get] /user/leader/point/list name:{}", name);
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
             return JsonResult.fail("lid不存在");
         }  // 先读缓存再读数据库
-        String key = RedisConstant.RedisPointListKey + leaderId;
-        if (redisHelper.hasKey(key) == false) {
-            // 查询数据库
-            List<GbOrgPointInfo> result = service.getMiniLeaderPointList(leaderId);
-            log.info("查询提货点列表 leaderId:{},rest:{}",leaderId, JSON.toJSONString(result));
-            if(CollectionUtils.isEmpty(result)){
-                return JsonResult.success();
-            }
-            List<PointResponse> data = PointResponse.getPointResponseList(result);
-            // 缓存到Redis
-            redisHelper.setCacheObject(key, data, RedisConstant.RedisPointListExpired, TimeUnit.SECONDS);
-            return JsonResult.success(data);
+        // 查询数据库
+        List<GbOrgPointInfo> result = service.getPointListForLeader(leaderId, name);
+        log.info("查询提货点列表 leaderId:{},name:{},rest:{}", leaderId, name, JSON.toJSONString(result));
+        if (CollectionUtils.isEmpty(result)) {
+            return JsonResult.success();
         }
+        List<PointResponse> data = PointResponse.getPointResponseList(result);
+        // 缓存到Redis
+        return JsonResult.success(data);
+    }
 
-        // 读取数据库
-        List<PointResponse> data = redisHelper.getCacheObject(key);
+    //添加团购活动时，调用查询提货点列表
+    @GetMapping("/addGroup/list")
+    public JsonResult addGroupPointList() {
+        log.info("[get] /user/leader/point/addGroup/list");
+        // 从请求头中获取团长id
+        Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
+        if (leaderId == 0) {
+            return JsonResult.fail("lid不存在");
+        }
+        // 查询数据库
+        List<GbOrgPointInfo> result = service.getMiniLeaderPointList(leaderId);
+        log.info("添加团购活动时，调用查询提货点列表 leaderId:{},rest:{}", leaderId, JSON.toJSONString(result));
+        if (CollectionUtils.isEmpty(result)) {
+            return JsonResult.success();
+        }
+        List<PointResponse> data = PointResponse.getPointResponseList(result);
         return JsonResult.success(data);
     }
 
@@ -90,16 +98,17 @@ public class LeaderPointController {
         data.setPointImg(request.getImg());
         data.setLongitude(request.getLon());
         data.setLatitude(request.getLat());
-        data.setPointScope(request.getScope());
+        //如果不传默认50公里
+        Integer pointScope = Optional.ofNullable(request.getScope()).orElse(20);
+        data.setPointScope(pointScope);
         data.setPointInfo(request.getInfo());
         data.setPerson(request.getPerson());
         data.setPhone(request.getPhone());
+        data.setLeaderId(request.getLeaderId());
         Long pointId = service.addMiniLeaderPoint(leaderId, data);
 
         // 删除提货点缓存
         String key = RedisConstant.RedisPointListKey + leaderId;
-        redisHelper.deleteObject(key);
-
         // 返回成功
         return JsonResult.success("添加成功", pointId);
     }
@@ -110,7 +119,7 @@ public class LeaderPointController {
 
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
-        if (leaderId == 0){
+        if (leaderId == 0) {
             return JsonResult.fail("lid不存在");
         }
 
@@ -126,15 +135,10 @@ public class LeaderPointController {
         data.setPointInfo(request.getInfo());
         boolean flag = service.editMiniLeaderPoint(leaderId, data);
 
-        // 删除提货点缓存
-        String key = RedisConstant.RedisPointListKey + leaderId;
-        redisHelper.deleteObject(key);
-
-        // 返回
         return JsonResult.success();
     }
 
-    // 关闭提货点
+    // 作废/恢复 提货点
     @GetMapping("/close")
     public JsonResult closePoint(@RequestParam("id") Long pointId) {
 
@@ -150,13 +154,23 @@ public class LeaderPointController {
             service.closeMiniLeaderPoint(leaderId, pointId, 0);
         }
 
-        // 删除提货点缓存
-        String key = RedisConstant.RedisPointListKey + leaderId;
-        redisHelper.deleteObject(key);
-
         // 返回
         return JsonResult.success();
     }
+
+    //查询提货点详情
+    @GetMapping("/info")
+    public JsonResult getPointInfo(@RequestParam("pointId") Long pointId) {
+        log.info("[get] /user/leader/point/info pointId:{}", pointId);
+        // 查询数据库
+        GbOrgPointInfo pointInfo = service.getPointInfo(pointId);
+        if (ObjectUtils.isEmpty(pointInfo)) {
+            return JsonResult.success();
+        }
+        PointResponse data = new PointResponse(pointInfo);
+        return JsonResult.success(data);
+    }
+
 
     // 提货点二维码
     @GetMapping("/ercode")

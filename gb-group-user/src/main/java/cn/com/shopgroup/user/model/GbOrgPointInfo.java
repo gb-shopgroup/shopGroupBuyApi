@@ -34,7 +34,7 @@ public class GbOrgPointInfo {
     private Double latitude;
     // 自提范围,单位：公里
     @TableField("point_scope")
-    private Byte pointScope;
+    private Integer pointScope;
     // 自提说明,给c端用户看的
     @TableField("point_info")
     private String pointInfo;

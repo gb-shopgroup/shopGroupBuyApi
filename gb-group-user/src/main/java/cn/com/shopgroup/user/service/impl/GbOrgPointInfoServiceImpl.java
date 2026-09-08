@@ -5,14 +5,12 @@ import cn.com.shopgroup.common.cache.RedisHelper;
 import cn.com.shopgroup.common.utils.TimeUtils;
 import cn.com.shopgroup.user.http.response.PointResponse;
 import cn.com.shopgroup.user.mapper.GbOrgPointInfoMapper;
-import cn.com.shopgroup.user.mapper.GbOrgPointRegionMapper;
-import cn.com.shopgroup.user.mapper.GbOrgPointStaffMapper;
 import cn.com.shopgroup.user.model.GbOrgPointInfo;
-import cn.com.shopgroup.user.model.GbOrgPointStaff;
 import cn.com.shopgroup.user.service.GbOrgPointInfoService;
 import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,6 +18,7 @@ import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -35,11 +34,6 @@ public class GbOrgPointInfoServiceImpl implements GbOrgPointInfoService {
     private GbOrgPointInfoMapper orgPointInfoMapper;
 
     @Resource
-    private GbOrgPointStaffMapper staffMapper;
-
-    @Resource
-    private GbOrgPointRegionMapper regionMapper;
-    @Resource
     private RedisHelper redisHelper;
 
 
@@ -52,35 +46,21 @@ public class GbOrgPointInfoServiceImpl implements GbOrgPointInfoService {
     public List<GbOrgPointInfo> getMiniPointList(Long leaderId) {
 
         LambdaQueryWrapper<GbOrgPointInfo> queryWrapper = Wrappers.lambdaQuery();
-        queryWrapper.select(
-                GbOrgPointInfo::getPointId,
-                GbOrgPointInfo::getPointName,
-                GbOrgPointInfo::getPointAddress);
         queryWrapper.eq(GbOrgPointInfo::getLeaderId, leaderId);
-        queryWrapper.eq(GbOrgPointInfo::getIsClose, 0);
+        queryWrapper.eq(GbOrgPointInfo::getIsClose, (byte) 0);
         queryWrapper.orderByAsc(GbOrgPointInfo::getPointId);
-        queryWrapper.last("limit 0, 10");
+        queryWrapper.last("limit 0, 20");
         List<GbOrgPointInfo> result = orgPointInfoMapper.selectList(queryWrapper);
         return result == null ? new ArrayList<>() : result;
     }
 
 
-    public List<GbOrgPointStaff> getMiniPointStaffIds(Long pointId) {
-
-        LambdaQueryWrapper<GbOrgPointStaff> queryWrapper = Wrappers.lambdaQuery();
-        queryWrapper.eq(GbOrgPointStaff::getPointId, pointId);
-        queryWrapper.orderByAsc(GbOrgPointStaff::getStaffId);
-        List<GbOrgPointStaff> lists = staffMapper.selectList(queryWrapper);
-        return lists == null ? new ArrayList<>() : lists;
-    }
-
-
     public List<GbOrgPointInfo> getMiniLeaderPointList(Long leaderId) {
-
         LambdaQueryWrapper<GbOrgPointInfo> queryWrapper = Wrappers.lambdaQuery();
         queryWrapper.eq(GbOrgPointInfo::getLeaderId, leaderId);
+        queryWrapper.eq(GbOrgPointInfo::getIsClose, (byte) 0);
         queryWrapper.orderByAsc(GbOrgPointInfo::getPointId);
-        queryWrapper.last("limit 0, 10");
+        queryWrapper.last("limit 0,20");
         List<GbOrgPointInfo> result = orgPointInfoMapper.selectList(queryWrapper);
         return result == null ? new ArrayList<>() : result;
     }
@@ -115,7 +95,9 @@ public class GbOrgPointInfoServiceImpl implements GbOrgPointInfoService {
         }
         updateWrapper.set(GbOrgPointInfo::getLongitude, info.getLongitude());
         updateWrapper.set(GbOrgPointInfo::getLatitude, info.getLatitude());
-        updateWrapper.set(GbOrgPointInfo::getPointScope, info.getPointScope());
+        if (info.getPointId() != null && info.getPointScope().intValue() != 0) {
+            updateWrapper.set(GbOrgPointInfo::getPointScope, info.getPointScope());
+        }
         updateWrapper.set(GbOrgPointInfo::getPointInfo, info.getPointInfo());
         updateWrapper.eq(GbOrgPointInfo::getLeaderId, leaderId);
         updateWrapper.eq(GbOrgPointInfo::getPointId, info.getPointId());
@@ -153,7 +135,7 @@ public class GbOrgPointInfoServiceImpl implements GbOrgPointInfoService {
         if (redisHelper.hasKey(key) == false) {
             // 查询数据库
             List<GbOrgPointInfo> result = getMiniPointList(leaderId);
-            log.info("getMiniPointList leaderId:{}", leaderId , JSON.toJSONString(result));
+            log.info("getMiniPointList leaderId:{}", leaderId, JSON.toJSONString(result));
             if (CollectionUtils.isEmpty(result)) {
                 log.info("【getMiniPointList】 leaderId:{}", leaderId + "自提点列表为空");
                 return new ArrayList<>();
@@ -168,5 +150,31 @@ public class GbOrgPointInfoServiceImpl implements GbOrgPointInfoService {
             List<PointResponse> data = redisHelper.getCacheObject(key);
             return data;
         }
+    }
+
+    @Override
+    public List<GbOrgPointInfo> getPointListForLeader(Long leaderId, String name) {
+        LambdaQueryWrapper<GbOrgPointInfo> queryWrapper = Wrappers.lambdaQuery();
+        queryWrapper.eq(GbOrgPointInfo::getLeaderId, leaderId);
+        if (!StringUtils.isEmpty(name)) {
+            queryWrapper.like(GbOrgPointInfo::getPointName, name);
+        }
+        queryWrapper.orderByAsc(GbOrgPointInfo::getPointId);
+        queryWrapper.last("limit 0,20");
+        List<GbOrgPointInfo> result = orgPointInfoMapper.selectList(queryWrapper);
+        return result == null ? new ArrayList<>() : result;
+    }
+
+
+    @Override
+    public List<GbOrgPointInfo> getPointListByIds(Collection<Long> pointIds) {
+        // 空集合直接返回, 避免生成非法 IN ()
+        if (pointIds == null || pointIds.isEmpty()) {
+            return new ArrayList<>();
+        }
+        LambdaQueryWrapper<GbOrgPointInfo> queryWrapper = Wrappers.lambdaQuery();
+        queryWrapper.in(GbOrgPointInfo::getPointId, pointIds);
+        List<GbOrgPointInfo> result = orgPointInfoMapper.selectList(queryWrapper);
+        return result == null ? new ArrayList<>() : result;
     }
 }

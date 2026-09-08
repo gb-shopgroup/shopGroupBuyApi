@@ -10,7 +10,6 @@ import cn.com.shopgroup.user.http.response.LeaderResponse;
 import cn.com.shopgroup.user.http.response.LoginMemberResponse;
 import cn.com.shopgroup.user.model.GbMemberInfo;
 import cn.com.shopgroup.user.model.GbOrgLeaderInfo;
-import cn.com.shopgroup.user.model.GbOrgPointInfo;
 import cn.com.shopgroup.user.model.GbOrgShopInfo;
 import cn.com.shopgroup.user.model.GbOrgStaffInfo;
 import cn.com.shopgroup.user.service.GbMemberInfoService;
@@ -20,17 +19,14 @@ import cn.com.shopgroup.user.service.GbOrgStaffInfoService;
 import com.alibaba.fastjson2.JSON;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.Resource;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("user/member")
@@ -150,20 +146,8 @@ public class MemberController {
                 leader.setShop(shopInfo.getShopName());
             }
 
-            // 查询员工负责的提货点
-            List<GbOrgPointInfo> lists = staffService.getMiniStaffPointList(staffInfo.getStaffId());
-            if (CollectionUtils.isEmpty(lists)) {
-                lists = new ArrayList<>();
-            }
-            List<Long> pointList = lists.stream().map(GbOrgPointInfo::getPointId).collect(Collectors.toList());
-            if (CollectionUtils.isEmpty(pointList)) {
-                pointList = new ArrayList<>();
-            }
-            String pointIds = pointList.stream().map(String::valueOf).collect(Collectors.joining(","));
-            if (StringUtils.isEmpty(pointIds)) {
-                pointIds = "";
-            }
-            leader.setPointIds(pointIds);
+            // 员工-提货点绑定表 gb_org_point_staff 已下线, 员工不再绑定提货点, pointIds 置空
+            leader.setPointIds("");
         }
 
         // 根据openid查询是否团长

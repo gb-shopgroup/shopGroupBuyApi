@@ -24,12 +24,12 @@ import cn.com.shopgroup.goods.model.GbGroupActivityInfo;
 import cn.com.shopgroup.goods.model.GbGroupCategoryInfo;
 import cn.com.shopgroup.goods.model.GbGroupTag;
 import cn.com.shopgroup.goods.service.GbGoodsInfoService;
-import cn.com.shopgroup.goods.service.GbGroupTagService;
 import cn.com.shopgroup.goods.service.GbGroupActivityInfoService;
 import cn.com.shopgroup.goods.service.GbGroupCategoryInfoService;
+import cn.com.shopgroup.goods.service.GbGroupTagService;
 import cn.com.shopgroup.user.model.GbOrgShopInfo;
 import cn.com.shopgroup.user.model.GbOrgStaffInfo;
-import cn.com.shopgroup.user.service.GbOrgLeaderInfoService;
+import cn.com.shopgroup.user.service.GbOrgPointInfoService;
 import cn.com.shopgroup.user.service.GbOrgShopInfoService;
 import cn.com.shopgroup.user.service.GbOrgStaffInfoService;
 import cn.com.shopgroup.user.utils.RequestParamsUtils;
@@ -93,11 +93,14 @@ public class LeaderGroupManageController {
     @Autowired
     private ResourceLoader resourceLoader;
 
+    @javax.annotation.Resource
+    private GbOrgPointInfoService pointInfoService;
+
     @Autowired
     private WxMiniAccessTokenHelper helper;
 
 
-    // 查询所有团购活动列表
+    // 团长端-查询所有团购活动列表
     @PostMapping("/get/groupActivity/list")
     public JsonResult getGroupActiveList(@Validated @RequestBody LeaderGroupListRequest request) {
         log.info("团长端-查询所有团购活动列表,request:{}", JSON.toJSONString(request));
@@ -189,7 +192,10 @@ public class LeaderGroupManageController {
             // 添加人员姓名
             data.setStaffName(staffInfo.getStaffName());
         }
-
+        Long pointId = Optional.ofNullable(request.getPointId()).orElse(0L);
+        if (pointId.intValue() == 0) {
+            return JsonResult.fail("新增团购活动时请添加自提点");
+        }
         // 团购商品信息兜底: 价格/名称/图片/类型未传时, 取商品表数据(一次批量查询, 避免循环内 N+1)
         fillGroupActGoodsInfo(request.getGoods());
         // 团购id,主键自增
@@ -202,6 +208,8 @@ public class LeaderGroupManageController {
         data.setIsolationId(0);
         // 商品提货方式,1自提2邮递
         data.setPickupStyle(request.getPickup());
+        // 自提点id,0未选择
+        data.setPointId(request.getPointId());
         // 团购名称
         data.setGroupName(request.getName());
 
@@ -296,7 +304,7 @@ public class LeaderGroupManageController {
     // 查询团购信息, 还要查询商品列表(价格以团购商品表冗余的团购价为准)
     @GetMapping("/get/groupActivity/info")
     public JsonResult getGroupActivity(@RequestParam("groupId") Long groupId) {
-        log.info("goods/get/groupActivity/info groupId:{}",groupId);
+        log.info("goods/get/groupActivity/info groupId:{}", groupId);
         GbGroupActivityInfo groupInfo = activityInfoService.getGroupInfo(groupId);
         if (ObjectUtils.isEmpty(groupInfo)) {
             return JsonResult.fail("未查到相关团购活动信息");
@@ -374,6 +382,8 @@ public class LeaderGroupManageController {
         data.setGroupName(request.getName());
         // 商品提货方式,1自提2邮递
         data.setPickupStyle(request.getPickup());
+        // 自提点id,0未选择
+        data.setPointId(request.getPointId());
 
         // 单个商品
         if (request.getGoods().size() == 1) {
@@ -476,7 +486,7 @@ public class LeaderGroupManageController {
     // 这样就不需要修改的时候同步Redis缓存了, 只需要关闭修改完, 打开上线的时候更新一次即可
     @PostMapping("/groupActivity/close")
     public JsonResult closeGroup(@RequestParam("groupId") Long groupId) {
-        log.info("goods/groupActivity/close groupId:{}",groupId);
+        log.info("goods/groupActivity/close groupId:{}", groupId);
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {

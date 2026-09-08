@@ -1,10 +1,7 @@
 package cn.com.shopgroup.user.service.impl;
 
 import cn.com.shopgroup.common.utils.TimeUtils;
-import cn.com.shopgroup.user.mapper.GbOrgPointStaffMapper;
 import cn.com.shopgroup.user.mapper.GbOrgStaffInfoMapper;
-import cn.com.shopgroup.user.model.GbOrgPointInfo;
-import cn.com.shopgroup.user.model.GbOrgPointStaff;
 import cn.com.shopgroup.user.model.GbOrgStaffInfo;
 import cn.com.shopgroup.user.service.GbOrgStaffInfoService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -21,9 +18,6 @@ public class GbOrgStaffInfoServiceImpl implements GbOrgStaffInfoService {
 
     @Resource
     private GbOrgStaffInfoMapper mapper;
-
-    @Resource
-    private GbOrgPointStaffMapper pointStaffMapper;
 
 
     public Long addAdminLeaderStaffInfo(Long leaderId, String name, String mobile, String nickName, String avatar, String openid) {
@@ -89,12 +83,6 @@ public class GbOrgStaffInfoServiceImpl implements GbOrgStaffInfoService {
     }
 
 
-    public List<GbOrgPointInfo> getMiniStaffPointList(Long staffId) {
-
-        return pointStaffMapper.getStaffPointList(staffId);
-    }
-
-
     public List<GbOrgStaffInfo> getMiniLeaderStaffList(Long leaderId) {
 
 
@@ -106,9 +94,8 @@ public class GbOrgStaffInfoServiceImpl implements GbOrgStaffInfoService {
 
 
         for (GbOrgStaffInfo item : result) {
-            List<GbOrgPointInfo> temp = pointStaffMapper.getStaffPointList(item.getStaffId());
-            if (temp == null) temp = new ArrayList<>();
-            item.setPointList(temp);
+            // 员工-提货点绑定表 gb_org_point_staff 已下线, 员工不再绑定提货点, 置空列表保持出参结构
+            item.setPointList(new ArrayList<>());
         }
 
 
@@ -144,19 +131,6 @@ public class GbOrgStaffInfoServiceImpl implements GbOrgStaffInfoService {
         mapper.insert(data);
         Long staffId = data.getStaffId();
 
-
-        if (pointList.size() > 0) {
-            List<GbOrgPointStaff> dataList = new ArrayList<>();
-            for (Long pid : pointList) {
-                GbOrgPointStaff temp = new GbOrgPointStaff();
-                temp.setStaffId(staffId);
-                temp.setPointId(pid);
-                dataList.add(temp);
-            }
-            if (dataList.size() > 0) pointStaffMapper.insert(dataList);
-        }
-
-
         return staffId;
     }
 
@@ -187,23 +161,6 @@ public class GbOrgStaffInfoServiceImpl implements GbOrgStaffInfoService {
         updateWrapper.eq(GbOrgStaffInfo::getStaffId, info.getStaffId());
         updateWrapper.eq(GbOrgStaffInfo::getLeaderId, leaderId);
         int flag = mapper.update(updateWrapper);
-
-
-        Long staffId = info.getStaffId();
-        LambdaQueryWrapper<GbOrgPointStaff> queryWrapper = Wrappers.lambdaQuery();
-        queryWrapper.eq(GbOrgPointStaff::getStaffId, staffId);
-        pointStaffMapper.delete(queryWrapper);
-        if (pointList.size() > 0) {
-            List<GbOrgPointStaff> dataList = new ArrayList<>();
-            for (Long pid : pointList) {
-                GbOrgPointStaff temp = new GbOrgPointStaff();
-                temp.setStaffId(staffId);
-                temp.setPointId(pid);
-                dataList.add(temp);
-            }
-            if (dataList.size() > 0) pointStaffMapper.insert(dataList);
-        }
-
 
         return flag > 0 ? true : false;
     }

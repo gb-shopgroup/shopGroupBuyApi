@@ -25,6 +25,8 @@ public class GroupActRequest {
     private Integer virtual;
     // 团购标签id,0=未选择
     private Long tagId;
+    // 自提点id,0未选择
+    private Long pointId;
     //活动开始时间
     @NotNull(message = "活动开始时间不能为空")
     private Integer startTime;

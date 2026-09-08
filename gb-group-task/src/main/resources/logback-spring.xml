@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
 
-    <!-- 抑制 MyBatis-Plus 对无主键/复合主键实体(如 gb_org_point_staff)打印的 WARN: Can not find table primary key in Class -->
+    <!-- 抑制 MyBatis-Plus 对无主键/复合主键实体打印的 WARN: Can not find table primary key in Class -->
     <logger name="com.baomidou.mybatisplus.core.metadata.TableInfoHelper" level="ERROR" />
 
     <!-- 从Spring环境获取应用名称 -->

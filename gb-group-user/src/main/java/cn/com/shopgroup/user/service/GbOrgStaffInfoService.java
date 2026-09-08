@@ -1,6 +1,5 @@
 package cn.com.shopgroup.user.service;
 
-import cn.com.shopgroup.user.model.GbOrgPointInfo;
 import cn.com.shopgroup.user.model.GbOrgStaffInfo;
 
 import java.util.List;
@@ -19,9 +18,6 @@ public interface GbOrgStaffInfoService {
 
 
     GbOrgStaffInfo getMiniStaffInfo(String openid);
-
-
-    List<GbOrgPointInfo> getMiniStaffPointList(Long staffId);
 
 
     List<GbOrgStaffInfo> getMiniLeaderStaffList(Long leaderId);

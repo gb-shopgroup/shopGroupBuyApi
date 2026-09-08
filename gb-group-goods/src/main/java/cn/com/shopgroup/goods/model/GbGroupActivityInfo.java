@@ -92,6 +92,9 @@ public class GbGroupActivityInfo {
     // 团购标签名称,冗余展示
     @TableField("tag_name")
     private String tagName;
+    // 自提点id,0未选择
+    @TableField("point_id")
+    private Long pointId;
 
     // 团购商品列表
     // 不是订单表里面的字段哦

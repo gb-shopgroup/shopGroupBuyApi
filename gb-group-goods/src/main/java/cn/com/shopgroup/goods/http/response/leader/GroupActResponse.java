@@ -38,6 +38,8 @@ public class GroupActResponse {
     private Long tagId;
     // 团购标签名称
     private String tagName;
+    // 自提点id,0未选择
+    private Long pointId;
     // 实际订单数量
     private Integer order;
     // 是否禁用,0上线1下线
@@ -96,6 +98,8 @@ public class GroupActResponse {
         // 团购标签
         this.tagId = data.getTagId();
         this.tagName = data.getTagName();
+        // 自提点id,0未选择
+        this.pointId = data.getPointId();
     }
 
     // 列表转换

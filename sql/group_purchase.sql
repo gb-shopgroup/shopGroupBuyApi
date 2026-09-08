@@ -154,22 +154,6 @@ CREATE TABLE `gb_goods_spec_value` (
   PRIMARY KEY (`val_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='商品规格值表';
 
--- group_purchase.gb_goods_stock_log definition
-
-CREATE TABLE `gb_goods_stock_log` (
-  `log_id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '日志id,主键自增',
-  `leader_id` int unsigned NOT NULL DEFAULT '0' COMMENT '团长id,外键',
-  `goods_id` int unsigned NOT NULL DEFAULT '0' COMMENT '商品id,外键',
-  `sku_id` int unsigned NOT NULL DEFAULT '0' COMMENT 'skuid,外键',
-  `log_type` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '变化类型,1=减少2=增加',
-  `goods_num` int unsigned NOT NULL DEFAULT '0' COMMENT '商品数量',
-  `goods_unit` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '商品单位',
-  `data_type` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '关联单据类型,1订单2补货',
-  `data_id` int unsigned NOT NULL DEFAULT '0' COMMENT '关联单据id,订单id或者补货id',
-  `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '添加时间',
-  PRIMARY KEY (`log_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='商品库存日志表';
-
 -- group_purchase.gb_group_activity_goods definition
 
 CREATE TABLE `gb_group_activity_goods` (
@@ -210,6 +194,7 @@ CREATE TABLE `gb_group_activity_info` (
   `is_check` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '平台审核',
   `check_remark` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '审核备注',
   `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '添加时间',
+  `point_id` int unsigned NOT NULL DEFAULT '0' COMMENT '自提点id,0未选择',
   PRIMARY KEY (`group_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='团购活动信息表';
 
@@ -223,85 +208,6 @@ CREATE TABLE `gb_group_category_info` (
   `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '添加时间',
   PRIMARY KEY (`cat_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='团购分类信息表';
-
--- group_purchase.gb_group_collection_activity definition
-
-CREATE TABLE `gb_group_collection_activity` (
-  `coll_id` int unsigned NOT NULL DEFAULT '0' COMMENT '合集id,主键/外键',
-  `group_id` int unsigned NOT NULL DEFAULT '0' COMMENT '团购id,主键/外键',
-  PRIMARY KEY (`coll_id`,`group_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='团购合集活动信息表';
-
--- group_purchase.gb_group_collection_info definition
-
-CREATE TABLE `gb_group_collection_info` (
-  `coll_id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '合集id,主键自增',
-  `leader_id` int unsigned NOT NULL DEFAULT '0' COMMENT '团长id,外键',
-  `isolation_id` int unsigned NOT NULL DEFAULT '0' COMMENT '数据隔离id',
-  `coll_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '合集名称',
-  `is_close` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '是否禁用',
-  `staff_id` int unsigned NOT NULL DEFAULT '0' COMMENT '添加人员id',
-  `staff_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '添加人员姓名',
-  `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '添加时间',
-  PRIMARY KEY (`coll_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='团购合集信息表';
-
--- group_purchase.gb_group_region_info definition
-
-CREATE TABLE `gb_group_region_info` (
-  `group_id` int unsigned NOT NULL DEFAULT '0' COMMENT '团购id,主键/外键',
-  `region_id` int unsigned NOT NULL DEFAULT '0' COMMENT '区域id,主键/外键',
-  PRIMARY KEY (`group_id`,`region_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='团购区域表';
-
--- group_purchase.gb_group_sales_info definition
-
-CREATE TABLE `gb_group_sales_info` (
-  `sales_id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '帮卖id,主键自增',
-  `group_id` int unsigned NOT NULL DEFAULT '0' COMMENT '团购id,外键',
-  `leader_id` int unsigned NOT NULL DEFAULT '0' COMMENT '团长id,外键',
-  `isolation_id` int unsigned NOT NULL DEFAULT '0' COMMENT '数据隔离id',
-  `is_close` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '是否禁用',
-  `staff_id` int unsigned NOT NULL DEFAULT '0' COMMENT '添加人员',
-  `staff_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '添加人员姓名',
-  `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '添加时间',
-  PRIMARY KEY (`sales_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='团购帮卖信息表';
-
--- group_purchase.gb_group_sales_price definition
-
-CREATE TABLE `gb_group_sales_price` (
-  `group_id` int unsigned NOT NULL DEFAULT '0' COMMENT '团购id,主键/外键',
-  `goods_id` int unsigned NOT NULL DEFAULT '0' COMMENT '商品id,主键/外键',
-  `sku_id` int unsigned NOT NULL DEFAULT '0' COMMENT 'skuid,主键/外键',
-  `leader_id` int unsigned NOT NULL DEFAULT '0' COMMENT '团长id,主键/外键',
-  `sales_type` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '帮卖类型,1=固定佣金2=自由定价',
-  `sales_price` decimal(6,2) NOT NULL DEFAULT '0.00' COMMENT '帮卖价格,固定佣金',
-  `commission` decimal(6,2) NOT NULL DEFAULT '0.00' COMMENT '帮卖佣金,固定佣金',
-  `min_price` decimal(6,2) NOT NULL DEFAULT '0.00' COMMENT '最低帮卖价格,自由定价',
-  `max_price` decimal(6,2) NOT NULL DEFAULT '0.00' COMMENT '最高帮卖价格,自由定价',
-  PRIMARY KEY (`group_id`,`goods_id`,`sku_id`,`leader_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='团购帮卖价格表';
-
--- group_purchase.gb_group_sales_set definition
-
-CREATE TABLE `gb_group_sales_set` (
-  `group_id` int unsigned NOT NULL DEFAULT '0' COMMENT '团购id,主键/外键',
-  `goods_id` int unsigned NOT NULL DEFAULT '0' COMMENT '商品id,主键/外键',
-  `sku_id` int unsigned NOT NULL DEFAULT '0' COMMENT 'skuid,主键/外键',
-  `leader_id` int unsigned NOT NULL DEFAULT '0' COMMENT '团长id,外键',
-  `sales_type` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '帮卖类型,1=固定佣金2=自由定价',
-  `sales_price` decimal(6,2) NOT NULL DEFAULT '0.00' COMMENT '帮卖价格,固定佣金',
-  `commission` decimal(6,2) NOT NULL DEFAULT '0.00' COMMENT '帮卖佣金,固定佣金',
-  `min_price` decimal(6,2) NOT NULL DEFAULT '0.00' COMMENT '最低帮卖价格,自由定价',
-  `max_price` decimal(6,2) NOT NULL DEFAULT '0.00' COMMENT '最高帮卖价格,自由定价',
-  `trigger_event` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '佣金分账时机,1支付完毕后2收货完毕后',
-  `is_close` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '是否禁用',
-  `staff_id` int unsigned NOT NULL DEFAULT '0' COMMENT '添加人员id',
-  `staff_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '添加人员姓名',
-  `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '添加时间',
-  PRIMARY KEY (`group_id`,`goods_id`,`sku_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='团购帮卖设置表';
 
 -- group_purchase.gb_image_library_info definition
 
@@ -663,22 +569,6 @@ CREATE TABLE `gb_org_point_info` (
   KEY `idx_leader_id` (`leader_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='自提点信息表';
 
--- group_purchase.gb_org_point_region definition
-
-CREATE TABLE `gb_org_point_region` (
-  `point_id` int unsigned NOT NULL DEFAULT '0' COMMENT '自提点id,主键/外键',
-  `region_id` int unsigned NOT NULL DEFAULT '0' COMMENT '区域id,主键/外键',
-  PRIMARY KEY (`point_id`,`region_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='自提点区域信息表';
-
--- group_purchase.gb_org_point_staff definition
-
-CREATE TABLE `gb_org_point_staff` (
-  `point_id` int unsigned NOT NULL DEFAULT '0' COMMENT '自提点id,主键/外键',
-  `staff_id` int unsigned NOT NULL DEFAULT '0' COMMENT '员工id,主键/外键',
-  PRIMARY KEY (`point_id`,`staff_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='自提点员工信息表';
-
 -- group_purchase.gb_org_shop_info definition
 
 CREATE TABLE `gb_org_shop_info` (
@@ -713,117 +603,6 @@ CREATE TABLE `gb_org_staff_info` (
   UNIQUE KEY `uk_openid` (`openid`),
   KEY `idx_leader_id` (`leader_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='员工信息表';
-
--- group_purchase.gb_region_area_info definition
-
-CREATE TABLE `gb_region_area_info` (
-  `region_id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '区域id,主键（自主编码）',
-  `region_parent` int unsigned NOT NULL DEFAULT '0' COMMENT '上级区域,外键',
-  `region_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '区域名称',
-  `center` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '区域坐标',
-  `is_close` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '是否禁用',
-  `map_id` int unsigned NOT NULL DEFAULT '0' COMMENT '地图定位id,外键',
-  `map_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '地图定位名称,冗余',
-  PRIMARY KEY (`region_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='行政区域信息表';
-
--- group_purchase.gb_region_map_info definition
-
-CREATE TABLE `gb_region_map_info` (
-  `map_id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '地图定位id,主键自增',
-  `map_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '地图定位名称',
-  `map_address` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '地图完整地址',
-  `region_id` int unsigned NOT NULL DEFAULT '0' COMMENT '区域id,外键',
-  `region_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '区域名称,冗余',
-  PRIMARY KEY (`map_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='地图区域信息表';
-
--- group_purchase.gb_report_business_info definition
-
-CREATE TABLE `gb_report_business_info` (
-  `report_id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '报表id',
-  `leader_id` int unsigned NOT NULL DEFAULT '0' COMMENT '团长id',
-  `bus_id` int unsigned NOT NULL DEFAULT '0' COMMENT '账户id',
-  `bus_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '账户名称',
-  `report_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '统计名称',
-  `start_time` int unsigned NOT NULL DEFAULT '0' COMMENT '开始时间',
-  `end_time` int unsigned NOT NULL DEFAULT '0' COMMENT '结束时间',
-  `order_fee` int unsigned NOT NULL DEFAULT '0' COMMENT '订单金额',
-  `received_fee` int unsigned NOT NULL DEFAULT '0' COMMENT '实到金额',
-  `bus_fee` int unsigned NOT NULL DEFAULT '0' COMMENT '分账金额',
-  `service_fee` int unsigned NOT NULL DEFAULT '0' COMMENT '平台服务费',
-  `other_fee` int unsigned NOT NULL DEFAULT '0' COMMENT '其他佣金',
-  `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '添加时间',
-  PRIMARY KEY (`report_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='团长分账统计报表';
-
--- group_purchase.gb_report_goods_info definition
-
-CREATE TABLE `gb_report_goods_info` (
-  `report_id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '报表id,主键自增',
-  `leader_id` int unsigned NOT NULL DEFAULT '0' COMMENT '团长id,外键',
-  `goods_id` int unsigned NOT NULL DEFAULT '0' COMMENT '商品id,外键',
-  `goods_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '商品名称,冗余',
-  `report_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '统计名称,月份',
-  `start_time` int unsigned NOT NULL DEFAULT '0' COMMENT '开始时间',
-  `end_time` int unsigned NOT NULL DEFAULT '0' COMMENT '结束时间',
-  `order_total` int unsigned NOT NULL DEFAULT '0' COMMENT '订单总量',
-  `sales_total` decimal(8,2) NOT NULL DEFAULT '0.00' COMMENT '订单总额',
-  `num_total` int unsigned NOT NULL DEFAULT '0' COMMENT '商品总量,考虑包装问题',
-  `goods_unit` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '商品单位',
-  `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '添加时间',
-  PRIMARY KEY (`report_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='团长商品统计报表';
-
--- group_purchase.gb_report_point_goods definition
-
-CREATE TABLE `gb_report_point_goods` (
-  `report_id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '报表id,主键自增',
-  `leader_id` int unsigned NOT NULL DEFAULT '0' COMMENT '团长id,外键',
-  `point_id` int unsigned NOT NULL DEFAULT '0' COMMENT '自提点id,外键',
-  `point_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '自提点名称,冗余',
-  `goods_id` int unsigned NOT NULL DEFAULT '0' COMMENT '商品id,外键',
-  `goods_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '商品名称,冗余',
-  `report_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '统计名称,月份',
-  `start_time` int unsigned NOT NULL DEFAULT '0' COMMENT '开始时间',
-  `end_time` int unsigned NOT NULL DEFAULT '0' COMMENT '结束时间',
-  `order_total` int unsigned NOT NULL DEFAULT '0' COMMENT '订单总量',
-  `sales_total` decimal(8,2) NOT NULL DEFAULT '0.00' COMMENT '订单总额',
-  `num_total` int unsigned NOT NULL DEFAULT '0' COMMENT '商品总量,考虑包装问题',
-  `goods_unit` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '商品单位',
-  `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '添加时间',
-  PRIMARY KEY (`report_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='团长自提点商品统计报表';
-
--- group_purchase.gb_report_point_info definition
-
-CREATE TABLE `gb_report_point_info` (
-  `report_id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '报表id,主键自增',
-  `leader_id` int unsigned NOT NULL DEFAULT '0' COMMENT '团长id,外键',
-  `point_id` int unsigned NOT NULL DEFAULT '0' COMMENT '自提点id,外键',
-  `point_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '自提点名称,冗余',
-  `report_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '统计名称,月份',
-  `start_time` int unsigned NOT NULL DEFAULT '0' COMMENT '开始时间',
-  `end_time` int unsigned NOT NULL DEFAULT '0' COMMENT '结束时间',
-  `order_total` int unsigned NOT NULL DEFAULT '0' COMMENT '订单总量',
-  `sales_total` decimal(8,2) NOT NULL DEFAULT '0.00' COMMENT '订单总额',
-  `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '添加时间',
-  PRIMARY KEY (`report_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='团长自提点统计报表';
-
--- group_purchase.gb_report_sales_info definition
-
-CREATE TABLE `gb_report_sales_info` (
-  `report_id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '报表id,主键自增',
-  `leader_id` int unsigned NOT NULL DEFAULT '0' COMMENT '团长id,外键',
-  `report_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '统计名称,月份',
-  `start_time` int unsigned NOT NULL DEFAULT '0' COMMENT '开始时间',
-  `end_time` int unsigned NOT NULL DEFAULT '0' COMMENT '结束时间',
-  `order_total` int unsigned NOT NULL DEFAULT '0' COMMENT '订单总量',
-  `sales_total` decimal(8,2) NOT NULL DEFAULT '0.00' COMMENT '订单总额',
-  `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '添加时间',
-  PRIMARY KEY (`report_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='团长销售统计报表';
 
 -- group_purchase.gb_sys_config_info definition
 

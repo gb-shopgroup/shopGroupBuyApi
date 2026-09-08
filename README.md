@@ -127,19 +127,19 @@ Maven 依赖仓库使用阿里云镜像（`https://maven.aliyun.com/repository/p
 
 ### 4.3 gb-group-user — 用户 / 团长 / 员工服务
 
-覆盖：会员登录注册（微信 openid / 手机号）、用户信息、团长店铺管理、自提点管理、员工管理、黑名单、消息、图片上传、文章与轮播图等。**44 个接口**。
+覆盖：会员登录注册（微信 openid / 手机号）、用户信息、团长店铺管理、自提点管理、员工管理、黑名单、消息、图片上传、文章与轮播图等。**46 个接口**。
 
 ### 4.4 gb-group-goods — 商品 / 团购服务
 
-覆盖：商品（分类、图片、包装、规格、规格值、SKU、库存）、团长商品管理、团购活动查询等。**21 个接口**。
+覆盖：商品（分类、图片、包装、规格、规格值、SKU、库存）、团长商品管理、团购活动查询等。**23 个接口**。
 
 ### 4.5 gb-group-order — 订单 / 支付 / 分账服务
 
-覆盖：下单、订单查询、核销（整单 / 部分核销）、退款（申请 / 审批 / 回调）、微信发货、易宝支付发起与回调、团长数据汇总、报表查询，以及团长端「我的团员」（含团购查看埋点，数据表 `gb_group_view_log`）等。**45 个接口**。
+覆盖：下单、订单查询、核销（整单 / 部分核销）、退款（申请 / 审批 / 回调）、微信发货、易宝支付发起与回调、团长数据汇总、报表查询，以及团长端「我的团员」（含团购查看埋点，数据表 `gb_group_view_log`）等。**44 个接口**。
 
 ### 4.6 gb-group-admin — 平台管理后台服务
 
-覆盖：后台登录（图形验证码）、团长管理、商品管理、团购管理、订单管理、会员管理、报表管理等。**25 个接口**。
+覆盖：后台登录（图形验证码）、团长管理、商品管理、团购管理、订单管理、会员管理、报表管理等。**29 个接口**。
 
 ### 4.7 gb-group-task — 定时任务 / 运维服务
 
@@ -159,9 +159,9 @@ Maven 依赖仓库使用阿里云镜像（`https://maven.aliyun.com/repository/p
 | 图片存储 | 华为云 OBS：`shopgroup.obs.cn-north-9.myhuaweicloud.com`（公有）/ 私有访问经 `https://api.shopgroup.com.cn/image/access` |
 | 支付回调 | `https://api.shopgroup.com.cn/group/order/notify` |
 
-> 建表脚本见 **`sql/group_purchase.sql`**（50 张表，从开发库 `group_purchase` 直接导出，仅含表结构）；后续新增的表单独建脚本，位于 `sql/` 下（如 `sql/gb_group_view_log.sql`），需在对应环境单独执行。
+> 建表脚本见 **`sql/group_purchase.sql`**（36 张表，从开发库 `group_purchase` 直接导出，仅含表结构）；后续新增的表单独建脚本，位于 `sql/` 下（如 `sql/gb_group_view_log.sql`），需在对应环境单独执行。
 
-### 5.2 核心表清单（共 51 张）
+### 5.2 核心表清单（共 35 张）
 
 | 表名 | 说明 |
 | --- | --- |
@@ -175,16 +175,9 @@ Maven 依赖仓库使用阿里云镜像（`https://maven.aliyun.com/repository/p
 | `gb_goods_sku_info` | 商品 SKU 信息表 |
 | `gb_goods_spec_info` | 商品规格信息表 |
 | `gb_goods_spec_value` | 商品规格值表 |
-| `gb_goods_stock_log` | 商品库存日志表 |
 | `gb_group_activity_goods` | 团购商品信息表 |
 | `gb_group_activity_info` | 团购活动信息表 |
 | `gb_group_category_info` | 团购分类信息表 |
-| `gb_group_collection_activity` | 团购合集活动信息表 |
-| `gb_group_collection_info` | 团购合集信息表 |
-| `gb_group_region_info` | 团购区域表 |
-| `gb_group_sales_info` | 团购帮卖信息表 |
-| `gb_group_sales_price` | 团购帮卖价格表 |
-| `gb_group_sales_set` | 团购帮卖设置表 |
 | `gb_group_view_log` | 团购查看记录表（用户浏览团购详情埋点，团长端"我的团员"查看次数/动态数据源） |
 | `gb_image_library_info` | 图片库信息表 |
 | `gb_member_address_info` | 用户/会员地址表 |
@@ -203,21 +196,12 @@ Maven 依赖仓库使用阿里云镜像（`https://maven.aliyun.com/repository/p
 | `gb_org_leader_info` | 团长信息表 |
 | `gb_org_message_info` | 团长消息表 |
 | `gb_org_point_info` | 自提点信息表 |
-| `gb_org_point_region` | 自提点区域信息表 |
-| `gb_org_point_staff` | 自提点员工信息表 |
 | `gb_org_shop_info` | 团长店铺信息表 |
 | `gb_org_staff_info` | 员工信息表 |
-| `gb_region_area_info` | 行政区域信息表 |
-| `gb_region_map_info` | 地图区域信息表 |
-| `gb_report_business_info` | 团长分账统计报表 |
-| `gb_report_goods_info` | 团长商品统计报表 |
-| `gb_report_point_goods` | 团长自提点商品统计报表 |
-| `gb_report_point_info` | 团长自提点统计报表 |
-| `gb_report_sales_info` | 团长销售统计报表 |
 | `gb_sys_config_info` | 系统配置信息表 |
 | `gb_sys_user_info` | 系统用户信息表 |
 
-> 业务域分布：**商品域**（9 表）、**团购域**（10 表，含新增 `gb_group_view_log` 查看埋点表）、**用户域**（4 表）、**订单域**（5 表）、**团长/商户域**（11 表）、**内容域**（3 表）、**区域域**（2 表）、**报表域**（5 表）、**系统域**（2 表），合计 51 张。
+> 业务域分布：**商品域**（8 表）、**团购域**（4 表，含查看埋点表 `gb_group_view_log`）、**用户域**（4 表）、**订单域**（5 表）、**团长/商户域**（9 表）、**内容域**（3 表）、**系统域**（2 表），合计 35 张。
 
 ---
 
@@ -228,7 +212,7 @@ Maven 依赖仓库使用阿里云镜像（`https://maven.aliyun.com/repository/p
 3. **用户参团**：首页查看团购分类与列表 → 进入团购详情 → 下单 → 发起易宝支付 → 支付回调更新订单。
 4. **订单履约**：用户到自提点出示订单码 → 团长/员工扫码核销（支持部分核销）→ 微信发货（快递场景）→ 自动收货。
 5. **退款流程**：用户申请退款 → 团长审批（通过/拒绝）→ 退款回调同步状态。
-6. **资金结算**：支付后按分账/佣金配置拆账 → 团长提现（绑定银行卡）→ 后台报表统计。
+6. **资金结算**：支付后按分账/佣金配置自动拆账到团长收款账户 → 团长提现（绑定银行卡）。
 
 ---
 
@@ -304,12 +288,12 @@ mvn -pl gb-group-task spring-boot:run
 | `page` / `pageSize` | 页码（从 1 开始）/ 每页条数 |
 | `start` / `end` | 开始时间 / 结束时间（如 yyyy-MM-dd） |
 
-- **接口数量统计**：user 44 个、order 45 个、goods 21 个、admin 25 个、task 8 个，合计 **143 个**。
+- **接口数量统计**：user 46 个、order 44 个、goods 23 个、admin 29 个、task 8 个，合计 **150 个**。
 - **详细版接口文档**（含每个接口的完整入参 / 出参字段说明，参数含义、必填、嵌套字段均已细化）见根目录 **`API接口文档.md`**，可通过 `python3 generate_api_doc.py` 扫描各模块 `*Controller.java` 重新生成。下方为接口总览清单。
 
 ### 8.2 接口清单
 
-#### 8.2.1 gb-group-user（用户/团长/员工）— 44 个接口
+#### 8.2.1 gb-group-user（用户/团长/员工）— 46 个接口
 
 **ImageSourceController**（`cn.com.shopgroup.user.controller`）
 
@@ -363,11 +347,13 @@ mvn -pl gb-group-task spring-boot:run
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/user/leader/point/list` | 查询提货点列表 | 无 |
-| 2 | POST | `/user/leader/point/add` | 添加提货点 | Body: **request** (PointRequest, JSON) |
-| 3 | POST | `/user/leader/point/edit` | 修改提货点 | Body: **request** (PointRequest, JSON) |
-| 4 | GET | `/user/leader/point/close` | 关闭提货点 | **id** (Long) |
-| 5 | GET | `/user/leader/point/ercode` | 提货点二维码 | **id** (Long) |
+| 1 | GET | `/user/leader/point/list` | 团长端-查询提货点列表 | **name** (String) |
+| 2 | GET | `/user/leader/point/addGroup/list` | 添加团购活动时，调用查询提货点列表 | 无 |
+| 3 | POST | `/user/leader/point/add` | 添加提货点 | Body: **request** (PointRequest, JSON) |
+| 4 | POST | `/user/leader/point/edit` | 修改提货点 | Body: **request** (PointRequest, JSON) |
+| 5 | GET | `/user/leader/point/close` | 作废/恢复 提货点 | **id** (Long) |
+| 6 | GET | `/user/leader/point/info` | 查询提货点详情 | **pointId** (Long) |
+| 7 | GET | `/user/leader/point/ercode` | 提货点二维码 | **id** (Long) |
 
 **LeaderShopController**（`cn.com.shopgroup.user.controller.leader`）
 
@@ -415,7 +401,7 @@ mvn -pl gb-group-task spring-boot:run
 | 1 | GET | `/user/member/info` | 根据 token 获取用户信息 | 无 |
 | 2 | GET | `/user/member/isleader` | 是否团长身份 | 无 |
 
-#### 8.2.2 gb-group-order（订单/退款/分账）— 45 个接口
+#### 8.2.2 gb-group-order（订单/退款/分账）— 44 个接口
 
 **OrderBusinessController**（`cn.com.shopgroup.order.controller`）
 
@@ -423,13 +409,6 @@ mvn -pl gb-group-task spring-boot:run
 | --- | --- | --- | --- | --- |
 | 1 | GET | `/order/orderbusiness/list` | 分页查询订单列表 | **page** (int); **pageSize** (int) |
 | 2 | GET | `/order/orderbusiness/count` | 查询订单总数 | 无 |
-
-**ReportController**（`cn.com.shopgroup.order.controller`）
-
-| 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
-| --- | --- | --- | --- | --- |
-| 1 | GET | `/order/leader/report/business/list` | 分账汇总列表 | **page** (int); **pageSize** (int) |
-| 2 | GET | `/order/leader/report/business/count` | 分账汇总数量 | 无 |
 
 **GroupOrderController**（`cn.com.shopgroup.order.controller.group`）
 
@@ -461,11 +440,12 @@ mvn -pl gb-group-task spring-boot:run
 | 4 | GET | `/order/group/order/info` | 用户订单详情 | **orderNo** (String) |
 | 5 | GET | `/order/group/order/makeErcode` | 用户订单小程序码(微信小程序码, 扫码进入C端小程序对应订单页面) | **orderNo** (String) |
 | 6 | GET | `/order/group/order/receipt` | 用户订单收货 | **orderNo** (String); **point** (Long) |
-| 7 | POST | `/order/group/order/apply/refund` | 用户申请订单退款 | Body: **refundApplyRequest** (OrderRefundApplyRequest, JSON) |
+| 7 | POST | `/order/group/order/apply/refund` | 用户申请订单退款。refundFlag: 1=退款(退"待收货"部分, 可退量=购买数-收货数-已申请退款数), 2=退货退款(退"已收货"部分, 可退量=收货数-已申请退货退款数); 申请成功后订单refund_fee与对应商品行退款/退货退款数量先占坑累计(可退量会相应扣减), 待团长审核: 同意=保留占坑并转正式退款, 不同意=自动恢复申请前(扣回订单refund_fee、回退商品行数量、售后状态置不同意); 出参data为本次申请退款总金额(单位:元) | Body: **refundApplyRequest** (OrderRefundApplyRequest, JSON) |
 | 8 | GET | `/order/group/order/refund/reasonList` | 用户退款原因下拉列表(申请退款时"选择退款原因") | 无 |
 | 9 | GET | `/order/group/order/refund/recodes` | 申请售后记录查询 | **orderNo** (String) |
 | 10 | GET | `/order/group/order/notAllReceiptList` | 用户端-查询还有商品未全部收货的订单列表(该用户在该团长/店铺下已支付, 且存在商品行收货数量小于购买数量的订单) | **shopId** (Long) |
 | 11 | POST | `/order/group/order/confirmShipping` | 用户点击确认收货组件后调用接口，更新订单已经操作按钮 | **orderNo** (String) |
+| 12 | POST | `/order/group/order/applyRefund/orderInfo` | 用户点击申请退货后调用接口 | Body: **request** (MemberOrderRefundRequest, JSON) |
 
 **WxOrderController**（`cn.com.shopgroup.order.controller.group`）
 
@@ -502,7 +482,7 @@ mvn -pl gb-group-task spring-boot:run
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
 | 1 | GET | `/order/leader/refund/count` | 退款订单数量 | **gid** (Long); **pid** (Long) |
-| 2 | POST | `/order/leader/refund/approve` | 售后订单审核（同意/不同意） | Body: **approveRequest** (OrderApproveRequest, JSON) |
+| 2 | POST | `/order/leader/refund/approve` | 售后订单审核（同意/不同意）。status: 1=同意, 2=不同意; 每单一行key=订单号, value.refundGoodsMap为本次申请的订单商品行(行内refundNum/refundAmount为本次申请值); 同意=保留申请时占坑的金额与数量, 订单转售后处理并通知退款; 不同意=自动恢复申请前(扣回订单refund_fee本次金额、按行回退商品退款/退货退款数量、商品售后状态置不同意); 团长端旧版本未回传refundFlag/金额时后端按该订单最近一笔售后记录兜底恢复 | Body: **approveRequest** (OrderApproveRequest, JSON) |
 
 **OrderRefundNotifyController**（`cn.com.shopgroup.order.controller.leader`）
 
@@ -517,7 +497,7 @@ mvn -pl gb-group-task spring-boot:run
 | 1 | GET | `/order/payment/order/pay` | 发起支付 | **orderNo** (String); **openid** (String) |
 | 2 | POST | `/order/payment/order/notify` | 支付回调 | 无 |
 
-#### 8.2.3 gb-group-goods（商品/团购）— 21 个接口
+#### 8.2.3 gb-group-goods（商品/团购）— 23 个接口
 
 **GroupGoodsController**（`cn.com.shopgroup.goods.controller`）
 
@@ -525,6 +505,7 @@ mvn -pl gb-group-task spring-boot:run
 | --- | --- | --- | --- | --- |
 | 1 | GET | `/goods/group/goods/list` | 团购商品列表(包装, 规格, sku) | **lid** (Long); **groupId** (Long) |
 | 2 | GET | `/goods/group/goods/stock` | 查询商品库存, 后期增加缓存 | **gid** (String) |
+| 3 | POST | `/goods/member/groupActivity/list` | 用户查询所有在线的团购活动列表[新用户未绑定团长时leaderId=0]: 仅返回未下线(isClose=0)且当前时间处于开团时间窗内(已开团未结束)的在线活动; leaderId>0按团长过滤(排序值sortOrder升序置顶优先, 同级按活动id倒序, 分页在SQL层完成); leaderId=0时需传经纬度(longitude/latitude, 缺失返回空列表), 仅统计已绑定自提点(pointId>0)的活动并过滤出绑定自提点与定位点球面距离小于20km者, 按活动id倒序(先距离过滤再分页); page默认1, pageSize默认10最大100 | Body: **request** (MemberGroupListRequest, JSON) |
 
 **LeaderGoodsManageController**（`cn.com.shopgroup.goods.controller`）
 
@@ -545,17 +526,18 @@ mvn -pl gb-group-task spring-boot:run
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | POST | `/goods/Leader/get/groupActivity/list` | 查询所有团购活动列表 | Body: **request** (LeaderGroupListRequest, JSON) |
+| 1 | POST | `/goods/Leader/get/groupActivity/list` | 团长端-查询所有团购活动列表 | Body: **request** (LeaderGroupListRequest, JSON) |
 | 2 | GET | `/goods/Leader/get/groupActivity/count` | 查询所有团购活动总数(筛选条件与列表接口一致, 保证分页总页数正确) | **cat** (Long); **name** (String); **status** (Integer) |
-| 3 | POST | `/goods/Leader/groupActivity/add` | 添加团购活动 | Body: **request** (GroupActRequest, JSON) |
-| 4 | GET | `/goods/Leader/get/groupActivity/info` | 查询团购信息, 还要查询商品列表(价格以团购商品表冗余的团购价为准) | **groupId** (Long) |
-| 5 | POST | `/goods/Leader/groupActivity/edit` | 修改团购活动, 团购进行中, 不允许修改 | Body: **request** (GroupActRequest, JSON) |
-| 6 | POST | `/goods/Leader/groupActivity/close` | 这样就不需要修改的时候同步Redis缓存了, 只需要关闭修改完, 打开上线的时候更新一次即可 | **groupId** (Long) |
-| 7 | GET | `/goods/Leader/get/groupActivity/cat` | 团购分类列表 | 无 |
-| 8 | POST | `/goods/Leader/share/groupActivity/poster` | 分享团购海报生成1 | **groupId** (Long) |
-| 9 | POST | `/goods/Leader/share/groupActivity/make/poster` | 分享团购活动海报（带有logo的海报） | **groupId** (Long) |
+| 3 | GET | `/goods/Leader/groupActivity/tag/list` | 团购标签下拉列表(添加/编辑团购活动时选择标签) | 无 |
+| 4 | POST | `/goods/Leader/groupActivity/add` | 添加团购活动 | Body: **request** (GroupActRequest, JSON) |
+| 5 | GET | `/goods/Leader/get/groupActivity/info` | 查询团购信息, 还要查询商品列表(价格以团购商品表冗余的团购价为准) | **groupId** (Long) |
+| 6 | POST | `/goods/Leader/groupActivity/edit` | 修改团购活动, 团购进行中, 不允许修改 | Body: **request** (GroupActRequest, JSON) |
+| 7 | POST | `/goods/Leader/groupActivity/close` | 这样就不需要修改的时候同步Redis缓存了, 只需要关闭修改完, 打开上线的时候更新一次即可 | **groupId** (Long) |
+| 8 | GET | `/goods/Leader/get/groupActivity/cat` | 团购分类列表 | 无 |
+| 9 | POST | `/goods/Leader/share/groupActivity/poster` | 分享团购海报生成1 | **groupId** (Long) |
+| 10 | POST | `/goods/Leader/share/groupActivity/make/poster` | 分享团购活动海报（带有logo的海报） | **groupId** (Long) |
 
-#### 8.2.4 gb-group-admin（后台管理）— 25 个接口
+#### 8.2.4 gb-group-admin（后台管理）— 29 个接口
 
 **AdminBusinessController**（`cn.com.shopgroup.controller`）
 
@@ -582,6 +564,17 @@ mvn -pl gb-group-task spring-boot:run
 | 1 | GET | `/admin/group/list` | 分页查询团购活动列表 | **page** (int); **pageSize** (int) |
 | 2 | GET | `/admin/group/count` | 查询团购活动总数 | 无 |
 | 3 | GET | `/admin/group/info` | 查询团购活动详情 | **id** (Long) |
+
+**AdminGroupTagController**（`cn.com.shopgroup.controller`）
+
+| 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
+| --- | --- | --- | --- | --- |
+| 1 | GET | `/admin/tag/list` | 分页查询标签列表(含停用, 名称模糊) | **keyword** (String); **page** (int); **pageSize** (int) |
+| 2 | GET | `/admin/tag/count` | 标签总数(与列表筛选条件一致, 供分页) | **keyword** (String) |
+| 3 | GET | `/admin/tag/info` | 标签详情 | **tagId** (Long) |
+| 4 | POST | `/admin/tag/add` | 新增标签 | Body: **tag** (GbGroupTag, JSON) |
+| 5 | POST | `/admin/tag/edit` | 编辑标签(可修改名称/颜色/排序/状态启停, 未传字段保留原值) | Body: **tag** (GbGroupTag, JSON) |
+| 6 | POST | `/admin/tag/delete` | 删除标签(被团购活动使用中禁止删除, 可改为停用) | **tagId** (Long) |
 
 **AdminLeaderController**（`cn.com.shopgroup.controller`）
 
@@ -619,13 +612,6 @@ mvn -pl gb-group-task spring-boot:run
 | --- | --- | --- | --- | --- |
 | 1 | GET | `/admin/order/list` | 分页查询订单列表 | **page** (int); **pageSize** (int) |
 | 2 | GET | `/admin/order/count` | 查询订单总数 | 无 |
-
-**AdminReportController**（`cn.com.shopgroup.controller`）
-
-| 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
-| --- | --- | --- | --- | --- |
-| 1 | GET | `/admin/report/list` | 分页查询订单列表 | **page** (int); **pageSize** (int) |
-| 2 | GET | `/admin/report/count` | 查询订单总数 | 无 |
 
 #### 8.2.5 gb-group-task（定时任务）— 8 个接口
 

@@ -28,10 +28,11 @@
         <result column="is_check" property="isCheck"/>
         <result column="check_remark" property="checkRemark"/>
         <result column="add_time" property="addTime"/>
+        <result column="point_id" property="pointId"/>
     </resultMap>
 
     <sql id="Base_Column_List">
-        group_id, cat_id, leader_id, isolation_id, pickup_style, group_name, group_img, group_img2, group_img3, group_price, group_price2, market_price, start_time, end_time, group_info, order_total, virtual_order, is_close, sort_order, staff_id, staff_name, is_check, check_remark, add_time
+        group_id, cat_id, leader_id, isolation_id, pickup_style, group_name, group_img, group_img2, group_img3, group_price, group_price2, market_price, start_time, end_time, group_info, order_total, virtual_order, is_close, sort_order, staff_id, staff_name, is_check, check_remark, add_time, point_id
     </sql>
 
 </mapper>

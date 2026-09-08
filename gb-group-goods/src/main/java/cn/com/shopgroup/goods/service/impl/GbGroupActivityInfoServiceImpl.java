@@ -7,7 +7,9 @@ import cn.com.shopgroup.goods.model.GbGoodsInfo;
 import cn.com.shopgroup.goods.model.GbGroupActivityGoods;
 import cn.com.shopgroup.goods.model.GbGroupActivityInfo;
 import cn.com.shopgroup.goods.service.GbGroupActivityInfoService;
+import cn.com.shopgroup.user.model.GbOrgPointInfo;
 import cn.com.shopgroup.user.service.GbOrgMessageInfoService;
+import cn.com.shopgroup.user.service.GbOrgPointInfoService;
 import com.alibaba.csp.sentinel.util.StringUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -16,8 +18,12 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoService {
@@ -30,6 +36,9 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
 
     @Resource
     private GbOrgMessageInfoService messageService;
+
+    @Resource
+    private GbOrgPointInfoService pointService;
 
 
     public List<GbGroupActivityInfo> getAdminGroupList(int page, int pageSize) {
@@ -147,7 +156,7 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
     }
 
 
-    public List<GbGroupActivityInfo> getMiniLeaderGroupList(int flag, Long leaderId, Long catId,String activityName, int status, int page, int pageSize) {
+    public List<GbGroupActivityInfo> getMiniLeaderGroupList(int flag, Long leaderId, Long catId, String activityName, int status, int page, int pageSize) {
         //(1、团长团查询 2 用户端查询)
         LambdaQueryWrapper<GbGroupActivityInfo> queryWrapper = Wrappers.lambdaQuery();
         queryWrapper.eq(GbGroupActivityInfo::getLeaderId, leaderId);
@@ -172,7 +181,7 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
             queryWrapper.like(GbGroupActivityInfo::getGroupName, activityName);
         }
         int cid = Optional.ofNullable(catId).orElse(0L).intValue();
-        if(cid != 0 ){
+        if (cid != 0) {
             queryWrapper.eq(GbGroupActivityInfo::getCatId, catId);
         }
         queryWrapper.orderByDesc(GbGroupActivityInfo::getGroupId);
@@ -238,6 +247,8 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
         // 团购标签
         data.setTagId(info.getTagId() == null ? 0L : info.getTagId());
         data.setTagName(info.getTagName() == null ? "" : info.getTagName());
+        // 自提点id,0未选择
+        data.setPointId(info.getPointId() == null ? 0L : info.getPointId());
         data.setAddTime(TimeUtils.getTimeStamp());
         mapper.insert(data);
         Long groupId = data.getGroupId();
@@ -275,6 +286,8 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
         // 团购标签
         updateWrapper.set(GbGroupActivityInfo::getTagId, info.getTagId() == null ? 0L : info.getTagId());
         updateWrapper.set(GbGroupActivityInfo::getTagName, info.getTagName() == null ? "" : info.getTagName());
+        // 自提点id,0未选择
+        updateWrapper.set(GbGroupActivityInfo::getPointId, info.getPointId() == null ? 0L : info.getPointId());
         updateWrapper.eq(GbGroupActivityInfo::getGroupId, info.getGroupId());
         updateWrapper.eq(GbGroupActivityInfo::getLeaderId, leaderId);
         int flag = mapper.update(updateWrapper);
@@ -314,6 +327,99 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
 
         GbGroupActivityGoods result = goodsMapper.isGroupGoodsOnline(leaderId, goodsId);
         return result != null && result.getGroupId() > 0 ? true : false;
+    }
+
+    @Override
+    public List<GbGroupActivityInfo> getMemberGroupActivityList(Long leaderId, Double longitude, Double latitude, int page, int pageSize) {
+
+        // 请求参数归一
+        if (page < 1) page = 1;
+        if (pageSize < 1) pageSize = 10;
+
+        // 1. 已绑定团长(leaderId > 0): 直接查询该团长的在线团购活动, SQL 分页
+        //    置顶活动优先(sort_order 升序), 置顶级别相同时新活动在前(按活动id倒序)
+        if (leaderId != null && leaderId > 0) {
+            LambdaQueryWrapper<GbGroupActivityInfo> queryWrapper = onlineWrapper();
+            queryWrapper.eq(GbGroupActivityInfo::getLeaderId, leaderId);
+            queryWrapper.orderByAsc(GbGroupActivityInfo::getSortOrder);
+            queryWrapper.orderByDesc(GbGroupActivityInfo::getGroupId);
+            List<GbGroupActivityInfo> result = mapper.selectList(queryWrapper.last("limit " + (page - 1) * pageSize + "," + pageSize));
+            return result == null ? new ArrayList<>() : result;
+        }
+
+        // 2. 未绑定团长(新用户, leaderId=0): 按定位经纬度过滤出离自提点 20km 内的在线活动
+        //    距离计算需要经纬度, 缺失时无法定位, 直接返回空列表
+        if (longitude == null || latitude == null) {
+            return new ArrayList<>();
+        }
+        // 2.1 第一阶段: 窄表扫描仅取 groupId/pointId 两列, 距离过滤与分页定位在此进行,
+        //     避免把全量在线活动的大字段(图片/详情等)加载进内存; 未选自提点的活动无法计算距离, SQL 端直接排除
+        LambdaQueryWrapper<GbGroupActivityInfo> lightWrapper = onlineWrapper();
+        lightWrapper.select(GbGroupActivityInfo::getGroupId, GbGroupActivityInfo::getPointId);
+        lightWrapper.isNotNull(GbGroupActivityInfo::getPointId).gt(GbGroupActivityInfo::getPointId, 0);
+        lightWrapper.orderByDesc(GbGroupActivityInfo::getGroupId);
+        List<GbGroupActivityInfo> lightList = mapper.selectList(lightWrapper);
+        if (lightList == null || lightList.isEmpty()) {
+            return new ArrayList<>();
+        }
+        // 收集绑定的自提点id, 批量查询自提点坐标
+        Set<Long> pointIdSet = new HashSet<>();
+        for (GbGroupActivityInfo item : lightList) {
+            pointIdSet.add(item.getPointId());
+        }
+        List<GbOrgPointInfo> pointList = pointService.getPointListByIds(pointIdSet);
+        Map<Long, GbOrgPointInfo> pointMap = new HashMap<>();
+        if (pointList != null) {
+            for (GbOrgPointInfo point : pointList) {
+                pointMap.put(point.getPointId(), point);
+            }
+        }
+        // 过滤出距离 20km 内的活动id(lightList 按活动id倒序, 遍历顺序即最终展示顺序)
+        List<Long> nearIds = new ArrayList<>();
+        for (GbGroupActivityInfo item : lightList) {
+            GbOrgPointInfo point = pointMap.get(item.getPointId());
+            if (point == null || point.getLongitude() == null || point.getLatitude() == null) {
+                continue;
+            }
+            if (distanceKm(longitude, latitude, point.getLongitude(), point.getLatitude()) < 20.0) {
+                nearIds.add(item.getGroupId());
+            }
+        }
+        if (nearIds.isEmpty()) {
+            return new ArrayList<>();
+        }
+        // 2.2 距离过滤需全量数据, 分页只能在过滤后进行; 内存定位当页id, 再按 id 集合查完整数据
+        int fromIndex = Math.min((page - 1) * pageSize, nearIds.size());
+        int toIndex = Math.min(fromIndex + pageSize, nearIds.size());
+        List<Long> pageIds = nearIds.subList(fromIndex, toIndex);
+        LambdaQueryWrapper<GbGroupActivityInfo> fullWrapper = Wrappers.lambdaQuery();
+        fullWrapper.in(GbGroupActivityInfo::getGroupId, pageIds);
+        fullWrapper.orderByDesc(GbGroupActivityInfo::getGroupId);
+        List<GbGroupActivityInfo> result = mapper.selectList(fullWrapper);
+        return result == null ? new ArrayList<>() : result;
+    }
+
+    // 在线团购活动条件: 未下线且当前时间处于开团时间窗内(已开团未结束); 排序由调用方按业务指定
+    private LambdaQueryWrapper<GbGroupActivityInfo> onlineWrapper() {
+
+        LambdaQueryWrapper<GbGroupActivityInfo> queryWrapper = Wrappers.lambdaQuery();
+        queryWrapper.eq(GbGroupActivityInfo::getIsClose, (byte) 0);
+        Integer nowTime = TimeUtils.getTimeStamp();
+        queryWrapper.le(GbGroupActivityInfo::getStartTime, nowTime);
+        queryWrapper.ge(GbGroupActivityInfo::getEndTime, nowTime);
+        return queryWrapper;
+    }
+
+    // 球面距离计算(haversine), 单位: 公里
+    private double distanceKm(double lon1, double lat1, double lon2, double lat2) {
+        final double R = 6371.0;
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double radLat1 = Math.toRadians(lat1);
+        double radLat2 = Math.toRadians(lat2);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(radLat1) * Math.cos(radLat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
 

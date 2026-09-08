@@ -1,19 +1,9 @@
 package cn.com.shopgroup.goods.service;
 
-import cn.com.shopgroup.common.utils.TimeUtils;
-import cn.com.shopgroup.goods.mapper.GbGroupActivityGoodsMapper;
-import cn.com.shopgroup.goods.mapper.GbGroupActivityInfoMapper;
 import cn.com.shopgroup.goods.model.GbGoodsInfo;
 import cn.com.shopgroup.goods.model.GbGroupActivityGoods;
 import cn.com.shopgroup.goods.model.GbGroupActivityInfo;
-import cn.com.shopgroup.user.service.GbOrgMessageInfoService;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import org.springframework.stereotype.Service;
 
-import javax.annotation.Resource;
-import java.util.ArrayList;
 import java.util.List;
 
 public interface GbGroupActivityInfoService {
@@ -36,7 +26,7 @@ public interface GbGroupActivityInfoService {
 
     Boolean addGroupOrderNumber(Long groupId);
 
-    List<GbGroupActivityInfo> getMiniLeaderGroupList(int flag,Long leaderId, Long catId,String activityName,int status, int page, int pageSize);
+    List<GbGroupActivityInfo> getMiniLeaderGroupList(int flag, Long leaderId, Long catId, String activityName, int status, int page, int pageSize);
 
     Long getMiniLeaderGroupCount(Long leaderId, Long catId, String activityName, int status);
 
@@ -49,4 +39,5 @@ public interface GbGroupActivityInfoService {
 
     Boolean isGoodsGrouping(Long leaderId, Long goodsId);
 
+    List<GbGroupActivityInfo> getMemberGroupActivityList(Long leaderId, Double longitude, Double latitude, int page, int pageSize);
 }

@@ -24,7 +24,6 @@ import cn.com.shopgroup.order.service.GbOrderInfoService;
 import cn.com.shopgroup.order.service.GbRefundReasonService;
 import cn.com.shopgroup.user.model.GbMemberInfo;
 import cn.com.shopgroup.user.model.GbOrgPointInfo;
-import cn.com.shopgroup.user.model.GbOrgPointStaff;
 import cn.com.shopgroup.user.model.GbOrgShopInfo;
 import cn.com.shopgroup.user.service.GbMemberInfoService;
 import cn.com.shopgroup.user.service.GbOrgMessageInfoService;
@@ -67,9 +66,6 @@ public class MemberOrderController {
 
     @Resource
     private GbOrgMessageInfoService messageService;
-
-    @Resource
-    private GbOrgPointInfoService pointStaffService;
 
     @Resource
     private GbMemberInfoService memberInfoService;
@@ -330,16 +326,9 @@ public class MemberOrderController {
         // 收货操作
         Boolean flag = orderInfoService.miniReceiptOrder(memberId, orderNo, pointId, pointName);
         // 收货消息类型: 1=系统消息2=内部消息3=业务消息
-        // 需要查询提货点的店员信息
-        List<GbOrgPointStaff> lists = pointStaffService.getMiniPointStaffIds(pointId);
+        // 员工-提货点绑定表 gb_org_point_staff 已下线, 不再通知店员, 直接通知团长
         String content = orderInfo.getNickname() + "(" + orderInfo.getMobile() + ")主动核销了编号 " + orderInfo.getReceiptCode() + " 的订单。";
-        if (lists.size() == 0) {
-            messageService.addMiniLeaderMessageInfo(orderInfo.getLeaderId(), 0L, (byte) 3, content);
-        } else {
-            for (GbOrgPointStaff item : lists) {
-                messageService.addMiniLeaderMessageInfo(orderInfo.getLeaderId(), item.getStaffId(), (byte) 3, content);
-            }
-        }
+        messageService.addMiniLeaderMessageInfo(orderInfo.getLeaderId(), 0L, (byte) 3, content);
 
         // 返回结果
         if (flag) {
@@ -439,13 +428,13 @@ public class MemberOrderController {
             OrderRefundGoodsRequest temp = goodsMap.get(tempId);
             Integer applyNum = temp.getRefundNum();
             if (applyNum == null || applyNum <= 0) {
-                return JsonResult.fail("商品名称"+tempGoodsName+"申请退数量必须大于0，请核对后再提交");
+                return JsonResult.fail("商品名称" + tempGoodsName + "申请退数量必须大于0，请核对后再提交");
             }
             if (canRefundNum <= 0) {
-                return JsonResult.fail("商品名称"+tempGoodsName+"已无可退数量，请核对后再提交");
+                return JsonResult.fail("商品名称" + tempGoodsName + "已无可退数量，请核对后再提交");
             }
             if (applyNum > canRefundNum) {
-                return JsonResult.fail("商品名称"+tempGoodsName+"申请退数量大于可退数量，请核对后再提交");
+                return JsonResult.fail("商品名称" + tempGoodsName + "申请退数量大于可退数量，请核对后再提交");
             }
             handledCount++;
             // 加入本次申请商品行集合(后续仅这些行累加退款/退货退款数量)
@@ -599,7 +588,7 @@ public class MemberOrderController {
         if (userId == null || StringUtils.isEmpty(userId) || userId.matches("^[0-9]+$") == false) {
             return JsonResult.fail("用户不存在");
         }
-        Long memberId = 117L;
+        Long memberId = 0L;
         try {
             memberId = Long.parseLong(userId);
             if (memberId == 0) {

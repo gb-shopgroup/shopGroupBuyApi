@@ -95,14 +95,4 @@ public interface AdminQueryMapper {
     @Select("SELECT COUNT(*) FROM `group_buy_order`.`gb_order_business_info`")
     long selectOrderBusinessCount();
 
-    // ========== 分账报表 ==========
-
-    // 分账报表分页列表（group_buy_order）
-    @Select("SELECT `report_id` AS reportId, `leader_id` AS leaderId, `bus_id` AS busId, `bus_name` AS busName, `report_name` AS reportName, `start_time` AS startTime, `end_time` AS endTime, `order_fee` AS orderFee, `received_fee` AS receivedFee, `bus_fee` AS busFee, `service_fee` AS serviceFee, `other_fee` AS otherFee, `add_time` AS addTime FROM `group_buy_order`.`gb_report_business_info` ORDER BY `add_time` DESC LIMIT #{offset}, #{pageSize}")
-    List<Map<String, Object>> selectReportPage(int offset, int pageSize);
-
-    // 分账报表总数（group_buy_order）
-    @Select("SELECT COUNT(*) FROM `group_buy_order`.`gb_report_business_info`")
-    long selectReportCount();
-
 }
