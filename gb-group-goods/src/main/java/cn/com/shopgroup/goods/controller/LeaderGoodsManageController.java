@@ -1,7 +1,9 @@
 package cn.com.shopgroup.goods.controller;
 
+import cn.com.shopgroup.common.exception.BusinessException;
 import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.TimeUtils;
+import cn.com.shopgroup.goods.exception.GoodsErrorCodeEnum;
 import cn.com.shopgroup.goods.http.request.leader.LeaderAddGoodsRequest;
 import cn.com.shopgroup.goods.http.request.leader.LeaderAddSpecRequest;
 import cn.com.shopgroup.goods.http.request.leader.LeaderAddSpecValRequest;
@@ -216,7 +218,7 @@ public class LeaderGoodsManageController {
 
         // 如果该商品正在团购中, 则不允许修改
         if (groupActivityInfoService.isGoodsGrouping(leaderId, request.getId())) {
-            return JsonResult.fail("该商品正在团购中, 不允许修改");
+            throw new BusinessException(GoodsErrorCodeEnum.GOODS_GROUPING);
         }
 
         // 1. 商品基本信息 -> gb_goods_info
@@ -246,7 +248,7 @@ public class LeaderGoodsManageController {
         // 3. 修改商品表
         boolean flag = goodsService.editMiniLeaderGoodsInfo(leaderId, data, imgList);
         if (!flag) {
-            return JsonResult.fail();
+            throw new BusinessException(GoodsErrorCodeEnum.UPDATE_FAILED);
         }
 
         // 4. 商品规格重建 -> gb_goods_spec_info / gb_goods_spec_value
@@ -272,11 +274,11 @@ public class LeaderGoodsManageController {
         // 查询旧状态
         GbGoodsInfo goodsInfo = goodsService.getGoodsInfo(goodsId);
         if (ObjectUtils.isEmpty(goodsInfo)) {
-            return JsonResult.fail("查询商品不存在,系统异常！");
+            throw new BusinessException(GoodsErrorCodeEnum.GOODS_NOT_EXIST);
         }
         // 如果该商品正在团购中, 则不允许操作
         if (groupActivityInfoService.isGoodsGrouping(leaderId, goodsId)) {
-            return JsonResult.fail("该商品正在团购中, 不允许修改");
+            throw new BusinessException(GoodsErrorCodeEnum.GOODS_GROUPING);
         }
         // 切换上下架状态
         int status = goodsInfo.getIsClose() == 0 ? 1 : 0;
@@ -337,16 +339,16 @@ public class LeaderGoodsManageController {
 
         // 商品不存在
         if (requestList == null || requestList.isEmpty()) {
-            return JsonResult.fail("SKU数据不能为空");
+            throw new BusinessException(GoodsErrorCodeEnum.SKU_REQUIRED);
         }
         Long goodsId = requestList.get(0).getGid();
         if (goodsId == null || goodsId == 0) {
-            return JsonResult.fail("商品不存在");
+            throw new BusinessException(GoodsErrorCodeEnum.GOODS_NOT_EXIST);
         }
 
         // 如果该商品正在团购中, 则不允许修改
         if (groupActivityInfoService.isGoodsGrouping(leaderId, goodsId)) {
-            return JsonResult.fail("该商品正在团购中, 不允许修改");
+            throw new BusinessException(GoodsErrorCodeEnum.GOODS_GROUPING);
         }
 
         // 先删除后添加(未提交SKU时自动生成, 保持原行为)
@@ -442,7 +444,7 @@ public class LeaderGoodsManageController {
     private Long getLeaderId() {
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
-            throw new IllegalArgumentException("lid不存在");
+            throw new BusinessException(GoodsErrorCodeEnum.LEADER_NOT_EXIST);
         }
         return leaderId;
     }

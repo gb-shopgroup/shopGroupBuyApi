@@ -1,8 +1,10 @@
 package cn.com.shopgroup.order.controller.group;
 
+import cn.com.shopgroup.common.exception.BusinessException;
 import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.wxmini.WxMiniAccessTokenHelper;
 import cn.com.shopgroup.common.wxmini.WxMiniProgramHelper;
+import cn.com.shopgroup.order.exception.OrderErrorCodeEnum;
 import cn.com.shopgroup.order.model.GbOrderInfo;
 import cn.com.shopgroup.order.service.GbOrderInfoService;
 import com.alibaba.fastjson2.JSON;
@@ -34,18 +36,18 @@ public class WxOrderController {
         GbOrderInfo orderInfo = orderInfoService.getOrderInfoByOrderNo(orderNo);
         log.info("【接口：/group/order/wx/order】 查询结果-orderInfo:{}", JSON.toJSON(orderInfo));
         if (ObjectUtils.isEmpty(orderInfo)) {
-            return JsonResult.fail("订单不存在");
+            throw new BusinessException(OrderErrorCodeEnum.ORDER_NOT_EXIST);
         }
 
         // 订单必须支付才行
         Integer orderStatus = orderInfo.getStatus();
         if (orderStatus.intValue() == 0) {
-            return JsonResult.fail("订单未支付");
+            throw new BusinessException(OrderErrorCodeEnum.PAYMENT_REQUIRED);
         }
         // 查询微信流水号
         String transactionId = orderInfo.getPayNo();
         if (StringUtils.isEmpty(transactionId)) {
-            return JsonResult.fail("订单未支付");
+            throw new BusinessException(OrderErrorCodeEnum.PAYMENT_REQUIRED);
         }
         // 获取 accessToken
         String accessToken = helper.getAccessToken(false);
@@ -57,7 +59,7 @@ public class WxOrderController {
         } else {
             if (status == -1) {
                 helper.removeAccessToken();
-                return JsonResult.fail("查询失败，请稍后再试！");
+                throw new BusinessException(OrderErrorCodeEnum.WX_STATUS_QUERY_FAILED);
             }
         }
         return JsonResult.success("查询成功", status);

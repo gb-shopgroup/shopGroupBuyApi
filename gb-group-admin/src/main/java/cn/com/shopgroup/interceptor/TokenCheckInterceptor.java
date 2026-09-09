@@ -3,7 +3,7 @@ package cn.com.shopgroup.interceptor;
 import cn.com.shopgroup.common.cache.RedisConstant;
 import cn.com.shopgroup.common.cache.RedisHelper;
 import cn.com.shopgroup.common.utils.TokenUtils;
-import cn.com.shopgroup.exception.TokenException;
+import cn.com.shopgroup.common.exception.TokenException;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import javax.servlet.http.HttpServletRequest;

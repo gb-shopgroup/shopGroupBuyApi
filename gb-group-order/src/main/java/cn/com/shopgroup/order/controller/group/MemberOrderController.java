@@ -1,5 +1,6 @@
 package cn.com.shopgroup.order.controller.group;
 
+import cn.com.shopgroup.common.exception.BusinessException;
 import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.MoneyUtil;
 import cn.com.shopgroup.common.utils.TimeUtils;
@@ -7,6 +8,7 @@ import cn.com.shopgroup.common.utils.TokenUtils;
 import cn.com.shopgroup.common.wxmini.WxMiniAccessTokenHelper;
 import cn.com.shopgroup.common.wxmini.WxMiniProgramHelper;
 import cn.com.shopgroup.order.constants.OrderStatusEnum;
+import cn.com.shopgroup.order.exception.OrderErrorCodeEnum;
 import cn.com.shopgroup.order.http.request.MemberOrderListRequest;
 import cn.com.shopgroup.order.http.request.MemberOrderRefundListRequest;
 import cn.com.shopgroup.order.http.request.MemberOrderRefundRequest;
@@ -87,20 +89,20 @@ public class MemberOrderController {
         // 查询用户信息
         String token = TokenUtils.getToken();
         if (StringUtils.isEmpty(token)) {
-            return JsonResult.fail("token不存在");
+            throw new BusinessException(OrderErrorCodeEnum.TOKEN_NOT_EXIST);
         }
         String userId = TokenUtils.parseToken(token);
         if (userId == null || StringUtils.isEmpty(userId) || userId.matches("^[0-9]+$") == false) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
         }
         Long memberId = 0l;
         try {
             memberId = Long.parseLong(userId);
         } catch (NumberFormatException e) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
         }
         if (memberId == 0) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
         }
         // 请求参数矫正
         int page = Optional.ofNullable(request.getPage()).orElse(1);
@@ -123,20 +125,20 @@ public class MemberOrderController {
         // 查询用户信息
         String token = TokenUtils.getToken();
         if (StringUtils.isEmpty(token)) {
-            return JsonResult.fail("token不存在");
+            throw new BusinessException(OrderErrorCodeEnum.TOKEN_NOT_EXIST);
         }
         String userId = TokenUtils.parseToken(token);
         if (userId == null || StringUtils.isEmpty(userId) || userId.matches("^[0-9]+$") == false) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
         }
         Long memberId = 0L;
         try {
             memberId = Long.parseLong(userId);
         } catch (NumberFormatException e) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
         }
         if (memberId == 0) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
         }
         // 请求参数矫正
         int page = Optional.ofNullable(request.getPage()).orElse(1);
@@ -160,20 +162,20 @@ public class MemberOrderController {
         // 查询用户信息
         String token = TokenUtils.getToken();
         if (token == null || token.length() == 0) {
-            return JsonResult.fail("token不存在");
+            throw new BusinessException(OrderErrorCodeEnum.TOKEN_NOT_EXIST);
         }
         String userId = TokenUtils.parseToken(token);
         if (userId == null || StringUtils.isEmpty(userId) || userId.matches("^[0-9]+$") == false) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
         }
         Long memberId = 0L;
         try {
             memberId = Long.parseLong(userId);
             if (memberId == 0) {
-                return JsonResult.fail("用户不存在");
+                throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
             }
         } catch (NumberFormatException e) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
         }
         // 根据提货点ID查询团长ID
         Long leaderId = 0L;
@@ -194,20 +196,20 @@ public class MemberOrderController {
         // 查询用户信息
         String token = TokenUtils.getToken();
         if (token == null || token.length() == 0) {
-            return JsonResult.fail("token不存在");
+            throw new BusinessException(OrderErrorCodeEnum.TOKEN_NOT_EXIST);
         }
         String userId = TokenUtils.parseToken(token);
         if (userId == null || StringUtils.isEmpty(userId) || userId.matches("^[0-9]+$") == false) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
         }
         Long memberId = 0L;
         try {
             memberId = Long.parseLong(userId);
             if (memberId == 0) {
-                return JsonResult.fail("用户不存在");
+                throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
             }
         } catch (NumberFormatException e) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
         }
 
         // 查询订单信息
@@ -226,25 +228,25 @@ public class MemberOrderController {
         // 查询用户信息
         String token = TokenUtils.getToken();
         if (token == null || token.length() == 0) {
-            return JsonResult.fail("token不存在");
+            throw new BusinessException(OrderErrorCodeEnum.TOKEN_NOT_EXIST);
         }
         String userId = TokenUtils.parseToken(token);
         if (StringUtils.isEmpty(userId) || userId.matches("^[0-9]+$") == false) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
         }
         Long memberId = 0L;
         try {
             memberId = Long.parseLong(userId);
         } catch (NumberFormatException e) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
         }
         if (memberId == 0) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
         }
 
         // 统一获取AccessToken
         String accessToken = helper.getAccessToken(false);
-        if (accessToken == null || accessToken.length() == 0) return JsonResult.fail("获取AccessToken失败");
+        if (accessToken == null || accessToken.length() == 0) throw new BusinessException(OrderErrorCodeEnum.ACCESS_TOKEN_FAILED);
 
         // 生成小程序码, 返回base64格式
         String base64 = "";
@@ -266,7 +268,7 @@ public class MemberOrderController {
 
         // 返回
         if (base64.length() == 0) {
-            return JsonResult.fail("二维码生成失败");
+            throw new BusinessException(OrderErrorCodeEnum.ERCODE_GEN_FAILED);
         } else {
             return JsonResult.success("二维码生成成功", base64);
         }
@@ -280,43 +282,43 @@ public class MemberOrderController {
         // 查询用户信息
         String token = TokenUtils.getToken();
         if (token == null || token.length() == 0) {
-            return JsonResult.fail("token不存在");
+            throw new BusinessException(OrderErrorCodeEnum.TOKEN_NOT_EXIST);
         }
         String userId = TokenUtils.parseToken(token);
         if (StringUtils.isEmpty(userId) || userId.matches("^[0-9]+$") == false) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
         }
         Long memberId = 0L;
         try {
             memberId = Long.parseLong(userId);
         } catch (NumberFormatException e) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
         }
         if (memberId == 0) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
         }
 
         // 先查询订单信息
         GbOrderInfo orderInfo = orderInfoService.getMiniOrderInfo(memberId, orderNo);
         if (ObjectUtils.isEmpty(orderInfo)) {
-            return JsonResult.fail("订单不存在");
+            throw new BusinessException(OrderErrorCodeEnum.ORDER_NOT_EXIST);
         }
 
         int status = orderInfo.getStatus().intValue();
         // 支付状态, 未支付不能收货
         if (status == 0) {
-            return JsonResult.fail("未支付, 不能收货");
+            throw new BusinessException(OrderErrorCodeEnum.ORDER_UNPAID_NOT_RECEIPT);
         }
 
         // 退货状态, 申请退货不能收货
         if (status == 3 || status == 4) {
-            return JsonResult.fail("已退款, 不能收货");
+            throw new BusinessException(OrderErrorCodeEnum.ORDER_REFUNDED_NOT_RECEIPT);
         }
 
         // 收货状态, 不能重复收货
         int receiptTime = orderInfo.getReceiptTime();
         if (status == 2 && receiptTime > 0) {
-            return JsonResult.fail("不能重复收货");
+            throw new BusinessException(OrderErrorCodeEnum.DUPLICATE_RECEIPT);
         }
 
         // 实际收货点(自提点)
@@ -334,7 +336,7 @@ public class MemberOrderController {
         if (flag) {
             return JsonResult.success("收货成功");
         } else {
-            return JsonResult.fail("收货失败");
+            throw new BusinessException(OrderErrorCodeEnum.RECEIPT_FAILED);
         }
     }
 
@@ -345,43 +347,43 @@ public class MemberOrderController {
         // 查询用户信息
         String token = TokenUtils.getToken();
         if (token == null || token.length() == 0) {
-            JsonResult.fail("token不存在");
+            throw new BusinessException(OrderErrorCodeEnum.TOKEN_NOT_EXIST);
         }
         String userId = TokenUtils.parseToken(token);
         if (StringUtils.isEmpty(userId) || userId.matches("^[0-9]+$") == false) {
-            JsonResult.fail("用户不存在");
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
         }
         Long memberId = 0L;
         try {
             memberId = Long.parseLong(userId);
         } catch (NumberFormatException e) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
         }
         GbMemberInfo memberInfo = memberInfoService.getMemberInfo(memberId);
         if (ObjectUtils.isEmpty(memberInfo)) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
         }
         String memberName = memberInfo.getNickname();
         String orderNo = refundApplyRequest.getOrderNo();
         // 先查询订单信息
         GbOrderInfo orderInfo = orderInfoService.getMiniOrderInfo(memberId, orderNo);
         if (ObjectUtils.isEmpty(orderInfo)) {
-            return JsonResult.fail("订单不存在");
+            throw new BusinessException(OrderErrorCodeEnum.ORDER_NOT_EXIST);
         }
 
         int status = orderInfo.getStatus().intValue();
         // 支付状态, 未支付不能收货
         if (status == OrderStatusEnum.UNPAID.getCode()) {
-            return JsonResult.fail("未支付, 不能申请退");
+            throw new BusinessException(OrderErrorCodeEnum.ORDER_UNPAID_NOT_REFUND);
         }
 
         // 退货状态, 申请退货不能收货
         if (status == OrderStatusEnum.REFUNDED.getCode()) {
-            return JsonResult.fail("已退款, 不能申请");
+            throw new BusinessException(OrderErrorCodeEnum.ORDER_REFUNDED_NOT_REFUND);
         }
         List<GbOrderGoodsInfo> goodsList = orderInfoService.getOrderGoodsList(orderNo);
         if (CollectionUtils.isEmpty(goodsList)) {
-            return JsonResult.fail("该订单未查询到商品信息");
+            throw new BusinessException(OrderErrorCodeEnum.ORDER_GOODS_NOT_FOUND);
         }
 
         Map<Long, OrderRefundGoodsRequest> goodsMap = refundApplyRequest.getRefundGoodsMap();
@@ -392,7 +394,7 @@ public class MemberOrderController {
         //    退货退款(2): 可退"已收货"部分 = 收货数量 - 已申请退货退款数量
         int isReturnGoods = Optional.ofNullable(refundApplyRequest.getRefundFlag()).orElse(0).intValue();
         if (isReturnGoods != 1 && isReturnGoods != 2) {
-            return JsonResult.fail("退款类型不正确");
+            throw new BusinessException(OrderErrorCodeEnum.REFUND_TYPE_INVALID);
         }
         // 本次申请实际处理的商品行数, 用于校验申请退款的商品都属于该订单
         int handledCount = 0;
@@ -428,13 +430,13 @@ public class MemberOrderController {
             OrderRefundGoodsRequest temp = goodsMap.get(tempId);
             Integer applyNum = temp.getRefundNum();
             if (applyNum == null || applyNum <= 0) {
-                return JsonResult.fail("商品名称" + tempGoodsName + "申请退数量必须大于0，请核对后再提交");
+                throw new BusinessException("商品名称" + tempGoodsName + "申请退数量必须大于0，请核对后再提交");
             }
             if (canRefundNum <= 0) {
-                return JsonResult.fail("商品名称" + tempGoodsName + "已无可退数量，请核对后再提交");
+                throw new BusinessException("商品名称" + tempGoodsName + "已无可退数量，请核对后再提交");
             }
             if (applyNum > canRefundNum) {
-                return JsonResult.fail("商品名称" + tempGoodsName + "申请退数量大于可退数量，请核对后再提交");
+                throw new BusinessException("商品名称" + tempGoodsName + "申请退数量大于可退数量，请核对后再提交");
             }
             handledCount++;
             // 加入本次申请商品行集合(后续仅这些行累加退款/退货退款数量)
@@ -453,7 +455,7 @@ public class MemberOrderController {
         }
         // 申请退款的商品必须全部属于该订单
         if (handledCount != goodsMap.size()) {
-            return JsonResult.fail("申请退款的商品信息与订单不一致，请重新提交");
+            throw new BusinessException(OrderErrorCodeEnum.REFUND_GOODS_NOT_MATCH);
         }
 
         String refundGoodsMsg = sb.toString();
@@ -462,7 +464,7 @@ public class MemberOrderController {
         // 申请退款总金额不能超过订单实付金额(payFee 单位:分), 防止超额退款
         int payFee = orderInfo.getPayFee() == null ? 0 : orderInfo.getPayFee().intValue();
         if (MoneyUtil.yuanToCent(allRefundAmount) > payFee) {
-            return JsonResult.fail("申请退款总金额大于订单实付金额, 请重新申请");
+            throw new BusinessException(OrderErrorCodeEnum.REFUND_AMOUNT_EXCEED);
         }
 
         // 申请退款 1 订单状态变成售后, 订单refund_fee累加本次申请金额(占坑)
@@ -487,7 +489,7 @@ public class MemberOrderController {
             // 返回本次申请退款的总金额, 供前端展示
             return JsonResult.success("已申请退款", allRefundAmount);
         } else {
-            return JsonResult.fail("申请退款失败");
+            throw new BusinessException(OrderErrorCodeEnum.REFUND_APPLY_FAILED);
         }
 
     }
@@ -520,24 +522,24 @@ public class MemberOrderController {
         // 查询用户信息
         String token = TokenUtils.getToken();
         if (token == null || token.length() == 0) {
-            return JsonResult.fail("token不存在");
+            throw new BusinessException(OrderErrorCodeEnum.TOKEN_NOT_EXIST);
         }
         String userId = TokenUtils.parseToken(token);
         if (StringUtils.isEmpty(userId) || userId.matches("^[0-9]+$") == false) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
         }
         Long memberId = 0L;
         try {
             memberId = Long.parseLong(userId);
         } catch (NumberFormatException e) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
         }
         if (memberId == 0) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
         }
         GbOrgShopInfo shopInfo = shopInfoService.getByShopId(shopId);
         if (ObjectUtils.isEmpty(shopInfo)) {
-            return JsonResult.fail("店铺信息不可用");
+            throw new BusinessException(OrderErrorCodeEnum.SHOP_INFO_UNAVAILABLE);
         }
         Long leaderId = shopInfo.getLeaderId();
         // 查询还有商品未全部收货的订单列表
@@ -555,20 +557,20 @@ public class MemberOrderController {
         // 查询用户信息
         String token = TokenUtils.getToken();
         if (token == null || token.length() == 0) {
-            return JsonResult.fail("token不存在");
+            throw new BusinessException(OrderErrorCodeEnum.TOKEN_NOT_EXIST);
         }
         String userId = TokenUtils.parseToken(token);
         if (StringUtils.isEmpty(userId) || userId.matches("^[0-9]+$") == false) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
         }
         Long memberId = 0L;
         try {
             memberId = Long.parseLong(userId);
         } catch (NumberFormatException e) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
         }
         if (memberId == 0) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
         }
 
         orderInfoService.updateClickConfirmFlag(orderNo, 1);
@@ -582,20 +584,20 @@ public class MemberOrderController {
         // 查询用户信息
         String token = TokenUtils.getToken();
         if (token == null || token.length() == 0) {
-            return JsonResult.fail("token不存在");
+            throw new BusinessException(OrderErrorCodeEnum.TOKEN_NOT_EXIST);
         }
         String userId = TokenUtils.parseToken(token);
         if (userId == null || StringUtils.isEmpty(userId) || userId.matches("^[0-9]+$") == false) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
         }
         Long memberId = 0L;
         try {
             memberId = Long.parseLong(userId);
             if (memberId == 0) {
-                return JsonResult.fail("用户不存在");
+                throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
             }
         } catch (NumberFormatException e) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
         }
 
         // 查询订单信息

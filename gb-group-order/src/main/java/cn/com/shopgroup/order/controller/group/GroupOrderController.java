@@ -2,8 +2,10 @@ package cn.com.shopgroup.order.controller.group;
 
 import cn.com.shopgroup.common.cache.RedisConstant;
 import cn.com.shopgroup.common.cache.RedisHelper;
+import cn.com.shopgroup.common.exception.BusinessException;
 import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.TokenUtils;
+import cn.com.shopgroup.order.exception.OrderErrorCodeEnum;
 import cn.com.shopgroup.order.http.request.OrderGoodsRequest;
 import cn.com.shopgroup.order.http.request.OrderRequest;
 import cn.com.shopgroup.order.service.OrderService;
@@ -41,31 +43,31 @@ public class GroupOrderController {
         // 查询用户信息
         String token = TokenUtils.getToken();
         if (token == null || token.length() == 0) {
-            return JsonResult.fail("token不存在");
+            throw new BusinessException(OrderErrorCodeEnum.TOKEN_NOT_EXIST);
         }
         String userId = TokenUtils.parseToken(token);
         if (StringUtils.isEmpty(userId) || userId.matches("^[0-9]+$") == false) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
         }
         Long memberId = 0L;
         try {
             memberId = Long.parseLong(userId);
         } catch (NumberFormatException e) {
-            JsonResult.fail("用户不存在");
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
         }
         if (memberId == 0) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
         }
         List<OrderGoodsRequest> goods = request.getGoods();
         if (CollectionUtils.isEmpty(goods)) {
-            return JsonResult.fail("请选择商品后再下单");
+            throw new BusinessException(OrderErrorCodeEnum.GOODS_REQUIRED);
         }
         String ids = goods.stream().map(OrderGoodsRequest::getId).collect(Collectors.toList()).toString();
         String nums = goods.stream().map(OrderGoodsRequest::getNum).collect(Collectors.toList()).toString();
         // 防刷
         String key = RedisConstant.RedisOrderAddKey + memberId + request.getGroupId() + ids + nums;
         if (redisHelper.hasKey(key)) {
-            return JsonResult.fail("订单正在处理中，请勿重复提交");
+            throw new BusinessException(OrderErrorCodeEnum.ORDER_PROCESSING);
         } else {
             //key----value--随便设置值，暂时用不到
             redisHelper.setCacheObject(key, key, RedisConstant.RedisOrderAddExpired, TimeUnit.SECONDS);
@@ -78,7 +80,7 @@ public class GroupOrderController {
         if (success == 1) {
             return JsonResult.success("下单成功", msg);
         } else {
-            return JsonResult.fail(msg);
+            throw new BusinessException(msg);
         }
     }
 

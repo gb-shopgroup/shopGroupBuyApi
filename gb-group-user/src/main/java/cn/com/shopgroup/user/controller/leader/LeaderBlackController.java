@@ -1,6 +1,8 @@
 package cn.com.shopgroup.user.controller.leader;
 
+import cn.com.shopgroup.common.exception.BusinessException;
 import cn.com.shopgroup.common.utils.JsonResult;
+import cn.com.shopgroup.user.exception.UserErrorCodeEnum;
 import cn.com.shopgroup.user.http.response.LeaderMemberResponse;
 import cn.com.shopgroup.user.model.GbMemberBlackList;
 import cn.com.shopgroup.user.model.GbMemberInfo;
@@ -38,11 +40,11 @@ public class LeaderBlackController {
     // 根据手机号查询用户
     @GetMapping("/leader/member/mobile")
     public JsonResult getMemberMobile(@RequestParam("mobile") String mobile) {
-        log.info("/user/leader/member/mobile req mobile:{}",mobile);
+        log.info("/user/leader/member/mobile req mobile:{}", mobile);
         GbMemberInfo data = memberInfoService.getMemberInfoByMobile(mobile);
         log.info("data from db info:{}", JSON.toJSONString(data));
         if (ObjectUtils.isEmpty(data)) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(UserErrorCodeEnum.USER_NOT_EXIST);
         }
         LeaderMemberResponse response = new LeaderMemberResponse(data);
         return JsonResult.success(response);
@@ -51,11 +53,11 @@ public class LeaderBlackController {
     // 加入黑名单
     @PostMapping("/leader/add/black")
     public JsonResult addMemberBlack(@RequestParam("memberId") Long memberId) {
-        log.info("/user/leader//add/black req memberId:{}",memberId);
+        log.info("/user/leader//add/black req memberId:{}", memberId);
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(UserErrorCodeEnum.LEADER_NOT_EXIST);
         }
         // 构建黑名单数据
         GbMemberBlackList data = new GbMemberBlackList();
@@ -64,8 +66,8 @@ public class LeaderBlackController {
         if (staffId != 0) {
             // 查询店员
             GbOrgStaffInfo staffInfo = staffService.getStaffInfo(staffId);
-            if(ObjectUtils.isEmpty(staffInfo)){
-                return JsonResult.fail("查询员工信息有误");
+            if (ObjectUtils.isEmpty(staffInfo)) {
+                throw new BusinessException(UserErrorCodeEnum.STAFF_QUERY_ERROR);
             }
             data.setStaffId(staffInfo.getStaffId());
             data.setStaffName(staffInfo.getStaffName());
@@ -73,12 +75,12 @@ public class LeaderBlackController {
         // 是否已经添加黑名单
         boolean isExists = blackService.getMemberBlackById(leaderId, memberId);
         if (isExists) {
-            return JsonResult.fail("已经添加黑名单了");
+            throw new BusinessException(UserErrorCodeEnum.BLACKLIST_EXISTED);
         }
         // 查询用户信息
         GbMemberInfo info = memberInfoService.getMemberInfo(memberId);
         if (ObjectUtils.isEmpty(info)) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(UserErrorCodeEnum.USER_NOT_EXIST);
         }
         data.setMemberId(info.getMemberId());
         data.setMobile(info.getMobile());
@@ -89,23 +91,23 @@ public class LeaderBlackController {
         if (isSuccess) {
             return JsonResult.success();
         } else {
-            return JsonResult.fail();
+            throw new BusinessException(UserErrorCodeEnum.UPDATE_FAILED);
         }
     }
 
     // 根据手机号查询黑名单用户
     @GetMapping("/leader/black/mobile")
     public JsonResult queryMemberBlack(@RequestParam("mobile") String mobile) {
-        log.info("根据手机号查询黑名单用户 req mobile:{}",mobile);
+        log.info("根据手机号查询黑名单用户 req mobile:{}", mobile);
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(UserErrorCodeEnum.LEADER_NOT_EXIST);
         }
         // 查询是否已经黑名单
         GbMemberBlackList blackInfo = blackService.getMemberBlackByMobile(leaderId, mobile);
         if (ObjectUtils.isEmpty(blackInfo)) {
-            return JsonResult.fail("黑名单不存在");
+            throw new BusinessException(UserErrorCodeEnum.BLACKLIST_NOT_EXIST);
         }
         // 返回数据
         LeaderMemberResponse response = new LeaderMemberResponse(blackInfo);
@@ -118,14 +120,14 @@ public class LeaderBlackController {
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(UserErrorCodeEnum.LEADER_NOT_EXIST);
         }
         // 解除黑名单
         boolean isSuccess = blackService.removeMemberBlack(leaderId, memberId);
         if (isSuccess) {
             return JsonResult.success();
         } else {
-            return JsonResult.fail();
+            throw new BusinessException(UserErrorCodeEnum.UPDATE_FAILED);
         }
     }
 
@@ -136,7 +138,7 @@ public class LeaderBlackController {
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(UserErrorCodeEnum.LEADER_NOT_EXIST);
         }
 
         // 请求参数矫正
@@ -156,7 +158,7 @@ public class LeaderBlackController {
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(UserErrorCodeEnum.LEADER_NOT_EXIST);
         }
         // 查询数量
         long total = blackService.getMemberBlackCount(leaderId);

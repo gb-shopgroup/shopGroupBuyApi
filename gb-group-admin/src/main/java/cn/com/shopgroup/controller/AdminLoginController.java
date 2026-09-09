@@ -2,9 +2,11 @@ package cn.com.shopgroup.controller;
 
 import cn.com.shopgroup.common.cache.RedisConstant;
 import cn.com.shopgroup.common.cache.RedisHelper;
+import cn.com.shopgroup.common.exception.BusinessException;
 import cn.com.shopgroup.common.utils.IpUtils;
 import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.TokenUtils;
+import cn.com.shopgroup.exception.AdminErrorCodeEnum;
 import cn.com.shopgroup.http.request.LoginRequest;
 import cn.com.shopgroup.http.response.UserResponse;
 import cn.com.shopgroup.user.model.GbSysUserInfo;
@@ -58,7 +60,7 @@ public class AdminLoginController {
             byte[] imageBytes = baos.toByteArray();
             base64Image = "data:image/jpeg;base64," + Base64.getEncoder().encodeToString(imageBytes);
         } catch (IOException e) {
-            throw new RuntimeException("生成验证码图片失败", e);
+            throw new BusinessException(AdminErrorCodeEnum.CAPTCHA_IMAGE_FAILED);
         }
 
         // 返回 Base64 图片
@@ -74,24 +76,24 @@ public class AdminLoginController {
         String redisKey = RedisConstant.RedisSysAdminKaptchaKey + captchaKey;
         String captchaText = redisHelper.getCacheObject(redisKey);
         if (captchaText == null || captchaText.equalsIgnoreCase(request.getCode()) == false) {
-            return JsonResult.fail("验证码不对");
+            throw new BusinessException(AdminErrorCodeEnum.CAPTCHA_ERROR);
         }
 
         // 再查询系统用户
         GbSysUserInfo userInfo = service.getUserByUsername(request.getUsername());
 
         // 用户不存在
-        if (userInfo == null) return JsonResult.fail("用户不存在");
+        if (userInfo == null) throw new BusinessException(AdminErrorCodeEnum.USER_NOT_EXIST);
 
         // 用户已关闭
-        if (userInfo.getIsClose() == 1) return JsonResult.fail("用户已关闭");
+        if (userInfo.getIsClose() == 1) throw new BusinessException(AdminErrorCodeEnum.USER_DISABLED);
 
         // 密码不正确
         String salt = "dxt2009";
         String pwd = request.getPassword() + salt;
         String md5 = DigestUtils.md5DigestAsHex(pwd.getBytes());
         if (md5.equalsIgnoreCase(userInfo.getPassWord()) == false) {
-            return JsonResult.fail("密码不正确");
+            throw new BusinessException(AdminErrorCodeEnum.PASSWORD_ERROR);
         }
 
         // 返回数据

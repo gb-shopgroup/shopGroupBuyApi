@@ -1,10 +1,12 @@
 package cn.com.shopgroup.order.controller.leader;
 
+import cn.com.shopgroup.common.exception.BusinessException;
 import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.MoneyUtil;
 import cn.com.shopgroup.common.wxmini.WxMiniAccessTokenHelper;
 import cn.com.shopgroup.common.wxmini.WxMiniProgramHelper;
 import cn.com.shopgroup.order.constants.OrderStatusEnum;
+import cn.com.shopgroup.order.exception.OrderErrorCodeEnum;
 import cn.com.shopgroup.order.http.request.LeaderOrderApplyRefundRequest;
 import cn.com.shopgroup.order.http.request.LeaderOrderListRequest;
 import cn.com.shopgroup.order.http.request.OrderVerifyGoodsRequest;
@@ -69,7 +71,7 @@ public class OrderController {
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(OrderErrorCodeEnum.LEADER_NOT_EXIST);
         }
         // 请求参数矫正
         int page = Optional.ofNullable(request.getPage()).orElse(1);
@@ -92,7 +94,7 @@ public class OrderController {
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(OrderErrorCodeEnum.LEADER_NOT_EXIST);
         }
         // 请求参数矫正
         int page = Optional.ofNullable(request.getPage()).orElse(1);
@@ -114,7 +116,7 @@ public class OrderController {
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(OrderErrorCodeEnum.LEADER_NOT_EXIST);
         }
         // 查询总数
         Long total = orderInfoService.getMiniLeaderOrderCount(leaderId, groupId, pointId, 2);
@@ -127,7 +129,7 @@ public class OrderController {
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(OrderErrorCodeEnum.LEADER_NOT_EXIST);
         }
         // 查询订单数量
         Map<String, Long> result = orderInfoService.getMiniLeaderOrderStatusTotal(leaderId, groupId, pointId);
@@ -144,12 +146,12 @@ public class OrderController {
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
-            return JsonResult.fail("");
+            throw new BusinessException(OrderErrorCodeEnum.LEADER_NOT_EXIST);
         }
         // 查询订单及其商品列表
         GbOrderInfo info = orderInfoService.getMiniLeaderOrderInfo(leaderId, request.getOrderNo(), request.getReceiptCode());
         if (ObjectUtils.isEmpty(info)) {
-            return JsonResult.fail("订单不存在");
+            throw new BusinessException(OrderErrorCodeEnum.ORDER_NOT_EXIST);
         } else {
             OrderResponse data = new OrderResponse(info);
             return JsonResult.success(data);
@@ -161,11 +163,11 @@ public class OrderController {
     public JsonResult queryOrder(@RequestParam("orderNo") String orderNo) {
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
-        if (leaderId == 0) return JsonResult.fail("lid不存在");
+        if (leaderId == 0) throw new BusinessException(OrderErrorCodeEnum.LEADER_NOT_EXIST);
         // 查询订单及其商品列表
         GbOrderInfo info = orderInfoService.getMiniLeaderOrderInfo(leaderId, orderNo, "");
         if (ObjectUtils.isEmpty(info)) {
-            return JsonResult.fail("订单不存在");
+            throw new BusinessException(OrderErrorCodeEnum.ORDER_NOT_EXIST);
         } else {
             OrderResponse data = new OrderResponse(info);
             return JsonResult.success(data);
@@ -180,11 +182,11 @@ public class OrderController {
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(OrderErrorCodeEnum.LEADER_NOT_EXIST);
         }
         GbOrgLeaderInfo leaderInfo = leaderInfoService.getLeaderInfo(leaderId);
         if (ObjectUtils.isEmpty(leaderInfo)) {
-            return JsonResult.fail("团长信息有误");
+            throw new BusinessException(OrderErrorCodeEnum.LEADER_INFO_ERROR);
         }
         // 从请求头中获取员工id
         Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
@@ -192,7 +194,7 @@ public class OrderController {
         if (staffId != 0) {
             GbOrgStaffInfo staffInfo = staffService.getStaffInfo(staffId);
             if (ObjectUtils.isEmpty(staffInfo)) {
-                return JsonResult.fail("staffId=" + staffId + "未查询到相关员工数据");
+                throw new BusinessException("staffId=" + staffId + "未查询到相关员工数据");
             }
             opName = staffInfo.getStaffName();
         }
@@ -200,27 +202,27 @@ public class OrderController {
         GbOrderInfo orderInfo = orderInfoService.getOrderInfoByOrderNo(orderNo);
         log.info("订单核销->查询订单信息，orderNo:{},info:{}", orderNo, JSON.toJSONString(orderInfo));
         if (ObjectUtils.isEmpty(orderInfo)) {
-            return JsonResult.fail("订单不存在");
+            throw new BusinessException(OrderErrorCodeEnum.ORDER_NOT_EXIST);
         }
         // 订单状态:0 待支付,1 待收货 2 部分收货 3 已提货 4 已退款, 5 售后 6 已取消
         int status = orderInfo.getStatus().intValue();
         if (status == OrderStatusEnum.UNPAID.getCode()) {
-            return JsonResult.fail("订单未支付, 不能核销");
+            throw new BusinessException(OrderErrorCodeEnum.ORDER_UNPAID_NOT_WRITEOFF);
         }
         // 退款状态
         if (status == OrderStatusEnum.REFUNDED.getCode()) {
-            return JsonResult.fail("订单已退款, 不能核销");
+            throw new BusinessException(OrderErrorCodeEnum.REFUNDED_NOT_WRITEOFF);
         }
         List<GbOrderGoodsInfo> goodsList = orderInfoService.getOrderGoodsList(orderNo);
         if (CollectionUtils.isEmpty(goodsList)) {
-            return JsonResult.fail("该订单未查询到商品信息");
+            throw new BusinessException(OrderErrorCodeEnum.ORDER_GOODS_NOT_FOUND);
         }
         // 开始核销
         String pointName = "";
 
         GbOrgPointInfo pointInfo = pointService.getPointInfo(pointId);
         if (ObjectUtils.isEmpty(pointInfo)) {
-            return JsonResult.fail("pointId=" + pointId + "未查询到相关point数据");
+            throw new BusinessException("pointId=" + pointId + "未查询到相关point数据");
         }
         if (pointId > 0 && pointInfo != null) {
             pointName = pointInfo.getPointName();
@@ -251,11 +253,11 @@ public class OrderController {
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(OrderErrorCodeEnum.LEADER_NOT_EXIST);
         }
         GbOrgLeaderInfo leaderInfo = leaderInfoService.getLeaderInfo(leaderId);
         if (ObjectUtils.isEmpty(leaderInfo)) {
-            return JsonResult.fail("团长信息有误");
+            throw new BusinessException(OrderErrorCodeEnum.LEADER_INFO_ERROR);
         }
         // 从请求头中获取员工id
         Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
@@ -263,23 +265,23 @@ public class OrderController {
         if (staffId != 0) {
             GbOrgStaffInfo staffInfo = staffService.getStaffInfo(staffId);
             if (ObjectUtils.isEmpty(staffInfo)) {
-                return JsonResult.fail("staffId=" + staffId + "未查询到相关员工数据");
+                throw new BusinessException("staffId=" + staffId + "未查询到相关员工数据");
             }
             opName = staffInfo.getStaffName();
         }
         // 查看订单是否已经被核销
         GbOrderInfo orderInfo = orderInfoService.getOrderInfoByOrderNo(request.getOrderNo());
         if (ObjectUtils.isEmpty(orderInfo)) {
-            return JsonResult.fail("订单不存在");
+            throw new BusinessException(OrderErrorCodeEnum.ORDER_NOT_EXIST);
         }
         // 订单状态:0 待支付,1 待收货 2 部分收货 3 已提货 4 已退款, 5 售后 6 已取消
         int status = orderInfo.getStatus().intValue();
         if (status == OrderStatusEnum.UNPAID.getCode() || status == OrderStatusEnum.CANCELED.getCode()) {
-            return JsonResult.fail("订单未支付, 不能核销");
+            throw new BusinessException(OrderErrorCodeEnum.ORDER_UNPAID_NOT_WRITEOFF);
         }
         List<GbOrderGoodsInfo> goodsList = orderInfoService.getOrderGoodsList(request.getOrderNo());
         if (CollectionUtils.isEmpty(goodsList)) {
-            return JsonResult.fail("该订单未查询到商品信息");
+            throw new BusinessException(OrderErrorCodeEnum.ORDER_GOODS_NOT_FOUND);
         }
 
         // 订单商品收货数量计算
@@ -292,7 +294,7 @@ public class OrderController {
             //未核销商品数量
             int remainNum = tempGoodNum.intValue() - tempReceiptNum.intValue();
             if (remainNum < 0) {
-                return JsonResult.fail("核销:商品数量大于订单剩余核销数");
+                throw new BusinessException(OrderErrorCodeEnum.VERIFY_NUM_EXCEED);
             }
             if (goodsMap.containsKey(tempId)) {
                 OrderVerifyGoodsRequest temp = goodsMap.get(tempId);
@@ -304,7 +306,7 @@ public class OrderController {
         if (request.getPid() > 0) {
             GbOrgPointInfo pointInfo = pointService.getPointInfo(request.getPid());
             if (ObjectUtils.isEmpty(pointInfo)) {
-                return JsonResult.fail("request.getPid()=" + request.getPid() + "未查询到相关数据");
+                throw new BusinessException("request.getPid()=" + request.getPid() + "未查询到相关数据");
             }
             pointName = pointInfo.getPointName();
         }
@@ -350,16 +352,16 @@ public class OrderController {
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(OrderErrorCodeEnum.LEADER_NOT_EXIST);
         }
         // 查询订单
         GbOrderBusinessInfo orderInfo = businessService.getOrderBusinessInfo(orderNo);
         if (ObjectUtils.isEmpty(orderInfo)) {
-            return JsonResult.fail("orderNo=" + orderNo + ",订单不存在");
+            throw new BusinessException("orderNo=" + orderNo + ",订单不存在");
         }
         // 是否已经发货
         if (orderInfo.getIsSend() == 1) {
-            JsonResult.fail("订单已发货");
+            throw new BusinessException(OrderErrorCodeEnum.ORDER_SENT);
         }
         // 再获取访问令牌
         String accessToken = wxAccessTokenHelper.getAccessToken(false);
@@ -388,7 +390,7 @@ public class OrderController {
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(OrderErrorCodeEnum.LEADER_NOT_EXIST);
         }
         // 返回的数据
         LeaderHomeShowDataResponse response = new LeaderHomeShowDataResponse();
@@ -423,7 +425,7 @@ public class OrderController {
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(OrderErrorCodeEnum.LEADER_NOT_EXIST);
         }
         // 请求参数矫正
         int currentPage = Optional.ofNullable(page).orElse(1);

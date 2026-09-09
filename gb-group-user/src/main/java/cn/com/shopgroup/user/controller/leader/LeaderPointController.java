@@ -2,10 +2,12 @@ package cn.com.shopgroup.user.controller.leader;
 
 import cn.com.shopgroup.common.cache.RedisConstant;
 import cn.com.shopgroup.common.config.UploadConfig;
+import cn.com.shopgroup.common.exception.BusinessException;
 import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.TimeUtils;
 import cn.com.shopgroup.common.wxmini.WxMiniAccessTokenHelper;
 import cn.com.shopgroup.common.wxmini.WxMiniProgramHelper;
+import cn.com.shopgroup.user.exception.UserErrorCodeEnum;
 import cn.com.shopgroup.user.http.request.PointRequest;
 import cn.com.shopgroup.user.http.response.PointResponse;
 import cn.com.shopgroup.user.model.GbOrgPointInfo;
@@ -50,7 +52,7 @@ public class LeaderPointController {
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(UserErrorCodeEnum.LEADER_NOT_EXIST);
         }  // 先读缓存再读数据库
         // 查询数据库
         List<GbOrgPointInfo> result = service.getPointListForLeader(leaderId, name);
@@ -70,7 +72,7 @@ public class LeaderPointController {
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(UserErrorCodeEnum.LEADER_NOT_EXIST);
         }
         // 查询数据库
         List<GbOrgPointInfo> result = service.getMiniLeaderPointList(leaderId);
@@ -89,7 +91,7 @@ public class LeaderPointController {
 
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
-        if (leaderId == 0) return JsonResult.fail("lid不存在");
+        if (leaderId == 0) throw new BusinessException(UserErrorCodeEnum.LEADER_NOT_EXIST);
 
         // 添加信息
         GbOrgPointInfo data = new GbOrgPointInfo();
@@ -120,7 +122,7 @@ public class LeaderPointController {
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(UserErrorCodeEnum.LEADER_NOT_EXIST);
         }
 
         // 修改信息
@@ -144,7 +146,7 @@ public class LeaderPointController {
 
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
-        if (leaderId == 0) return JsonResult.fail("lid不存在");
+        if (leaderId == 0) throw new BusinessException(UserErrorCodeEnum.LEADER_NOT_EXIST);
 
         // 查询旧的
         GbOrgPointInfo pointInfo = service.getPointInfo(pointId);
@@ -162,6 +164,9 @@ public class LeaderPointController {
     @GetMapping("/info")
     public JsonResult getPointInfo(@RequestParam("pointId") Long pointId) {
         log.info("[get] /user/leader/point/info pointId:{}", pointId);
+        if (pointId == null || pointId < 1) {
+            throw new BusinessException(UserErrorCodeEnum.REQUEST_PARAM_ILLEGAL);
+        }
         // 查询数据库
         GbOrgPointInfo pointInfo = service.getPointInfo(pointId);
         if (ObjectUtils.isEmpty(pointInfo)) {
@@ -199,7 +204,8 @@ public class LeaderPointController {
 
         // 统一获取AccessToken
         String accessToken = helper.getAccessToken(false);
-        if (accessToken == null || accessToken.length() == 0) return JsonResult.fail("获取AccessToken失败");
+        if (accessToken == null || accessToken.length() == 0)
+            throw new BusinessException(UserErrorCodeEnum.ACCESS_TOKEN_FAILED);
 
         // 再获取二维码
         String page = "pages/order/index";

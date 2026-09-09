@@ -1,6 +1,8 @@
 package cn.com.shopgroup.controller;
 
+import cn.com.shopgroup.common.exception.BusinessException;
 import cn.com.shopgroup.common.utils.JsonResult;
+import cn.com.shopgroup.exception.AdminErrorCodeEnum;
 import cn.com.shopgroup.http.request.LeaderRequest;
 import cn.com.shopgroup.http.response.OptionResponse;
 import cn.com.shopgroup.user.model.GbMemberInfo;
@@ -66,18 +68,18 @@ public class AdminLeaderController {
         // 根据手机号查询用户信息
         String mobile = request.getMobile();
         GbMemberInfo memberInfo = memberInfoService.getMemberInfoByMobile(mobile);
-        if (memberInfo == null) return JsonResult.fail("小程序用户不存在");
+        if (memberInfo == null) throw new BusinessException(AdminErrorCodeEnum.WX_USER_NOT_EXIST);
 
         // 手机号是否已经存在
         GbOrgStaffInfo staffInfo = staffInfoService.getAdminLeaderStaffInfoByMobile(request.getMobile());
         if (!ObjectUtils.isEmpty(staffInfo)) {
-            return JsonResult.fail("手机号已存在");
+            throw new BusinessException(AdminErrorCodeEnum.PHONE_EXISTED);
         }
 
         // 商编是否已经存在
         GbOrgBusinessInfo businessInfo = businessInfoService.getAdminBusinessInfoByCode(request.getShopCode());
         if (!ObjectUtils.isEmpty(businessInfo)) {
-            return JsonResult.fail("商户编号已存在");
+            throw new BusinessException(AdminErrorCodeEnum.MERCHANT_NO_EXISTED);
         }
 
         // 获取用户昵称，头像和openid
@@ -88,13 +90,13 @@ public class AdminLeaderController {
         // 添加团长信息
         Long leaderId = service.addAdminLeaderInfo(request.getName(), mobile, nickName, avatar, openid, request.getCommission(), request.getCashType());
         if (leaderId.intValue() <= 0) {
-            return JsonResult.fail("添加失败");
+            throw new BusinessException(AdminErrorCodeEnum.ADD_FAILED);
         }
 
         // 添加人员信息
         Long staffId = staffInfoService.addAdminLeaderStaffInfo(leaderId, request.getName(), mobile, nickName, avatar, openid);
         if (staffId.intValue() <= 0) {
-            return JsonResult.fail("添加失败");
+            throw new BusinessException(AdminErrorCodeEnum.ADD_FAILED);
         }
 
         // 添加店铺信息

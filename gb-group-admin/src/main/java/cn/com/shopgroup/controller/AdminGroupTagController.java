@@ -1,6 +1,8 @@
 package cn.com.shopgroup.controller;
 
+import cn.com.shopgroup.common.exception.BusinessException;
 import cn.com.shopgroup.common.utils.JsonResult;
+import cn.com.shopgroup.exception.AdminErrorCodeEnum;
 import cn.com.shopgroup.goods.model.GbGroupTag;
 import cn.com.shopgroup.goods.service.GbGroupTagService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -43,7 +45,7 @@ public class AdminGroupTagController {
 
         GbGroupTag tag = tagService.getTagById(tagId);
         if (tag == null) {
-            return JsonResult.fail("未查询到标签信息");
+            throw new BusinessException(AdminErrorCodeEnum.TAG_NOT_FOUND);
         }
         return JsonResult.success(tag);
     }
@@ -53,15 +55,15 @@ public class AdminGroupTagController {
     public JsonResult addTag(@RequestBody GbGroupTag tag) {
 
         if (tag.getTagName() == null || tag.getTagName().trim().isEmpty()) {
-            return JsonResult.fail("标签名称不能为空");
+            throw new BusinessException(AdminErrorCodeEnum.TAG_NAME_EMPTY);
         }
         if (tagService.getTagByTagName(tag.getTagName().trim(), null) != null) {
-            return JsonResult.fail("标签名称已存在");
+            throw new BusinessException(AdminErrorCodeEnum.TAG_NAME_EXISTED);
         }
         if (tagService.addTag(tag)) {
             return JsonResult.success("添加成功");
         }
-        return JsonResult.fail("添加失败");
+        throw new BusinessException(AdminErrorCodeEnum.ADD_FAILED);
     }
 
     // 编辑标签(可修改名称/颜色/排序/状态启停, 未传字段保留原值)
@@ -69,18 +71,18 @@ public class AdminGroupTagController {
     public JsonResult editTag(@RequestBody GbGroupTag tag) {
 
         if (tag.getTagId() == null) {
-            return JsonResult.fail("标签id不能为空");
+            throw new BusinessException(AdminErrorCodeEnum.TAG_ID_EMPTY);
         }
         if (tag.getTagName() == null || tag.getTagName().trim().isEmpty()) {
-            return JsonResult.fail("标签名称不能为空");
+            throw new BusinessException(AdminErrorCodeEnum.TAG_NAME_EMPTY);
         }
         if (tagService.getTagByTagName(tag.getTagName().trim(), tag.getTagId()) != null) {
-            return JsonResult.fail("标签名称已存在");
+            throw new BusinessException(AdminErrorCodeEnum.TAG_NAME_EXISTED);
         }
         if (tagService.updateTag(tag)) {
             return JsonResult.success("修改成功");
         }
-        return JsonResult.fail("修改失败");
+        throw new BusinessException(AdminErrorCodeEnum.UPDATE_FAILED);
     }
 
     // 删除标签(被团购活动使用中禁止删除, 可改为停用)
@@ -89,11 +91,11 @@ public class AdminGroupTagController {
 
         Long refCount = tagService.countGroupActivityByTagId(tagId);
         if (refCount != null && refCount > 0) {
-            return JsonResult.fail("该标签已被团购活动使用, 不可删除, 可改为停用");
+            throw new BusinessException(AdminErrorCodeEnum.TAG_IN_USE);
         }
         if (tagService.deleteTag(tagId)) {
             return JsonResult.success("删除成功");
         }
-        return JsonResult.fail("删除失败");
+        throw new BusinessException(AdminErrorCodeEnum.DELETE_FAILED);
     }
 }

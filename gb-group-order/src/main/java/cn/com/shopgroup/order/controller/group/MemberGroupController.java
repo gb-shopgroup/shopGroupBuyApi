@@ -2,6 +2,7 @@ package cn.com.shopgroup.order.controller.group;
 
 import cn.com.shopgroup.common.cache.RedisConstant;
 import cn.com.shopgroup.common.cache.RedisHelper;
+import cn.com.shopgroup.common.exception.BusinessException;
 import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.PhoneGeneratorUtils;
 import cn.com.shopgroup.common.utils.TokenUtils;
@@ -17,6 +18,7 @@ import cn.com.shopgroup.order.http.request.MemberGroupViewRequest;
 import cn.com.shopgroup.order.http.response.GroupLogs;
 import cn.com.shopgroup.order.http.response.GroupOrderRecordResponse;
 import cn.com.shopgroup.order.http.response.MemberHomeGroupActResponse;
+import cn.com.shopgroup.order.exception.OrderErrorCodeEnum;
 import cn.com.shopgroup.order.service.GbGroupViewLogService;
 import cn.com.shopgroup.order.service.GbOrderInfoService;
 import cn.com.shopgroup.user.http.response.ShopResponse;
@@ -160,11 +162,11 @@ public class MemberGroupController {
     public JsonResult groupView(@RequestBody MemberGroupViewRequest request) {
         log.info("order/group/groupActivity/view req:{}", JSON.toJSONString(request));
         if (request == null || request.getGroupId() == null || request.getGroupId() <= 0) {
-            return JsonResult.fail("groupId不能为空");
+            throw new BusinessException(OrderErrorCodeEnum.GROUP_ID_REQUIRED);
         }
         Long memberId = this.getCurrentMemberId();
         if (memberId == null || memberId <= 0) {
-            return JsonResult.fail("请先登录");
+            throw new BusinessException(OrderErrorCodeEnum.LOGIN_REQUIRED);
         }
         // 防抖在服务内部处理
         Boolean flag = viewLogService.recordView(memberId, request.getGroupId());
@@ -447,7 +449,7 @@ public class MemberGroupController {
     public JsonResult groupOrderRecords(@RequestParam(value = "groupId", required = false) Long groupId,
                                         @RequestParam(value = "limit", required = false) Integer limit) {
         if (groupId == null || groupId <= 0) {
-            return JsonResult.fail("团购活动id不能为空");
+            throw new BusinessException(OrderErrorCodeEnum.GROUP_ID_REQUIRED);
         }
         List<GroupOrderRecordResponse> data = orderInfoService.getGroupOrderRecordList(groupId, limit);
         return JsonResult.success(data);

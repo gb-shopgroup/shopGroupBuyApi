@@ -2,10 +2,12 @@ package cn.com.shopgroup.user.controller.member;
 
 import cn.com.shopgroup.common.cache.RedisConstant;
 import cn.com.shopgroup.common.cache.RedisHelper;
+import cn.com.shopgroup.common.exception.BusinessException;
 import cn.com.shopgroup.common.utils.IntEncryptorUtils;
 import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.TokenUtils;
 import cn.com.shopgroup.common.wxmini.WxMiniAccessTokenHelper;
+import cn.com.shopgroup.user.exception.UserErrorCodeEnum;
 import cn.com.shopgroup.user.http.response.LeaderResponse;
 import cn.com.shopgroup.user.http.response.LoginMemberResponse;
 import cn.com.shopgroup.user.model.GbMemberInfo;
@@ -59,26 +61,26 @@ public class MemberController {
         // 查询用户信息
         String token = TokenUtils.getToken();
         if (token == null || token.length() == 0) {
-            return JsonResult.fail("token不存在");
+            throw new BusinessException(UserErrorCodeEnum.TOKEN_NOT_EXIST);
         }
         String userId = TokenUtils.parseToken(token);
         if (userId == null || StringUtils.isEmpty(userId) || userId.matches("^[0-9]+$") == false) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(UserErrorCodeEnum.USER_NOT_EXIST);
         }
         Long memberId = 0l;
         try {
             memberId = Long.parseLong(userId);
         } catch (NumberFormatException e) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(UserErrorCodeEnum.USER_NOT_EXIST);
         }
         if (memberId == 0) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(UserErrorCodeEnum.USER_NOT_EXIST);
         }
 
         // 查询用户信息
         GbMemberInfo result = service.getMiniMemberById(memberId);
         if (result == null) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(UserErrorCodeEnum.USER_NOT_EXIST);
         }
         LoginMemberResponse data = new LoginMemberResponse(result);
 
@@ -101,28 +103,28 @@ public class MemberController {
         // 查询用户信息
         String token = TokenUtils.getToken();
         if (token == null || token.length() == 0) {
-            return JsonResult.fail("token不存在");
+            throw new BusinessException(UserErrorCodeEnum.TOKEN_NOT_EXIST);
         }
         String userId = TokenUtils.parseToken(token);
         if (userId == null || StringUtils.isEmpty(userId) || userId.matches("^[0-9]+$") == false) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(UserErrorCodeEnum.USER_NOT_EXIST);
         }
         Long memberId = 0L;
         try {
             memberId = Long.parseLong(userId);
         } catch (NumberFormatException e) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(UserErrorCodeEnum.USER_NOT_EXIST);
         }
         if (memberId == 0) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(UserErrorCodeEnum.USER_NOT_EXIST);
         }
 
         // 查询用户openid
         GbMemberInfo info = service.getMemberInfo(memberId);
-        if (info == null) return JsonResult.fail("用户不存在");
+        if (info == null) throw new BusinessException(UserErrorCodeEnum.USER_NOT_EXIST);
         String openid = info.getOpenid();
         if (openid == null || openid.length() == 0) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(UserErrorCodeEnum.USER_NOT_EXIST);
         }
 
         // 返回团长员工信息

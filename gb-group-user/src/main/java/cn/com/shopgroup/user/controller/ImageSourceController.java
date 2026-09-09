@@ -1,8 +1,10 @@
 package cn.com.shopgroup.user.controller;
 
 import cn.com.shopgroup.common.config.UploadConfig;
+import cn.com.shopgroup.common.exception.BusinessException;
 import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.TimeUtils;
+import cn.com.shopgroup.user.exception.UserErrorCodeEnum;
 import cn.com.shopgroup.user.service.GbImageLibraryInfoService;
 import cn.com.shopgroup.user.utils.ImageUtils;
 import org.springframework.util.Base64Utils;
@@ -56,23 +58,23 @@ public class ImageSourceController {
         // 1. 校验文件大小
         long fileSize = file.getSize();
         if (fileSize > MAX_FILE_SIZE) {
-            throw new RuntimeException("文件大小不能超过5MB");
+            throw new BusinessException(UserErrorCodeEnum.FILE_SIZE_EXCEEDED);
         }
         if (fileSize <= 0) {
-            throw new RuntimeException("文件不能为空");
+            throw new BusinessException(UserErrorCodeEnum.FILE_EMPTY);
         }
 
         // 2. 校验MIME类型（优先，防改后缀）
         String contentType = file.getContentType();
         if (contentType == null || !ALLOW_MIME.contains(contentType.toLowerCase())) {
-            throw new RuntimeException("仅支持 jpg/png/gif/bmp 格式图片");
+            throw new BusinessException(UserErrorCodeEnum.IMAGE_FORMAT_NOT_SUPPORTED);
         }
 
         // 3. 校验文件后缀（双重兜底）
         String fileName = file.getOriginalFilename();
         String suffix = getFileSuffix(fileName).toLowerCase();
         if (!ALLOW_SUFFIX.contains(suffix)) {
-            throw new RuntimeException("仅支持 jpg/png/gif/bmp 格式图片");
+            throw new BusinessException(UserErrorCodeEnum.IMAGE_FORMAT_NOT_SUPPORTED);
         }
     }
 
@@ -108,7 +110,7 @@ public class ImageSourceController {
         String datePath = TimeUtils.getTodayStr();
         File fileFolder = new File(rootPath + File.separator + datePath);
         if (!fileFolder.exists() && !fileFolder.mkdirs()) {
-            throw new RuntimeException("图片上传目录创建失败");
+            throw new BusinessException(UserErrorCodeEnum.DIRECTORY_CREATE_FAILED);
         }
 
         // 保存图片文件
@@ -117,7 +119,7 @@ public class ImageSourceController {
             file.transferTo(uploadedFile);
         } catch (IOException e) {
             e.printStackTrace();
-            throw new RuntimeException("图片保存失败", e);
+            throw new BusinessException(UserErrorCodeEnum.FILE_SAVE_FAILED);
         }
 
         // 返回数据
@@ -151,7 +153,7 @@ public class ImageSourceController {
         String path = "avatar";
 
         // 图片不能为空
-        if (file.isEmpty()) { return JsonResult.fail("图片不能为空"); }
+        if (file.isEmpty()) { throw new BusinessException(UserErrorCodeEnum.FILE_EMPTY); }
 
         // 执行校验
         validateFile(file);
@@ -171,7 +173,7 @@ public class ImageSourceController {
             service.addImage(0L, (byte)0, url, (byte)0);
             return JsonResult.success("上传成功", url);
         }else{
-            return JsonResult.fail("上传失败");
+            throw new BusinessException(UserErrorCodeEnum.IMAGE_UPLOAD_FAILED);
         }
     }
 
@@ -188,7 +190,7 @@ public class ImageSourceController {
         String path = "goods";
 
         // 图片不能为空
-        if (file.isEmpty()) { return JsonResult.fail("图片不能为空"); }
+        if (file.isEmpty()) { throw new BusinessException(UserErrorCodeEnum.FILE_EMPTY); }
 
         // 执行校验
         validateFile(file);
@@ -197,7 +199,7 @@ public class ImageSourceController {
         int[] size = this.getImageSize(file);
         int imgWidth = size[0];
         int imgHeight = size[1];
-        if(imgWidth == 0 || imgHeight == 0){ return JsonResult.fail("获取图片尺寸失败"); }
+        if(imgWidth == 0 || imgHeight == 0){ throw new BusinessException(UserErrorCodeEnum.IMAGE_SIZE_INVALID); }
         boolean isZip = true;
         if (imgWidth == width && imgHeight == height) { isZip = false; }
 
@@ -221,7 +223,7 @@ public class ImageSourceController {
             service.addImage(0L, (byte)0, url, (byte)0);
             return JsonResult.success("上传成功", url);
         }else{
-            return JsonResult.fail("上传失败");
+            throw new BusinessException(UserErrorCodeEnum.IMAGE_UPLOAD_FAILED);
         }
     }
 
@@ -238,7 +240,7 @@ public class ImageSourceController {
         String path = "banner";
 
         // 图片不能为空
-        if (file.isEmpty()) { return JsonResult.fail("图片不能为空"); }
+        if (file.isEmpty()) { throw new BusinessException(UserErrorCodeEnum.FILE_EMPTY); }
 
         // 执行校验
         validateFile(file);
@@ -247,7 +249,7 @@ public class ImageSourceController {
         int[] size = this.getImageSize(file);
         int imgWidth = size[0];
         int imgHeight = size[1];
-        if(imgWidth == 0 || imgHeight == 0){ return JsonResult.fail("获取图片尺寸失败"); }
+        if(imgWidth == 0 || imgHeight == 0){ throw new BusinessException(UserErrorCodeEnum.IMAGE_SIZE_INVALID); }
         boolean isZip = true;
         if (imgWidth == width && imgHeight == height) { isZip = false; }
 
@@ -273,7 +275,7 @@ public class ImageSourceController {
             service.addImage(0L, (byte)0, url, (byte)0);
             return JsonResult.success("上传成功", url);
         }else{
-            return JsonResult.fail("上传失败");
+            throw new BusinessException(UserErrorCodeEnum.IMAGE_UPLOAD_FAILED);
         }
     }
 
@@ -292,7 +294,7 @@ public class ImageSourceController {
             imageBytes = Files.readAllBytes(img.toPath());
         }catch (IOException e){
             e.printStackTrace();
-            return JsonResult.fail("图片不存在或读取失败");
+            throw new BusinessException(UserErrorCodeEnum.IMAGE_READ_FAILED);
         }
 
         // 将图片字节数组进行 Base64 编码

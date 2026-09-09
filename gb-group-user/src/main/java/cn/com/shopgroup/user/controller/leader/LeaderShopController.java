@@ -4,8 +4,10 @@ import cn.com.shopgroup.common.cache.RedisConstant;
 import cn.com.shopgroup.common.cache.RedisHelper;
 import cn.com.shopgroup.common.config.UploadConfig;
 import cn.com.shopgroup.common.utils.HuaWeiOBS;
+import cn.com.shopgroup.common.exception.BusinessException;
 import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.TimeUtils;
+import cn.com.shopgroup.user.exception.UserErrorCodeEnum;
 import cn.com.shopgroup.user.http.request.ShopErCodeRequest;
 import cn.com.shopgroup.user.http.request.ShopRequest;
 import cn.com.shopgroup.user.http.response.ShopResponse;
@@ -56,7 +58,7 @@ public class LeaderShopController {
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(UserErrorCodeEnum.LEADER_NOT_EXIST);
         }
         return handleGetShop(leaderId);
     }
@@ -67,7 +69,7 @@ public class LeaderShopController {
             // 查询数据库 ---获取店铺信息
             GbOrgShopInfo shopInfo = shopInfoService.getMiniLeaderShop(leaderId);
             if (ObjectUtils.isEmpty(shopInfo)) {
-                return JsonResult.success("暂无店铺信息");
+                return JsonResult.success(UserErrorCodeEnum.DATA_NOT_FOUND.getMessage());
             }
             // 缓存起来
             ShopResponse data = new ShopResponse(shopInfo);
@@ -87,13 +89,14 @@ public class LeaderShopController {
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(UserErrorCodeEnum.LEADER_NOT_EXIST);
         }
         GbOrgShopInfo shopInfo = shopInfoService.getInfoByLeaderAndShopId(leaderId, request.getShopId());
         log.info("修改店铺信息.先查询店铺结果shopInfo:{}", JSON.toJSONString(shopInfo));
         if (ObjectUtils.isEmpty(shopInfo)) {
-            String msg = "shopId=" + request.getShopId() + ",leaderId=" + leaderId + "未查询相关店铺信息";
-            return JsonResult.fail(msg);
+            String msg = "shopId=" + request.getShopId()
+                    + ",leaderId=" + leaderId + UserErrorCodeEnum.DATA_NOT_FOUND.getMessage();
+            throw new BusinessException(msg);
         }
         // 保存店铺信息
         shopInfo.setShopBanner(request.getBanner());
@@ -111,7 +114,7 @@ public class LeaderShopController {
             redisHelper.deleteObject(key);
             return JsonResult.success();
         } else {
-            return JsonResult.fail();
+            throw new BusinessException(UserErrorCodeEnum.UPDATE_FAILED);
         }
     }
 
@@ -122,12 +125,13 @@ public class LeaderShopController {
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(UserErrorCodeEnum.LEADER_NOT_EXIST);
         }
         GbOrgShopInfo shopInfo = shopInfoService.getInfoByLeaderAndShopId(leaderId, request.getShopId());
         if (ObjectUtils.isEmpty(shopInfo)) {
-            String msg = "shopId=" + request.getShopId() + ",leaderId=" + leaderId + "未查询相关店铺信息";
-            return JsonResult.fail(msg);
+            String msg = "shopId=" + request.getShopId()
+                    + ",leaderId=" + leaderId + UserErrorCodeEnum.DATA_NOT_FOUND.getMessage();
+            throw new BusinessException(msg);
         }
         // 保存店铺信息
         shopInfo.setShopCodeUrl(request.getShopUrl());
@@ -139,7 +143,7 @@ public class LeaderShopController {
             redisHelper.deleteObject(key);
             return JsonResult.success();
         } else {
-            return JsonResult.fail();
+            throw new BusinessException(UserErrorCodeEnum.UPDATE_FAILED);
         }
     }
 
@@ -156,16 +160,16 @@ public class LeaderShopController {
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(UserErrorCodeEnum.LEADER_NOT_EXIST);
         }
         GbOrgShopInfo shopInfo = shopInfoService.getByShopId(shopId);
         if (ObjectUtils.isEmpty(shopInfo)) {
             log.error("生成二维码失败,未查询到相关店铺信息" + shopId);
-            return JsonResult.fail("shopId=" + shopId + "二维码生成失败");
+            throw new BusinessException("shopId=" + shopId + UserErrorCodeEnum.QRCODE_GEN_FAILED.getMessage());
         }
         if (StringUtil.isNotEmpty(shopInfo.getShopCodeUrl())) {
             log.error("二维码已经存在");
-            return JsonResult.fail("二维码已经存在，二维码生成失败");
+            throw new BusinessException(UserErrorCodeEnum.QRCODE_EXISTED);
         }
 
         // 生成二维码图片
@@ -175,7 +179,7 @@ public class LeaderShopController {
             bytes = QRCodeUtil.imageToBytes(qrImg, "png");
         } catch (Exception e) {
             log.error("生成二维码失败：" + e.getMessage());
-            return JsonResult.fail("二维码生成失败");
+            throw new BusinessException(UserErrorCodeEnum.QRCODE_GEN_FAILED);
         }
         // 判断本地上传还是云存储上传: # 1=本地上传, 2=云端上传
         int type = uploadConfig.getType();
@@ -201,7 +205,7 @@ public class LeaderShopController {
         } catch (Exception e) {
             log.error("上传二维码失败：" + e.getMessage());
             e.printStackTrace();
-            return JsonResult.fail("二维码上传失败");
+            throw new BusinessException(UserErrorCodeEnum.QRCODE_UPLOAD_FAILED);
         }
 
         // 获取图片访问路径

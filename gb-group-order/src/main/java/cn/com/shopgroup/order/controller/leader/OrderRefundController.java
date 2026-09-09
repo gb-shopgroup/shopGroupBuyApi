@@ -1,10 +1,12 @@
 package cn.com.shopgroup.order.controller.leader;
 
+import cn.com.shopgroup.common.exception.BusinessException;
 import cn.com.shopgroup.common.utils.CustomIdGenerator;
 import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.MoneyUtil;
 import cn.com.shopgroup.common.utils.TimeUtils;
 import cn.com.shopgroup.yeepay.YeePayUtils;
+import cn.com.shopgroup.order.exception.OrderErrorCodeEnum;
 import cn.com.shopgroup.goods.service.GbGoodsInfoService;
 import cn.com.shopgroup.goods.service.GbGoodsSkuInfoService;
 import cn.com.shopgroup.order.constants.PaymentStatusEnum;
@@ -80,7 +82,7 @@ public class OrderRefundController {
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(OrderErrorCodeEnum.LEADER_NOT_EXIST);
         }
 
         // 查询总数
@@ -95,7 +97,7 @@ public class OrderRefundController {
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(OrderErrorCodeEnum.LEADER_NOT_EXIST);
         }
         // 从请求头中获取员工id
         Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
@@ -104,7 +106,7 @@ public class OrderRefundController {
         if (staffId != 0) {
             GbOrgStaffInfo staffInfo = staffService.getStaffInfo(staffId);
             if (ObjectUtils.isEmpty(staffInfo)) {
-                return JsonResult.fail("staffId=" + staffId + "未查询到相关员工数据");
+                throw new BusinessException("staffId=" + staffId + "未查询到相关员工数据");
             }
             opName = staffInfo.getStaffName();
             opId = staffInfo.getStaffId();
@@ -115,7 +117,7 @@ public class OrderRefundController {
         //参数设置校验，这里不用判断空map情况
         Map<String, OrderRefundInfoRequest> refundMap = approveRequest.getRefundOrderGoodsMap();
         if (refundMap.isEmpty()) {
-            return JsonResult.fail("请查看请求参数，审核失败");
+            throw new BusinessException(OrderErrorCodeEnum.REFUND_PARAM_ERROR);
         }
         for (Map.Entry<String, OrderRefundInfoRequest> entry : refundMap.entrySet()) {
             String orderNo = entry.getKey();
@@ -129,7 +131,7 @@ public class OrderRefundController {
             //查询原订单中的商品
             List<GbOrderGoodsInfo> goodsList = orderInfoService.getOrderGoodsList(orderNo);
             if (CollectionUtils.isEmpty(goodsList)) {
-                return JsonResult.fail("该订单未查询到商品信息");
+                throw new BusinessException(OrderErrorCodeEnum.ORDER_GOODS_NOT_FOUND);
             }
             // 订单商品处理: 仅校验本次审核的申请商品, 数量不能超过对应退款类型的剩余可退数量
             Map<Long, OrderRefundGoodsRequest> refundGoodsMap = refundInfoRequest.getRefundGoodsMap();
@@ -142,7 +144,7 @@ public class OrderRefundController {
                 }
                 OrderRefundGoodsRequest temp = refundGoodsMap.get(orderGoodsId);
                 if (temp.getRefundNum() == null || temp.getRefundNum() <= 0) {
-                    return JsonResult.fail("申请退货商品数量不合法，审核失败");
+                    throw new BusinessException(OrderErrorCodeEnum.REFUND_QTY_ILLEGAL);
                 }
                 int goodsNum = goods.getGoodsNum() == null ? 0 : goods.getGoodsNum(); // 订单商品数量
                 int receiptNum = goods.getReceiptNum() == null ? 0 : goods.getReceiptNum(); // 收货数量
@@ -165,7 +167,7 @@ public class OrderRefundController {
                     remainRefundNum = 0;
                 }
                 if (temp.getRefundNum() > remainRefundNum) {
-                    return JsonResult.fail("申请退货商品数量大于实际可退数量，审核失败");
+                    throw new BusinessException(OrderErrorCodeEnum.REFUND_QTY_EXCEEDED);
                 }
             }
 

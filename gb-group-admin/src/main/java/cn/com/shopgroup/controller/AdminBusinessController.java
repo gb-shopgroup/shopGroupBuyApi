@@ -1,9 +1,11 @@
 package cn.com.shopgroup.controller;
 
+import cn.com.shopgroup.common.exception.BusinessException;
 import cn.com.shopgroup.common.merchant.MerchantInfo;
 import cn.com.shopgroup.common.merchant.MerchantService;
 import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.MoneyUtil;
+import cn.com.shopgroup.exception.AdminErrorCodeEnum;
 import cn.com.shopgroup.http.request.LeaderBusinessRequest;
 import cn.com.shopgroup.user.model.GbOrgBusinessInfo;
 import cn.com.shopgroup.user.service.GbOrgBusinessInfoService;
@@ -67,7 +69,7 @@ public class AdminBusinessController {
 
         // 商户编号已经存在
         GbOrgBusinessInfo businessInfo = service.getAdminBusinessInfoByCode(request.getShopCode());
-        if (businessInfo != null) return JsonResult.fail("商户编号已经存在");
+        if (businessInfo != null) throw new BusinessException(AdminErrorCodeEnum.MERCHANT_NO_EXISTED);
 
         // 添加收款商户
         service.addAdminBusinessInfo(request.getLeaderId(), request.getShopName(), request.getShopCode());

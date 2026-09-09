@@ -2,6 +2,7 @@ package cn.com.shopgroup.order.controller.payment;
 
 import cn.com.shopgroup.common.cache.RedisConstant;
 import cn.com.shopgroup.common.cache.RedisHelper;
+import cn.com.shopgroup.common.exception.BusinessException;
 import cn.com.shopgroup.common.merchant.MerchantInfo;
 import cn.com.shopgroup.common.merchant.MerchantService;
 import cn.com.shopgroup.common.utils.CustomIdGenerator;
@@ -14,6 +15,7 @@ import cn.com.shopgroup.common.wxmini.WxMiniProgramHelper;
 import cn.com.shopgroup.goods.service.GbGroupActivityInfoService;
 import cn.com.shopgroup.order.constants.OrderStatusEnum;
 import cn.com.shopgroup.order.constants.PaymentStatusEnum;
+import cn.com.shopgroup.order.exception.OrderErrorCodeEnum;
 import cn.com.shopgroup.order.model.GbOrderBusinessInfo;
 import cn.com.shopgroup.order.model.GbOrderInfo;
 import cn.com.shopgroup.order.model.OrderTransactionLog;
@@ -89,29 +91,29 @@ public class OrderPaymentController {
         // 防刷
         String key = RedisConstant.RedisOrderPayKey + orderNo;
         if (redisHelper.hasKey(key)) {
-            return JsonResult.fail("不要重复发起支付");
+            throw new BusinessException(OrderErrorCodeEnum.REPEAT_PAY_REQUEST);
         } else {
             redisHelper.setCacheObject(key, orderNo, RedisConstant.RedisOrderPayExpired, TimeUnit.SECONDS);
         }
 
         // 用户openid
         if (StringUtils.isEmpty(openid)) {
-            return JsonResult.fail("openid不存在");
+            throw new BusinessException(OrderErrorCodeEnum.OPENID_REQUIRED);
         }
         // 查询订单信息
         GbOrderInfo orderInfo = orderInfoService.getOrderInfoByOrderNo(orderNo);
         log.info("[order/pay] params->orderNo:{},getOrderInfo:{}", orderNo, JSON.toJSONString(orderInfo));
         if (ObjectUtils.isEmpty(orderInfo)) {
-            return JsonResult.fail("订单不存在");
+            throw new BusinessException(OrderErrorCodeEnum.ORDER_NOT_EXIST);
         }
         int nowTime = TimeUtils.getTimeStamp();
         int orderAddTime = orderInfo.getAddTime().intValue();
         if (nowTime - orderAddTime > limitPayOrderTime) {
-            return JsonResult.fail("订单已超时不能支付");
+            throw new BusinessException(OrderErrorCodeEnum.ORDER_TIMEOUT);
         }
         int orderStatus = orderInfo.getStatus().intValue();
         if (orderStatus != OrderStatusEnum.UNPAID.getCode()) {
-            return JsonResult.fail("只有待支付订单才能支付");
+            throw new BusinessException(OrderErrorCodeEnum.ONLY_UNPAID_PAYABLE);
         }
         // 订单价格和商品名称(团购名称)
         Double orderAmount = orderInfo.getOrderPrice();
@@ -120,18 +122,18 @@ public class OrderPaymentController {
         Long leaderId = orderInfo.getLeaderId();
         GbOrgLeaderInfo leaderInfo = leaderService.getLeaderInfo(leaderId);
         if (ObjectUtils.isEmpty(leaderInfo)) {
-            return JsonResult.fail("团长信息有误");
+            throw new BusinessException(OrderErrorCodeEnum.LEADER_INFO_ERROR);
         }
         List<GbOrgBusinessInfo> businessList = businessService.getMiniBusinessList(leaderId);
         if (CollectionUtils.isEmpty(businessList)) {
-            return JsonResult.fail("该团长没有收款账户");
+            throw new BusinessException(OrderErrorCodeEnum.LEADER_NO_ACCOUNT);
         }
         /**
          * 去掉账户限制最多收款额度
          */
         List<GbOrgBusinessInfo> businessInfoList = handleLimitAmount(businessList, orderAmount);
         if (CollectionUtils.isEmpty(businessInfoList)) {
-            return JsonResult.fail("该团长下的收款账户收款额度已经全部受限制，暂时不能支付");
+            throw new BusinessException(OrderErrorCodeEnum.ACCOUNT_LIMIT_EXCEEDED);
         }
         // 新算法
         MerchantInfo merchantInfo = this.getLeaderMinMoneyMerchantInfo(leaderId, businessInfoList);
@@ -165,7 +167,7 @@ public class OrderPaymentController {
         } else {
             transactionLog.setPayStatus(PaymentStatusEnum.FAILED.getCode());
             handleInsertTransaction(transactionLog);
-            return JsonResult.fail();
+            throw new BusinessException(OrderErrorCodeEnum.PAY_FAILED);
         }
     }
 

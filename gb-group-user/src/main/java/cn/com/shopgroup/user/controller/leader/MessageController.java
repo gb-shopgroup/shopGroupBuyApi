@@ -1,6 +1,8 @@
 package cn.com.shopgroup.user.controller.leader;
 
+import cn.com.shopgroup.common.exception.BusinessException;
 import cn.com.shopgroup.common.utils.JsonResult;
+import cn.com.shopgroup.user.exception.UserErrorCodeEnum;
 import cn.com.shopgroup.user.http.response.MessageResponse;
 import cn.com.shopgroup.user.model.GbOrgLeaderInfo;
 import cn.com.shopgroup.user.model.GbOrgMessageInfo;
@@ -38,12 +40,12 @@ public class MessageController {
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(UserErrorCodeEnum.LEADER_NOT_EXIST);
         }
         // 团长查看所有消息：员工的openid和团长openid是否一致
         GbOrgLeaderInfo leaderInfo = orgLeaderInfoService.getLeaderInfo(leaderId);
         if (ObjectUtils.isEmpty(leaderInfo)) {
-            return JsonResult.fail("lid=" + leaderId + "查不到相关团长信息");
+            throw new BusinessException("lid=" + leaderId + UserErrorCodeEnum.DATA_NOT_FOUND.getMessage());
         }
         // 从请求头中获取员工id
         Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
@@ -51,7 +53,7 @@ public class MessageController {
         if (staffId != 0) {
             staffInfo = orgStaffInfoService.getStaffInfo(staffId);
             if (ObjectUtils.isEmpty(staffInfo)) {
-                return JsonResult.fail("sid查不到员工信息");
+                throw new BusinessException(UserErrorCodeEnum.STAFF_NOT_EXIST);
             }
         }
 
@@ -78,12 +80,12 @@ public class MessageController {
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(UserErrorCodeEnum.LEADER_NOT_EXIST);
         }
         // 团长查看所有消息：员工的openid和团长openid是否一致
         GbOrgLeaderInfo leaderInfo = orgLeaderInfoService.getLeaderInfo(leaderId);
         if (ObjectUtils.isEmpty(leaderInfo)) {
-            return JsonResult.fail("lid=" + leaderId + "查不到相关团长信息");
+            throw new BusinessException("lid=" + leaderId + UserErrorCodeEnum.DATA_NOT_FOUND.getMessage());
         }
         // 从请求头中获取员工id
         GbOrgStaffInfo staffInfo = null;
@@ -91,7 +93,7 @@ public class MessageController {
         if (staffId != 0) {
             staffInfo = orgStaffInfoService.getStaffInfo(staffId);
             if (ObjectUtils.isEmpty(staffInfo)) {
-                return JsonResult.fail("sid查不到员工信息");
+                throw new BusinessException(UserErrorCodeEnum.STAFF_NOT_EXIST);
             }
         }
 
@@ -113,12 +115,12 @@ public class MessageController {
 
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
-        if (leaderId == 0) return JsonResult.fail("lid不存在");
+        if (leaderId == 0) throw new BusinessException(UserErrorCodeEnum.LEADER_NOT_EXIST);
 
         // 团长查看所有消息：员工的openid和团长openid是否一致
         GbOrgLeaderInfo leaderInfo = orgLeaderInfoService.getLeaderInfo(leaderId);
         if (ObjectUtils.isEmpty(leaderInfo)) {
-            return JsonResult.fail("lid=" + leaderId + "查不到相关团长信息");
+            throw new BusinessException("lid=" + leaderId + UserErrorCodeEnum.DATA_NOT_FOUND.getMessage());
         }
         // 从请求头中获取员工id
         GbOrgStaffInfo staffInfo = null;
@@ -126,7 +128,7 @@ public class MessageController {
         if (staffId != 0) {
             staffInfo = orgStaffInfoService.getStaffInfo(staffId);
             if (ObjectUtils.isEmpty(staffInfo)) {
-                return JsonResult.fail("sid查不到员工信息");
+                throw new BusinessException(UserErrorCodeEnum.DATA_NOT_FOUND);
             }
         }
 
@@ -148,14 +150,14 @@ public class MessageController {
 
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
-        if (leaderId == 0) return JsonResult.fail("lid不存在");
+        if (leaderId == 0) throw new BusinessException(UserErrorCodeEnum.LEADER_NOT_EXIST);
 
         // 从请求头中获取员工id
         Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
         if (staffId != 0) {
             GbOrgStaffInfo staffInfo = orgStaffInfoService.getStaffInfo(staffId);
             if (ObjectUtils.isEmpty(staffInfo)) {
-                return JsonResult.fail("sid查不到员工信息");
+                throw new BusinessException(UserErrorCodeEnum.STAFF_NOT_EXIST);
             }
         }
 

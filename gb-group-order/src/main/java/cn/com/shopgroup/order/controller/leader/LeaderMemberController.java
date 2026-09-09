@@ -1,6 +1,8 @@
 package cn.com.shopgroup.order.controller.leader;
 
+import cn.com.shopgroup.common.exception.BusinessException;
 import cn.com.shopgroup.common.utils.JsonResult;
+import cn.com.shopgroup.order.exception.OrderErrorCodeEnum;
 import cn.com.shopgroup.order.http.request.LeaderMemberListRequest;
 import cn.com.shopgroup.order.http.response.LeaderMemberDetailResponse;
 import cn.com.shopgroup.order.http.response.LeaderMemberListResponse;
@@ -38,7 +40,7 @@ public class LeaderMemberController {
         log.info("团长端-我的团员列表，参数request:{}", JSON.toJSONString(request));
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == null || leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(OrderErrorCodeEnum.LEADER_NOT_EXIST);
         }
         int page = Optional.ofNullable(request.getPage()).orElse(1);
         int pageSize = Optional.ofNullable(request.getPageSize())
@@ -57,10 +59,10 @@ public class LeaderMemberController {
         log.info("团长端-团员详情，memberId:{}", memberId);
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == null || leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(OrderErrorCodeEnum.LEADER_NOT_EXIST);
         }
         if (memberId == null || memberId <= 0) {
-            return JsonResult.fail("memberId参数错误");
+            throw new BusinessException(OrderErrorCodeEnum.MEMBER_ID_PARAM_ERROR);
         }
         LeaderMemberDetailResponse data = orderInfoService.getLeaderMemberDetail(leaderId, memberId);
         return JsonResult.success(data);

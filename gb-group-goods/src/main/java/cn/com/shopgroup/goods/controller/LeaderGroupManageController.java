@@ -3,6 +3,7 @@ package cn.com.shopgroup.goods.controller;
 import cn.com.shopgroup.common.cache.RedisConstant;
 import cn.com.shopgroup.common.cache.RedisHelper;
 import cn.com.shopgroup.common.config.UploadConfig;
+import cn.com.shopgroup.common.exception.BusinessException;
 import cn.com.shopgroup.common.utils.HuaWeiOBS;
 import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.PosterDTO;
@@ -12,6 +13,7 @@ import cn.com.shopgroup.common.utils.PosterUtils;
 import cn.com.shopgroup.common.utils.TimeUtils;
 import cn.com.shopgroup.common.wxmini.WxMiniAccessTokenHelper;
 import cn.com.shopgroup.common.wxmini.WxMiniProgramHelper;
+import cn.com.shopgroup.goods.exception.GoodsErrorCodeEnum;
 import cn.com.shopgroup.goods.http.request.group.GroupActGoodsRequest;
 import cn.com.shopgroup.goods.http.request.group.GroupActRequest;
 import cn.com.shopgroup.goods.http.request.leader.LeaderGroupListRequest;
@@ -107,7 +109,7 @@ public class LeaderGroupManageController {
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(GoodsErrorCodeEnum.LEADER_NOT_EXIST);
         }
 
         // 请求参数矫正
@@ -133,7 +135,7 @@ public class LeaderGroupManageController {
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(GoodsErrorCodeEnum.LEADER_NOT_EXIST);
         }
         // 查询总数
         long total = activityInfoService.getMiniLeaderGroupCount(leaderId, catId, name, Optional.ofNullable(status).orElse(0));
@@ -167,13 +169,13 @@ public class LeaderGroupManageController {
         log.info("[添加团购活动]参数:{}", JSON.toJSONString(request));
         // 1. 校验时间
         if (request.getEndTime() < (request.getStartTime())) {
-            return JsonResult.fail("结束时间必须晚于开始时间");
+            throw new BusinessException(GoodsErrorCodeEnum.TIME_RANGE_INVALID);
         }
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         log.info("添加团购活动时，团长id:{}", leaderId);
         if (leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(GoodsErrorCodeEnum.LEADER_NOT_EXIST);
         }
         // 从请求头中获取员工id
         Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
@@ -185,7 +187,7 @@ public class LeaderGroupManageController {
             staffInfo = staffService.getStaffInfo(staffId);
             log.info("添加团购活动时，stfInfo:{}", JSON.toJSONString(staffInfo));
             if (ObjectUtils.isEmpty(staffInfo)) {
-                return JsonResult.fail("未查询到员工信息");
+                throw new BusinessException(GoodsErrorCodeEnum.STAFF_NOT_EXIST);
             }
             // 添加人员id
             data.setStaffId(staffId);
@@ -194,7 +196,7 @@ public class LeaderGroupManageController {
         }
         Long pointId = Optional.ofNullable(request.getPointId()).orElse(0L);
         if (pointId.intValue() == 0) {
-            return JsonResult.fail("新增团购活动时请添加自提点");
+            throw new BusinessException(GoodsErrorCodeEnum.PICKUP_POINT_REQUIRED);
         }
         // 团购商品信息兜底: 价格/名称/图片/类型未传时, 取商品表数据(一次批量查询, 避免循环内 N+1)
         fillGroupActGoodsInfo(request.getGoods());
@@ -305,14 +307,17 @@ public class LeaderGroupManageController {
     @GetMapping("/get/groupActivity/info")
     public JsonResult getGroupActivity(@RequestParam("groupId") Long groupId) {
         log.info("goods/get/groupActivity/info groupId:{}", groupId);
+        if (groupId == null || groupId < 1) {
+            throw new BusinessException(GoodsErrorCodeEnum.REQUEST_ID_THAN_ZERO);
+        }
         GbGroupActivityInfo groupInfo = activityInfoService.getGroupInfo(groupId);
         if (ObjectUtils.isEmpty(groupInfo)) {
-            return JsonResult.fail("未查到相关团购活动信息");
+            throw new BusinessException(GoodsErrorCodeEnum.GROUP_NOT_EXIST);
         }
         // 团购商品列表(冗余表, 含团购价/市场价/商品名称/主图)
         List<GbGroupActivityGoods> activityGoodsList = activityInfoService.getGroupActivityGoodsList(groupId);
         if (CollectionUtils.isEmpty(activityGoodsList)) {
-            return JsonResult.fail("未查到相关团购商品信息");
+            throw new BusinessException(GoodsErrorCodeEnum.GROUP_GOODS_NOT_EXIST);
         }
         // 商品表数据(补充单位/库存), 一次批量查询
         List<Long> goodsIds = new ArrayList<>();
@@ -341,7 +346,7 @@ public class LeaderGroupManageController {
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(GoodsErrorCodeEnum.LEADER_NOT_EXIST);
         }
 
         // 从请求头中获取员工id
@@ -354,7 +359,7 @@ public class LeaderGroupManageController {
             staffInfo = staffService.getStaffInfo(staffId);
             log.info("添加团购活动时，stfInfo:{}", JSON.toJSONString(staffInfo));
             if (ObjectUtils.isEmpty(staffInfo)) {
-                return JsonResult.fail("未查询到员工信息");
+                throw new BusinessException(GoodsErrorCodeEnum.STAFF_NOT_EXIST);
             }
             // 修改人员姓名
             data.setStaffName(staffInfo.getStaffName());
@@ -362,13 +367,13 @@ public class LeaderGroupManageController {
         // 团购进行中, 不允许修改
         GbGroupActivityInfo groupInfo = activityInfoService.getGroupInfo(request.getId());
         if (ObjectUtils.isEmpty(groupInfo)) {
-            return JsonResult.fail("未查询到团购活动信息");
+            throw new BusinessException(GoodsErrorCodeEnum.GROUP_NOT_EXIST);
         }
         int nowTime = TimeUtils.getTimeStamp();
         int startTime = groupInfo.getStartTime().intValue();
         int endTime = groupInfo.getEndTime().intValue();
         if (startTime < nowTime && nowTime < endTime) {
-            return JsonResult.fail("团购进行中, 不允许修改");
+            throw new BusinessException(GoodsErrorCodeEnum.GROUP_ONGOING);
         }
 
         // 团购商品信息兜底: 价格/名称/图片/类型未传时, 取商品表数据(一次批量查询, 避免循环内 N+1)
@@ -477,7 +482,7 @@ public class LeaderGroupManageController {
         if (flag) {
             return JsonResult.success("修改成功");
         } else {
-            return JsonResult.fail("修改失败");
+            throw new BusinessException(GoodsErrorCodeEnum.UPDATE_FAILED);
         }
     }
 
@@ -490,7 +495,7 @@ public class LeaderGroupManageController {
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(GoodsErrorCodeEnum.LEADER_NOT_EXIST);
         }
 
         // 从请求头中获取员工id
@@ -502,7 +507,7 @@ public class LeaderGroupManageController {
             // 员工信息
             staffInfo = staffService.getStaffInfo(staffId);
             if (ObjectUtils.isEmpty(staffInfo)) {
-                return JsonResult.fail("未查询到员工信息");
+                throw new BusinessException(GoodsErrorCodeEnum.STAFF_NOT_EXIST);
             }
             updateId = staffId;
             updateName = staffInfo.getStaffName();
@@ -514,7 +519,7 @@ public class LeaderGroupManageController {
         // 查询旧状态
         GbGroupActivityInfo groupInfo = activityInfoService.getGroupInfo(groupId);
         if (ObjectUtils.isEmpty(groupInfo)) {
-            return JsonResult.fail("未查询到团购活动信息");
+            throw new BusinessException(GoodsErrorCodeEnum.GROUP_NOT_EXIST);
         }
         if (groupInfo.getIsClose() == 0) {
             // 关闭
@@ -522,7 +527,7 @@ public class LeaderGroupManageController {
         } else {
             // 平台审核未通过, 不允许打开上线
             if (groupInfo.getIsCheck() == 0) {
-                return JsonResult.fail("平台未审核, 不允许打开上线");
+                throw new BusinessException(GoodsErrorCodeEnum.NOT_AUDITED);
             }
             // 打开
             activityInfoService.closeMiniLeaderGroupInfo(leaderId, groupId, 0, updateId, updateName, groupInfo.getGroupName());
@@ -562,7 +567,7 @@ public class LeaderGroupManageController {
 
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
-        if (leaderId == 0) return JsonResult.fail("lid不存在");
+        if (leaderId == 0) throw new BusinessException(GoodsErrorCodeEnum.LEADER_NOT_EXIST);
 
 //        // 从请求头中获取员工id
 //        Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
@@ -571,13 +576,13 @@ public class LeaderGroupManageController {
         // 查询团购详情
         GbGroupActivityInfo groupInfo = activityInfoService.getGroupInfo(groupId);
         if (ObjectUtils.isEmpty(groupInfo)) {
-            return JsonResult.fail("团购不存在");
+            throw new BusinessException(GoodsErrorCodeEnum.GROUP_NOT_EXIST);
         }
 
         // 第一个团购商品
         List<GbGroupActivityGoods> goodsList = activityInfoService.getGroupActivityGoodsList(groupId);
         if (CollectionUtils.isEmpty(goodsList)) {
-            return JsonResult.fail("团购商品不存在");
+            throw new BusinessException(GoodsErrorCodeEnum.GROUP_GOODS_NOT_EXIST);
         }
         GbGroupActivityGoods goodsInfo = goodsList.get(0);
 
@@ -639,7 +644,7 @@ public class LeaderGroupManageController {
 
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
-        if (leaderId == 0) return JsonResult.fail("lid不存在");
+        if (leaderId == 0) throw new BusinessException(GoodsErrorCodeEnum.LEADER_NOT_EXIST);
 
         // 从请求头中获取员工id
 //        Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
@@ -648,13 +653,13 @@ public class LeaderGroupManageController {
         // 查询团购详情
         GbGroupActivityInfo groupInfo = activityInfoService.getGroupInfo(groupId);
         if (ObjectUtils.isEmpty(groupInfo)) {
-            return JsonResult.fail("团购不存在");
+            throw new BusinessException(GoodsErrorCodeEnum.GROUP_NOT_EXIST);
         }
 
         // 第一个团购商品
         List<GbGroupActivityGoods> goodsList = activityInfoService.getGroupActivityGoodsList(groupId);
         if (CollectionUtils.isEmpty(goodsList)) {
-            return JsonResult.fail("团购商品不存在");
+            throw new BusinessException(GoodsErrorCodeEnum.GROUP_GOODS_NOT_EXIST);
         }
         GbGroupActivityGoods goodsInfo = goodsList.get(0);
 
@@ -673,7 +678,8 @@ public class LeaderGroupManageController {
 
             // 统一获取AccessToken
             String accessToken = helper.getAccessToken(false);
-            if (accessToken == null || accessToken.length() == 0) return JsonResult.fail("获取AccessToken失败");
+            if (accessToken == null || accessToken.length() == 0)
+                throw new BusinessException(GoodsErrorCodeEnum.ACCESS_TOKEN_FAILED);
 
             // 获取二维码
             String page = "pages/group/index";
@@ -731,8 +737,8 @@ public class LeaderGroupManageController {
             e.printStackTrace();
         }
 
-        // 失败
-        return JsonResult.fail();
+        // 海报生成失败
+        throw new BusinessException(GoodsErrorCodeEnum.POSTER_GEN_FAILED);
     }
 
 

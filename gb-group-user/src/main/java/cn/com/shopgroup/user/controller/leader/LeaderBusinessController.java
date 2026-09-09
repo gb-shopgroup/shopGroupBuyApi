@@ -1,6 +1,8 @@
 package cn.com.shopgroup.user.controller.leader;
 
+import cn.com.shopgroup.common.exception.BusinessException;
 import cn.com.shopgroup.common.utils.JsonResult;
+import cn.com.shopgroup.user.exception.UserErrorCodeEnum;
 import cn.com.shopgroup.user.http.request.BusinessRequest;
 import cn.com.shopgroup.user.http.request.OCBusinessRequest;
 import cn.com.shopgroup.user.http.response.BusinessResponse;
@@ -38,7 +40,7 @@ public class LeaderBusinessController {
 
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
-        if (leaderId == 0) return JsonResult.fail("lid不存在");
+        if (leaderId == 0) throw new BusinessException(UserErrorCodeEnum.LEADER_NOT_EXIST);
 
         // 查询收款账户列表
         List<GbOrgBusinessInfo> result = service.getMiniLeaderBusinessList(leaderId);
@@ -58,11 +60,11 @@ public class LeaderBusinessController {
 
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
-        if (leaderId == 0) return JsonResult.fail("lid不存在");
+        if (leaderId == 0) throw new BusinessException(UserErrorCodeEnum.LEADER_NOT_EXIST);
 
         // 证件号码不能重复
         boolean isExist = service.isMiniLeaderAccountExist(request.getNo());
-        if (isExist) return JsonResult.fail("证件号码已经存在");
+        if (isExist) throw new BusinessException(UserErrorCodeEnum.CERT_NO_EXISTED);
 
         // 添加账户信息
         GbOrgBusinessInfo data = new GbOrgBusinessInfo();
@@ -91,15 +93,15 @@ public class LeaderBusinessController {
 
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
-        if (leaderId == 0) return JsonResult.fail("lid不存在");
+        if (leaderId == 0) throw new BusinessException(UserErrorCodeEnum.LEADER_NOT_EXIST);
 
         // 已经审核通过后不能修改
         GbOrgBusinessInfo businessInfo = service.getBusinessInfo(request.getId());
         if (ObjectUtils.isEmpty(businessInfo)) {
-            return JsonResult.fail("未查到到相关信息");
+            throw new BusinessException(UserErrorCodeEnum.DATA_NOT_FOUND);
         }
         if (businessInfo.getIsCheck() == 1) {
-            return JsonResult.fail("已审核, 不允许修改");
+            throw new BusinessException(UserErrorCodeEnum.ALREADY_AUDITED);
         }
         // 添加账户信息
         GbOrgBusinessInfo data = new GbOrgBusinessInfo();
@@ -121,7 +123,7 @@ public class LeaderBusinessController {
         if (flag) {
             return JsonResult.success();
         } else {
-            return JsonResult.fail();
+            throw new BusinessException(UserErrorCodeEnum.UPDATE_FAILED);
         }
     }
 
@@ -134,7 +136,7 @@ public class LeaderBusinessController {
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
-            return JsonResult.fail("lid不存在");
+            throw new BusinessException(UserErrorCodeEnum.LEADER_NOT_EXIST);
         }
         service.closeMiniLeaderBusiness(leaderId, request.getBusId(), request.getStatus());
         return JsonResult.success();

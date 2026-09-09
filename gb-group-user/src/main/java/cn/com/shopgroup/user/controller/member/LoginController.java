@@ -2,11 +2,13 @@ package cn.com.shopgroup.user.controller.member;
 
 import cn.com.shopgroup.common.cache.RedisConstant;
 import cn.com.shopgroup.common.cache.RedisHelper;
+import cn.com.shopgroup.common.exception.BusinessException;
 import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.TimeUtils;
 import cn.com.shopgroup.common.utils.TokenUtils;
 import cn.com.shopgroup.common.wxmini.WxMiniAccessTokenHelper;
 import cn.com.shopgroup.common.wxmini.WxMiniProgramHelper;
+import cn.com.shopgroup.user.exception.UserErrorCodeEnum;
 import cn.com.shopgroup.user.http.request.MemberRequest;
 import cn.com.shopgroup.user.http.response.LoginMemberResponse;
 import cn.com.shopgroup.user.model.GbMemberInfo;
@@ -48,7 +50,7 @@ public class LoginController {
 
         // 统一获取AccessToken
         String accessToken = helper.getAccessToken(false);
-        if (accessToken == null || accessToken.length() == 0) return JsonResult.fail("获取AccessToken失败");
+        if (accessToken == null || accessToken.length() == 0) throw new BusinessException(UserErrorCodeEnum.ACCESS_TOKEN_FAILED);
 
         // 再根据access_token和code获取手机号
         Map<String, String> result = WxMiniProgramHelper.getPhoneNumber(accessToken, code);
@@ -58,10 +60,10 @@ public class LoginController {
             if (phone.equalsIgnoreCase("access_token")) {
                 // 微信小程序access_token失效了
                 helper.removeAccessToken();
-                return JsonResult.fail("请稍后重试");
+                throw new BusinessException(UserErrorCodeEnum.DATA_NOT_FOUND);
             } else {
                 // 返回错误
-                return JsonResult.fail(phone);
+                throw new BusinessException(phone);
             }
         } else {
             // 新用户返回手机号即可
@@ -80,7 +82,7 @@ public class LoginController {
         String data = res.get("data");
         String success = res.get("success");
         if (Integer.parseInt(success) == 0) {
-            return JsonResult.fail(data);
+            throw new BusinessException(data);
         } else {
             return JsonResult.success("查询成功", data);
         }
@@ -164,13 +166,13 @@ public class LoginController {
         // 获取请求头中的token
         String token = TokenUtils.getToken();
         if (token == null || token.length() == 0) {
-            return JsonResult.fail("token不存在");
+            throw new BusinessException(UserErrorCodeEnum.TOKEN_NOT_EXIST);
         }
 
         // 解析token获取用户id
         String userId = TokenUtils.parseToken(token);
         if (userId == null || userId.length() == 0 || userId.matches("^[0-9]+$") == false) {
-            return JsonResult.fail("用户不存在");
+            throw new BusinessException(UserErrorCodeEnum.USER_NOT_EXIST);
         }
 
         // 清除该用户在Redis中的登录态
