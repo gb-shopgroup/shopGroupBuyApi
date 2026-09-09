@@ -5,6 +5,8 @@ public class RedisConstant {
 
     public final static long WxMiniAccessTokenExpired = 6900;
     public final static String WxMiniAccessTokenKey = "WxMiniAccessToken";
+    // access_token刷新分布式锁, 保证同一时间只有一个实例向微信刷新
+    public final static String WxMiniAccessTokenLockKey = "WxMiniAccessToken:lock";
 
 
     public final static long RedisShopInfoExpired = 30*24*60*60;

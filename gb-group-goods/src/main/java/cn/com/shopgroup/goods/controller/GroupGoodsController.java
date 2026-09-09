@@ -62,7 +62,7 @@ public class GroupGoodsController {
     // 团购商品列表(包装, 规格, sku)
     @GetMapping("/group/goods/list")
     public JsonResult goodsList(@RequestParam("lid") Long leaderId, @RequestParam("groupId") Long groupId) {
-        log.info("goods/group/goods/lis leaderId:{},groupId:{}", leaderId, groupId);
+        log.info("goods/group/goods/list leaderId:{},groupId:{}", leaderId, groupId);
         // 从缓存里面读取
         String key = RedisConstant.RedisGroupGoodsListKey + groupId;
         if (redisHelper.hasKey(key) == false) {

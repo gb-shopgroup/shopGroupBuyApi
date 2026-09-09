@@ -22,6 +22,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
@@ -274,31 +275,27 @@ public class GbOrderInfoService {
     }
 
 
-    public Boolean miniRefundOrder(Long memberId, String orderNo, Double allRefundAmount) {
+    // 用户申请退款: 仅把订单置为售后(5)待团长审核并记录申请时间; 主表退费金额refund_fee不在申请时维护(占坑),
+    // 待团长同意且退款成功后, 才由 addMiniOrderRefundFee 累加到订单主表; 拒绝时金额无需回退即回到申请前
+    public Boolean miniRefundOrder(Long memberId, String orderNo) {
 
         LambdaUpdateWrapper<GbOrderInfo> updateWrapper = Wrappers.lambdaUpdate();
         updateWrapper.eq(GbOrderInfo::getOrderNo, orderNo);
         updateWrapper.eq(GbOrderInfo::getMemberId, memberId);
         updateWrapper.set(GbOrderInfo::getStatus, OrderStatusEnum.APPLY_REFUND.getCode());
         updateWrapper.set(GbOrderInfo::getRefundTime, TimeUtils.getTimeStamp());
-        // 本次申请退款总金额(元)转分后, 累计维护到订单表refund_fee
-        if (allRefundAmount != null && allRefundAmount > 0) {
-            int addRefundFee = MoneyUtil.yuanToCent(allRefundAmount);
-            updateWrapper.setSql("refund_fee = refund_fee + " + addRefundFee);
-        }
         int flag = mapper.update(updateWrapper);
         return flag > 0 ? true : false;
     }
 
-    // 审核拒绝退款时, 回退订单表refund_fee中累计的本次申请退款金额(单位:分), 防止退款统计虚增
-    public Boolean deductMiniOrderRefundFee(String orderNo, Integer deductRefundFee) {
-        if (orderNo == null || deductRefundFee == null || deductRefundFee <= 0) {
+    // 团长审核同意且退款成功后, 把本次申请退款金额(单位:分)累计维护到订单表refund_fee
+    public Boolean addMiniOrderRefundFee(String orderNo, Integer addRefundFee) {
+        if (orderNo == null || addRefundFee == null || addRefundFee <= 0) {
             return false;
         }
         LambdaUpdateWrapper<GbOrderInfo> updateWrapper = Wrappers.lambdaUpdate();
         updateWrapper.eq(GbOrderInfo::getOrderNo, orderNo);
-        // 累计金额不足时置0, 避免出现负数
-        updateWrapper.setSql("refund_fee = IF(refund_fee >= " + deductRefundFee + ", refund_fee - " + deductRefundFee + ", 0)");
+        updateWrapper.setSql("refund_fee = IFNULL(refund_fee, 0) + " + addRefundFee);
         int flag = mapper.update(updateWrapper);
         return flag > 0 ? true : false;
     }
@@ -860,7 +857,8 @@ public class GbOrderInfoService {
      */
     /**
      * 审核拒绝时回退商品行本次申请累计的退款/退货退款数量
-     * 与订单refund_fee扣回配套: 申请时数量与费用已占坑, 拒绝则按本次申请量回退, 否则占坑导致无法再次申请/统计虚高
+     * 申请时商品行数量占坑(主表refund_fee金额改为团长同意后才累加, 不在申请时占坑),
+     * 拒绝则按本次申请量回退, 否则占坑导致无法再次申请/数量虚高
      *
      * @param refundNumMap  key=订单商品id, value=本次申请数量(审核拒绝时从请求回传)
      * @param isReturnGoods 1=退款(退待收货部分, 回退refund_num) 2=退货退款(退已收货部分, 回退refund_goods_num)
@@ -987,47 +985,62 @@ public class GbOrderInfoService {
         return result;
     }
 
-    public List<GbOrderInfo> getMemberApplyRefundOrderList(Long memberId, Integer status, int page, int pageSize) {
+    // 用户售后订单列表: 支持按商品名称模糊过滤; 同一订单不同商品可能处于不同售后(审核)状态
+    // (1 待审核 2 同意 3 不同意), 因此按(订单,审核状态)拆分返回, 每种状态一行(该行goods为该状态商品子集)
+    public List<GbOrderInfo> getMemberApplyRefundOrderList(Long memberId, Integer status, String goodsName, int page, int pageSize) {
         // 参数防御: 避免 limit 偏移量出现负数, pageSize 限制上限
         page = Math.max(page, 1);
         pageSize = Math.min(Math.max(pageSize, 1), 100);
+        String trimGoodsName = StringUtils.isEmpty(goodsName) ? null : goodsName.trim();
+        // 售后(审核)状态: 1 待审核 2 同意 3 不同意; 不传=查询该用户所有存在售后记录(1/2/3)的订单
+        List<Integer> statusScope = (status != null && status >= 1 && status <= 3)
+                ? Arrays.asList(status)
+                : Arrays.asList(1, 2, 3);
 
-        // 1. 按售后(审核)状态定位订单:
-        //    商品行售后状态(0 无 1 待审核 2 同意 3 不同意)
-        //    status 不传: 查询该用户所有存在售后记录(1/2/3)的订单
-        //    status 传 1/2/3: 查询包含对应售后状态商品行的订单(已退款/已拒绝等历史售后订单也能查到)
-        QueryWrapper<GbOrderInfo> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("member_id", memberId);
-        String applyScope = (status != null && status > 0)
-                ? "apply_refund = " + status
-                : "apply_refund in (1, 2, 3)";
-        queryWrapper.inSql("order_no",
-                "select order_no from gb_order_goods_info where " + applyScope
-                        + " and order_no in (select order_no from gb_order_info where member_id = " + memberId + ")");
-        queryWrapper.orderByDesc("id");
+        // 1. 先按商品名称/售后(审核)状态过滤订单商品行, 拿到命中的订单号集合(仅限当前用户的订单)
+        LambdaQueryWrapper<GbOrderGoodsInfo> hitGoodsWrapper = Wrappers.lambdaQuery();
+        hitGoodsWrapper.in(GbOrderGoodsInfo::getApplyRefund, statusScope);
+        if (trimGoodsName != null) {
+            hitGoodsWrapper.like(GbOrderGoodsInfo::getGoodsName, trimGoodsName);
+        }
+        hitGoodsWrapper.inSql(GbOrderGoodsInfo::getOrderNo,
+                "select order_no from gb_order_info where member_id = " + memberId);
+        List<GbOrderGoodsInfo> hitGoodsList = goodsMapper.selectList(hitGoodsWrapper);
+        if (CollectionUtils.isEmpty(hitGoodsList)) {
+            return new ArrayList<>();
+        }
+        List<String> hitOrderNos = hitGoodsList.stream()
+                .map(GbOrderGoodsInfo::getOrderNo)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+
+        // 2. 用命中的订单号分页查询订单(按订单id倒序)
+        LambdaQueryWrapper<GbOrderInfo> queryWrapper = Wrappers.lambdaQuery();
+        queryWrapper.eq(GbOrderInfo::getMemberId, memberId);
+        queryWrapper.in(GbOrderInfo::getOrderNo, hitOrderNos);
+        queryWrapper.orderByDesc(GbOrderInfo::getId);
         queryWrapper.last("limit " + (page - 1) * pageSize + "," + pageSize);
         List<GbOrderInfo> orderList = mapper.selectList(queryWrapper);
         if (CollectionUtils.isEmpty(orderList)) {
             return new ArrayList<>();
         }
 
-        // 2. 批量查询本页订单的商品信息, 按 orderNo 关联
+        // 3. 批量查询本页订单对应的售后商品行(过滤条件与步骤1保持一致), 按 orderNo 关联
         List<String> orderNos = orderList.stream()
                 .map(GbOrderInfo::getOrderNo)
                 .collect(Collectors.toList());
         LambdaQueryWrapper<GbOrderGoodsInfo> goodsWrapper = Wrappers.lambdaQuery();
         goodsWrapper.in(GbOrderGoodsInfo::getOrderNo, orderNos);
-        if (status != null && status > 0) {
-            // 指定售后状态时, 仅返回该状态的售后商品行; 不传状态则返回整单商品行
-            goodsWrapper.eq(GbOrderGoodsInfo::getApplyRefund, status);
+        goodsWrapper.in(GbOrderGoodsInfo::getApplyRefund, statusScope);
+        if (trimGoodsName != null) {
+            goodsWrapper.like(GbOrderGoodsInfo::getGoodsName, trimGoodsName);
         }
         goodsWrapper.orderByDesc(GbOrderGoodsInfo::getId);
         List<GbOrderGoodsInfo> goodsList = goodsMapper.selectList(goodsWrapper);
         if (CollectionUtils.isEmpty(goodsList)) {
             return new ArrayList<>();
         }
-
-        // 3. 按 orderNo 组装订单商品列表
         Map<String, List<GbOrderGoodsInfo>> goodsMap = new HashMap<>();
         for (GbOrderGoodsInfo item : goodsList) {
             String orderNo = item.getOrderNo();
@@ -1039,12 +1052,35 @@ public class GbOrderInfoService {
                 goodsMap.put(orderNo, tempList);
             }
         }
+
+        // 4. 组装: 同一订单的商品可能处于不同售后(审核)状态, 按状态拆分成多行返回
+        //    例: 同一订单3个商品状态分别为 1待审核/2同意/3不同意 时, 该订单拆成3条数据展示
         List<GbOrderInfo> result = new ArrayList<>();
         for (GbOrderInfo item : orderList) {
-            String orderNo = item.getOrderNo();
-            if (goodsMap.containsKey(orderNo)) {
-                item.setGoodsInfoList(goodsMap.get(orderNo));
-                result.add(item);
+            List<GbOrderGoodsInfo> orderGoodsList = goodsMap.get(item.getOrderNo());
+            if (CollectionUtils.isEmpty(orderGoodsList)) {
+                continue;
+            }
+            // 按审核状态分组(状态顺序固定 1->2->3, 保证同一订单多行展示顺序稳定)
+            Map<Integer, List<GbOrderGoodsInfo>> statusGroupMap = new LinkedHashMap<>();
+            for (GbOrderGoodsInfo goods : orderGoodsList) {
+                Integer goodsStatus = goods.getApplyRefund() == null ? 0 : goods.getApplyRefund();
+                List<GbOrderGoodsInfo> groupList = statusGroupMap.get(goodsStatus);
+                if (groupList == null) {
+                    groupList = new ArrayList<>();
+                    statusGroupMap.put(goodsStatus, groupList);
+                }
+                groupList.add(goods);
+            }
+            for (Integer groupStatus : statusScope) {
+                List<GbOrderGoodsInfo> groupGoods = statusGroupMap.get(groupStatus);
+                if (CollectionUtils.isEmpty(groupGoods)) {
+                    continue;
+                }
+                GbOrderInfo orderView = new GbOrderInfo();
+                BeanUtils.copyProperties(item, orderView);
+                orderView.setGoodsInfoList(groupGoods);
+                result.add(orderView);
             }
         }
         return result;

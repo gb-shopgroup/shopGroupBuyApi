@@ -118,7 +118,7 @@ public class MemberOrderController {
         return JsonResult.success(data);
     }
 
-    // 用户售后订单列表（按订单状态筛选, 分页查询）
+    // 用户售后订单列表(支持商品名称筛选; 同一订单商品售后状态不同时按状态拆分多条返回, 分页查询)
     @PostMapping("/group/order/applyRefundList")
     public JsonResult applyRefundList(@RequestBody MemberOrderRefundListRequest request) {
         log.info("用户端查询售后订单列表接口-参数request:{}", JSON.toJSONString(request));
@@ -145,8 +145,9 @@ public class MemberOrderController {
         int pageSize = Optional.ofNullable(request.getPageSize())
                 .map(size -> Math.min(size, 100))
                 .orElse(10);
-        // 查询订单信息
-        List<GbOrderInfo> list = orderInfoService.getMemberApplyRefundOrderList(memberId, request.getStatus(), page, pageSize);
+        // 查询订单信息(支持商品名称过滤, 并按商品售后状态拆分)
+        List<GbOrderInfo> list = orderInfoService.getMemberApplyRefundOrderList(
+                memberId, request.getStatus(), request.getGoodsName(), page, pageSize);
         if (CollectionUtils.isEmpty(list)) {
             return JsonResult.success();
         }
@@ -246,7 +247,8 @@ public class MemberOrderController {
 
         // 统一获取AccessToken
         String accessToken = helper.getAccessToken(false);
-        if (accessToken == null || accessToken.length() == 0) throw new BusinessException(OrderErrorCodeEnum.ACCESS_TOKEN_FAILED);
+        if (accessToken == null || accessToken.length() == 0)
+            throw new BusinessException(OrderErrorCodeEnum.ACCESS_TOKEN_FAILED);
 
         // 生成小程序码, 返回base64格式
         String base64 = "";
@@ -340,7 +342,7 @@ public class MemberOrderController {
         }
     }
 
-    // 用户申请订单退款。refundFlag: 1=退款(退"待收货"部分, 可退量=购买数-收货数-已申请退款数), 2=退货退款(退"已收货"部分, 可退量=收货数-已申请退货退款数); 申请成功后订单refund_fee与对应商品行退款/退货退款数量先占坑累计(可退量会相应扣减), 待团长审核: 同意=保留占坑并转正式退款, 不同意=自动恢复申请前(扣回订单refund_fee、回退商品行数量、售后状态置不同意); 出参data为本次申请退款总金额(单位:元)
+    // 用户申请订单退款。refundFlag: 1=退款(退"待收货"部分, 可退量=购买数-收货数-已申请退款数), 2=退货退款(退"已收货"部分, 可退量=收货数-已申请退货退款数); 申请成功后仅对应商品行退款/退货退款数量先占坑累计(可退量会相应扣减), 订单主表refund_fee不在申请时维护, 待团长审核: 同意且退款成功后才把本次金额累加到订单refund_fee, 不同意=主表金额天然不变回到申请前, 仅回退商品行数量并把售后状态置不同意; 出参data为本次申请退款总金额(单位:元)
     @PostMapping("/group/order/apply/refund")
     public JsonResult orderApplyRefund(@Validated @RequestBody OrderRefundApplyRequest refundApplyRequest) {
         log.info("[用户申请订单退款操作],params->{}", JSON.toJSONString(refundApplyRequest));
@@ -467,8 +469,8 @@ public class MemberOrderController {
             throw new BusinessException(OrderErrorCodeEnum.REFUND_AMOUNT_EXCEED);
         }
 
-        // 申请退款 1 订单状态变成售后, 订单refund_fee累加本次申请金额(占坑)
-        Boolean flag = orderInfoService.miniRefundOrder(memberId, orderNo, allRefundAmount);
+        // 申请退款: 订单状态置为售后(5)待团长审核(主表refund_fee不在申请时累加, 待团长同意且退款成功后才维护)
+        Boolean flag = orderInfoService.miniRefundOrder(memberId, orderNo);
         // 订单商品变更: 仅本次申请的商品行累加退款/退货退款数量(占坑); 审核同意保留, 审核拒绝时回退
         orderInfoService.updateOrderGoodsRefundByOrderNo(applyGoodsList, isReturnGoods);
         if (flag) {
@@ -479,7 +481,7 @@ public class MemberOrderController {
             refundRecord.setOperateName(memberName);
             refundRecord.setIsAgree(0);
             refundRecord.setOrderNo(orderNo);
-            // 落库本次申请的类型与金额(单位:分), 团长端审核未回传类型/金额时, 拒绝流程据此兜底恢复
+            // 落库本次申请的类型与金额(单位:分), 团长端审核未回传类型/金额时, 审核处理据此兜底(拒绝回退商品数量/同意累加主表退费金额)
             refundRecord.setRefundFlag(isReturnGoods);
             refundRecord.setRefundAmount(MoneyUtil.yuanToCent(allRefundAmount));
             refundRecord.setActionReason(refundApplyRequest.getActionReason());

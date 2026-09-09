@@ -67,7 +67,8 @@ public class GbMemberInfoServiceImpl implements GbMemberInfoService {
                 GbMemberInfo::getNickname,
                 GbMemberInfo::getAvatar,
                 GbMemberInfo::getMobile,
-                GbMemberInfo::getOpenid);
+                GbMemberInfo::getOpenid,
+                GbMemberInfo::getLeaderId);
         //queryWrapper.eq(GbMemberInfo::getIsClose, 0);
         queryWrapper.eq(GbMemberInfo::getMemberId, memberId);
         queryWrapper.orderByDesc(GbMemberInfo::getMemberId);
@@ -84,7 +85,8 @@ public class GbMemberInfoServiceImpl implements GbMemberInfoService {
                 GbMemberInfo::getNickname,
                 GbMemberInfo::getAvatar,
                 GbMemberInfo::getMobile,
-                GbMemberInfo::getOpenid);
+                GbMemberInfo::getOpenid,
+                GbMemberInfo::getLeaderId);
         //queryWrapper.eq(GbMemberInfo::getIsClose, 0);
         queryWrapper.eq(GbMemberInfo::getOpenid, openId);
         queryWrapper.orderByDesc(GbMemberInfo::getMemberId);

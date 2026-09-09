@@ -38,20 +38,43 @@ public class WxMiniProgramHelper {
 
 
     public static Map<String, String> getAccessToken() {
+        return getAccessToken(false);
+    }
+
+    // 稳定版接口获取access_token(https://developers.weixin.qq.com/doc/offiaccount/Basic_Information/getStableAccessToken.html)
+    // 相比普通cgi-bin/token接口: 有效期内并发请求会返回同一个token, 避免多实例并发刷新导致token互相失效(40001 not latest)
+    // forceRefresh=true时强制刷新, 会使旧token立即失效, 仅在token丢失/报40001时使用
+    public static Map<String, String> getAccessToken(boolean forceRefresh) {
 
         Map<String, String> result = new HashMap();
-        String url = String.format("https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=%s&secret=%s", AppID, AppSecret);
-        RestTemplate restTemplate = new RestTemplate();
-        ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
-        Map<String, Object> responseBody = response.getBody();
+        String url = "https://api.weixin.qq.com/cgi-bin/stable_token";
 
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
 
-        if (responseBody.containsKey("access_token")) {
-            result.put("success", "1");
-            result.put("data", responseBody.get("access_token").toString());
-        } else {
+        Map<String, Object> paramMap = new HashMap<>();
+        paramMap.put("grant_type", "client_credential");
+        paramMap.put("appid", AppID);
+        paramMap.put("secret", AppSecret);
+        paramMap.put("force_refresh", forceRefresh);
+
+        try {
+            HttpEntity<Map<String, Object>> httpEntity = new HttpEntity<>(paramMap, headers);
+            RestTemplate restTemplate = new RestTemplate();
+            ResponseEntity<Map> response = restTemplate.postForEntity(url, httpEntity, Map.class);
+            Map<String, Object> responseBody = response.getBody();
+
+            if (responseBody != null && responseBody.containsKey("access_token")) {
+                result.put("success", "1");
+                result.put("data", responseBody.get("access_token").toString());
+            } else {
+                result.put("success", "0");
+                result.put("data", responseBody == null ? "响应为空" : responseBody.get("errmsg").toString());
+            }
+        } catch (Exception e) {
+            log.error("调用微信stable_token接口异常", e);
             result.put("success", "0");
-            result.put("data", responseBody.get("errmsg").toString());
+            result.put("data", e.toString());
         }
         return result;
     }

@@ -87,7 +87,7 @@
 | 57 | order | GET | `/order/group/groupActivity/logs2` | 团购记录(跟团记录), 滚动部分 |
 | 58 | order | GET | `/order/group/order/records` | 真实跟团记录：基于支付成功订单数据 |
 | 59 | order | POST | `/order/group/order/list` | 用户订单列表（按订单状态/商品名称筛选, 分页查询） |
-| 60 | order | POST | `/order/group/order/applyRefundList` | 用户售后订单列表（按订单状态筛选, 分页查询） |
+| 60 | order | POST | `/order/group/order/applyRefundList` | 用户售后订单列表（支持商品名称筛选; 同一订单商品售后状态不同时按状态拆分多条返回, 分页查询） |
 | 61 | order | GET | `/order/group/order/count` | 用户订单数量 |
 | 62 | order | GET | `/order/group/order/info` | 用户订单详情 |
 | 63 | order | GET | `/order/group/order/makeErcode` | 用户订单小程序码(微信小程序码, 扫码进入C端小程序对应订单页面) |
@@ -2061,7 +2061,7 @@ data 类型：`List<OrderResponse>`（数组，元素类型 `OrderResponse`，�
 
 #### 2. POST `/order/group/order/applyRefundList`
 
-**功能说明**：用户售后订单列表（按订单状态筛选, 分页查询）
+**功能说明**：用户售后订单列表（支持商品名称筛选; 同一订单的商品可能处于不同售后/审核状态, 结果按商品的售后状态拆分返回, 每种状态一条(该条goods为该状态商品子集), 例如同一订单三个商品状态分别为 1待审核/2同意/3不同意 时返回三条; 分页查询, 分页发生在订单维度, 拆分行数不做二次截断）
 
 **入参**
 
@@ -2075,6 +2075,7 @@ data 类型：`List<OrderResponse>`（数组，元素类型 `OrderResponse`，�
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | status | `Integer` | 否 | 1 待审核 2 同意 3 不同意 |
+| goodsName | `String` | 否 | 商品名称（模糊查询; 仅返回包含命中商品售后行的订单/记录） |
 | page | `Integer` | 否 | 不传 |
 | pageSize | `Integer` | 否 | — |
 

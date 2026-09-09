@@ -49,6 +49,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 @RestController
@@ -83,6 +85,12 @@ public class OrderPaymentController {
     private WxMiniAccessTokenHelper tokenHelper;
     //订单支付时间30分钟，900秒；
     private static final int limitPayOrderTime = 1800;
+    // 延迟调用微信发货的执行线程池, 避免阻塞支付回调
+    private static final ScheduledExecutorService wxShipmentExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread thread = new Thread(r, "wx-shipment-delay");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     // 发起支付
     @GetMapping("/order/pay")
@@ -201,18 +209,21 @@ public class OrderPaymentController {
     // 支付回调
     @PostMapping("/order/notify")
     public String notifyPay(HttpServletRequest req) {
-        log.info("易宝支付回调-order/payment//order/notify req:{}", JSON.toJSONString(req));
+        log.info("易宝支付回调-order/payment/order/notify ......");
         // 获取响应数据(密文)
         final String contentTypeStr = req.getContentType();
+        log.info("易宝支付回调 - contentTypeStr: {}", contentTypeStr);
         if (!StringUtils.startsWith(contentTypeStr, "application/x-www-form-urlencoded")) {
             throw new IllegalArgumentException("RSA回调请求仅支持form格式");
         }
         // 加密签名后的业务数据
         String response = req.getParameter("response");
+        log.info("易宝支付回调 - response: {}", response);
         // 解密成明文
         String plaintText = DigitalEnvelopeUtils.decrypt(response, "RSA2048");
         // 将明文转化为Json对象
         JSONObject jsonResponse = JSONObject.parse(plaintText);
+        log.info("易宝支付回调 - jsonResponse: {}", JSON.toJSONString(jsonResponse));
 
         // 支付结果：SUCCESS（订单支付成功），FAIL（支付失败），TIME_OUT（订单过期）
         String status = "";
@@ -277,10 +288,12 @@ public class OrderPaymentController {
         int payPrice = MoneyUtil.yuanToCent(Double.parseDouble(payAmount));
         log.info("支付回调更新订单信息......");
         orderInfoService.miniPayOrder(orderNo, channelTrxId, payPrice);
-
         // 订单查询填充”订单收款账户信息表“ 数据表
         GbOrderInfo orderInfo = orderInfoService.getOrderInfoByOrderNo(orderNo);
-
+        log.info("易v宝支付回调-orderNo:{},orderInfo:{}", orderNo, JSON.toJSONString(orderInfo));
+        if (ObjectUtils.isEmpty(orderInfo)) {
+            return "fail";
+        }
         // 写入”订单收款账户信息表“ 数据表, 主要是分账金额的计算, 后期直接定时任务分账即可
         GbOrderBusinessInfo orderBusinessInfo = new GbOrderBusinessInfo();
         // 订单id,主键
@@ -339,15 +352,45 @@ public class OrderPaymentController {
             return;
         }
         int type = leaderInfo.getCashType().intValue();
+        // 团长结算到账方式: 0=支付时延迟到账型, 1=核销时延迟到账型
+        // type=0 时延迟15秒再调用微信发货(上传发货信息+标记已调用微信发货), 等微信侧发货状态生效, 同时避免阻塞易宝支付回调请求
         if (type == 0) {
-            String accessToken = tokenHelper.getAccessToken(false);
-            String name = orderInfo.getGroupName();
-            int wxFlag = WxMiniProgramHelper.uploadShippingInfo(accessToken, transactionId, name, orderInfo.getOpenid());
-            // 微信发货调用成功, 标记订单已调用微信发货(wx_shipment:0=未调用,1=已调用)
-            if (wxFlag == 1) {
-                orderInfoService.updateWxShipment(orderInfo.getOrderNo());
-            }
+            log.info("支付-易宝支付回调---15秒后再调用微信发货......");
+            String orderNo = orderInfo.getOrderNo();
+            wxShipmentExecutor.schedule(() -> {
+                try {
+                    // 首次调用(使用缓存access_token)
+                    int wxFlag = callWxUploadShippingInfo(orderInfo, transactionId, false);
+                    // access_token失效(微信返回40001/42001, 对应-1)时, 清除缓存并强制刷新后重试一次
+                    if (wxFlag == -1) {
+                        tokenHelper.removeAccessToken();
+                        log.warn("[微信发货]access_token失效, 清除缓存并强制刷新后重试, orderNo:{}", orderNo);
+                        wxFlag = callWxUploadShippingInfo(orderInfo, transactionId, true);
+                    }
+                    // 微信发货调用成功, 标记订单已调用微信发货(wx_shipment:0=未调用,1=已调用)
+                    if (wxFlag == 1) {
+                        orderInfoService.updateWxShipment(orderNo);
+                        orderBusinessService.updateBusinessOrderSendStatus(orderNo);
+                        log.info("[微信发货]延迟调用微信发货成功, orderNo:{}", orderNo);
+                    } else {
+                        log.warn("[微信发货]延迟调用微信发货失败, orderNo:{}, wxFlag:{}", orderNo, wxFlag);
+                    }
+                } catch (Exception e) {
+                    log.error("[微信发货]延迟调用微信发货异常, orderNo:{}", orderNo, e);
+                }
+            }, 15, TimeUnit.SECONDS);
         }
+    }
+
+    // 调用微信发货信息录入(可强制刷新access_token), 返回: 1=成功, 0=业务失败, -1=access_token失效(40001/42001)
+    private int callWxUploadShippingInfo(GbOrderInfo orderInfo, String transactionId, boolean forceRefreshToken) {
+        // forceRefreshToken=true 时忽略Redis缓存, 强制向微信重新获取access_token
+        String accessToken = tokenHelper.getAccessToken(forceRefreshToken);
+        if (StringUtils.isEmpty(accessToken)) {
+            log.warn("[微信发货]获取access_token失败, orderNo:{}", orderInfo.getOrderNo());
+            return -1;
+        }
+        return WxMiniProgramHelper.uploadShippingInfo(accessToken, transactionId, orderInfo.getGroupName(), orderInfo.getOpenid());
     }
 
     // 新的轮询算法: 按照收款金额从小到大排列, 取第一个即可

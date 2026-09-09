@@ -12,6 +12,7 @@ public class LoginMemberResponse {
     private String mobile;
     private String openid;
     private String token;
+    private Long leaderId;
 
     public LoginMemberResponse() {
 
@@ -24,6 +25,7 @@ public class LoginMemberResponse {
         this.avatar = data.getAvatar();
         this.mobile = data.getMobile();
         this.openid = data.getOpenid();
+        this.leaderId = data.getLeaderId();
     }
 
 }
