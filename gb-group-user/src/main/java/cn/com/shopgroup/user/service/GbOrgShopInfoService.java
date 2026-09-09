@@ -19,4 +19,6 @@ public interface GbOrgShopInfoService {
     Boolean updateShopInfo(GbOrgShopInfo shopInfo);
 
     GbOrgShopInfo getByShopId(Long shopId);
+
+    boolean addShopInfo(GbOrgShopInfo shopInfo);
 }

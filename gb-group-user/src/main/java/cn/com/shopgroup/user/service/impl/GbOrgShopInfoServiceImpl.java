@@ -75,5 +75,11 @@ public class GbOrgShopInfoServiceImpl implements GbOrgShopInfoService {
         return mapper.selectById(shopId);
     }
 
+    @Override
+    public boolean addShopInfo(GbOrgShopInfo shopInfo) {
+        int flag = mapper.insert(shopInfo);
+        return flag > 0 ? true : false;
+    }
+
 
 }

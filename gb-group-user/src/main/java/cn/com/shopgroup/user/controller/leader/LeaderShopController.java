@@ -3,8 +3,8 @@ package cn.com.shopgroup.user.controller.leader;
 import cn.com.shopgroup.common.cache.RedisConstant;
 import cn.com.shopgroup.common.cache.RedisHelper;
 import cn.com.shopgroup.common.config.UploadConfig;
-import cn.com.shopgroup.common.utils.HuaWeiOBS;
 import cn.com.shopgroup.common.exception.BusinessException;
+import cn.com.shopgroup.common.utils.HuaWeiOBS;
 import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.TimeUtils;
 import cn.com.shopgroup.user.exception.UserErrorCodeEnum;
@@ -82,7 +82,7 @@ public class LeaderShopController {
         return JsonResult.success(data);
     }
 
-    // 修改店铺信息
+    // 修改/保存-店铺信息
     @PostMapping("/leader/shop/save")
     public JsonResult saveShop(@Validated @RequestBody ShopRequest request) {
         log.info("修改店铺信息.../leader/shop/save req:{}", JSON.toJSONString(request));
@@ -91,12 +91,17 @@ public class LeaderShopController {
         if (leaderId == 0) {
             throw new BusinessException(UserErrorCodeEnum.LEADER_NOT_EXIST);
         }
-        GbOrgShopInfo shopInfo = shopInfoService.getInfoByLeaderAndShopId(leaderId, request.getShopId());
-        log.info("修改店铺信息.先查询店铺结果shopInfo:{}", JSON.toJSONString(shopInfo));
-        if (ObjectUtils.isEmpty(shopInfo)) {
-            String msg = "shopId=" + request.getShopId()
-                    + ",leaderId=" + leaderId + UserErrorCodeEnum.DATA_NOT_FOUND.getMessage();
-            throw new BusinessException(msg);
+        GbOrgShopInfo shopInfo = new GbOrgShopInfo();
+        Long shopId = request.getShopId() == null ? 0L : request.getShopId();
+        if (shopId.intValue() > 0) {
+            //shopInfo = shopInfoService.getInfoByLeaderAndShopId(leaderId, request.getShopId());
+            //目前一个团长只有一个店铺，后续需求变动，再根据情况处理
+            shopInfo = shopInfoService.getMiniLeaderShop(leaderId);
+            log.info("修改店铺信息.先查询店铺结果shopInfo:{}", JSON.toJSONString(shopInfo));
+            if (ObjectUtils.isEmpty(shopInfo)) {
+                String msg = "leaderId=" + leaderId + UserErrorCodeEnum.DATA_NOT_FOUND.getMessage();
+                throw new BusinessException(msg);
+            }
         }
         // 保存店铺信息
         shopInfo.setShopBanner(request.getBanner());
@@ -106,7 +111,13 @@ public class LeaderShopController {
         shopInfo.setShopCodeUrl(request.getShopCodeUrl());
         shopInfo.setShopLogo(request.getShopLogo());
         shopInfo.setShopShortName(request.getShortName());
-        boolean flag = shopInfoService.updateShopInfo(shopInfo);
+        boolean flag = false;
+        if (shopId.intValue() > 0) {
+            flag = shopInfoService.updateShopInfo(shopInfo);
+        } else {
+            flag = shopInfoService.addShopInfo(shopInfo);
+        }
+
         // 返回
         if (flag) {
             // 删除店铺缓存
