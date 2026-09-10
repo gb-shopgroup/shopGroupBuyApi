@@ -1,6 +1,6 @@
 # ShopGroupBuyApi 接口文档（详细版）
 
-> 自动生成时间：2026-09-08 16:43:19
+> 自动生成时间：2026-09-10 15:57:19
 
 > 生成方式：扫描各模块 `*Controller.java` 源码（`python3 generate_api_doc.py` 可重新生成）
 
@@ -15,7 +15,7 @@
 ## 目录
 
 1. **gb-group-user**（用户/团长/员工）— 46 个接口
-2. **gb-group-order**（订单/退款/分账）— 44 个接口
+2. **gb-group-order**（订单/退款/分账）— 43 个接口
 3. **gb-group-goods**（商品/团购）— 23 个接口
 4. **gb-group-admin**（后台管理）— 29 个接口
 5. **gb-group-task**（定时任务）— 8 个接口
@@ -24,7 +24,7 @@
 
 ## 接口总览索引
 
-> 共 150 个接口，按下表序号定位到下方各模块接口详情；「功能说明」列为 `—` 表示源码无方法注释，可按入参 / 出参字段推断用途。
+> 共 149 个接口，按下表序号定位到下方各模块接口详情；「功能说明」列为 `—` 表示源码无方法注释，可按入参 / 出参字段推断用途。
 
 | 序号 | 模块 | 方式 | 路径 | 功能说明 |
 | --- | --- | --- | --- | --- |
@@ -54,7 +54,7 @@
 | 24 | user | GET | `/user/leader/point/info` | 查询提货点详情 |
 | 25 | user | GET | `/user/leader/point/ercode` | 提货点二维码 |
 | 26 | user | GET | `/user/leader/shop/info` | 查看店铺信息 |
-| 27 | user | POST | `/user/leader/shop/save` | 修改店铺信息 |
+| 27 | user | POST | `/user/leader/shop/save` | 修改/保存-店铺信息 |
 | 28 | user | POST | `/user/leader/shop/update` | 更新店铺码图片地址（保存店铺二维码上传后的访问URL） |
 | 29 | user | GET | `/user/leader/getGroup/shop` | 通过leaderId团长店铺详情 |
 | 30 | user | POST | `/user/leader/shop/makeQrCode` | 团长-我的店铺二维码,上传到服务器返回URL |
@@ -79,105 +79,104 @@
 | 49 | order | POST | `/order/group/add` | 用户下单 |
 | 50 | order | GET | `/order/group/groupActivity/cat` | 团购分类列表（首页） |
 | 51 | order | POST | `/order/group/get/groupActivity/list` | 用户首页-查询所有团购活动列表 |
-| 52 | order | GET | `/order/group/groupActivity/count` | 团购数量（首页） |
-| 53 | order | GET | `/order/group/groupActivity/info` | 团购详情(团长分享页面)---用户首页：团长更多好货也用 |
-| 54 | order | POST | `/order/group/groupActivity/view` | 用户查看团购详情-显式埋点上报(分享等场景前端调用; 首页进入详情会自动埋点, 可不上报) |
-| 55 | order | GET | `/order/group/groupActivity/shop` | 团长店铺详情 |
-| 56 | order | GET | `/order/group/groupActivity/logs` | 晚上时间只生成固定跟团记录（锁定在19:00-20:00生成的订单）。 |
-| 57 | order | GET | `/order/group/groupActivity/logs2` | 团购记录(跟团记录), 滚动部分 |
-| 58 | order | GET | `/order/group/order/records` | 真实跟团记录：基于支付成功订单数据 |
-| 59 | order | POST | `/order/group/order/list` | 用户订单列表（按订单状态/商品名称筛选, 分页查询） |
-| 60 | order | POST | `/order/group/order/applyRefundList` | 用户售后订单列表（支持商品名称筛选; 同一订单商品售后状态不同时按状态拆分多条返回, 分页查询） |
-| 61 | order | GET | `/order/group/order/count` | 用户订单数量 |
-| 62 | order | GET | `/order/group/order/info` | 用户订单详情 |
-| 63 | order | GET | `/order/group/order/makeErcode` | 用户订单小程序码(微信小程序码, 扫码进入C端小程序对应订单页面) |
-| 64 | order | GET | `/order/group/order/receipt` | 用户订单收货 |
-| 65 | order | POST | `/order/group/order/apply/refund` | 用户申请订单退款。refundFlag: 1=退款(退"待收货"部分, 可退量=购买数-收货数-已申请退款数), 2=退货退款(退"已收货"部分, 可退量=收货数-已申请退货退款数); 申请成功后订单refund_fee与对应商品行退款/退货退款数量先占坑累计(可退量会相应扣减), 待团长审核: 同意=保留占坑并转正式退款, 不同意=自动恢复申请前(扣回订单refund_fee、回退商品行数量、售后状态置不同意); 出参data为本次申请退款总金额(单位:元) |
-| 66 | order | GET | `/order/group/order/refund/reasonList` | 用户退款原因下拉列表(申请退款时"选择退款原因") |
-| 67 | order | GET | `/order/group/order/refund/recodes` | 申请售后记录查询 |
-| 68 | order | GET | `/order/group/order/notAllReceiptList` | 用户端-查询还有商品未全部收货的订单列表(该用户在该团长/店铺下已支付, 且存在商品行收货数量小于购买数量的订单) |
-| 69 | order | POST | `/order/group/order/confirmShipping` | 用户点击确认收货组件后调用接口，更新订单已经操作按钮 |
-| 70 | order | POST | `/order/group/order/applyRefund/orderInfo` | 用户点击申请退货后调用接口 |
-| 71 | order | GET | `/order/group/wx/order` | 查询微信订单发货状态（查询订单状态枚举：(1) 待发货；(2) 已发货；(3) 确认收货；(4) 交易完成；(5) 已退款；(6) 资金待结算） |
-| 72 | order | POST | `/order/leader/myMember/list` | 我的团员列表（支持手机号/昵称搜索，分页） |
-| 73 | order | GET | `/order/leader/myMember/detail` | 团员详情（消费/退款/跟团次数/查看次数/动态） |
-| 74 | order | POST | `/order/leader/order/list` | 团长订单列表（按团活动/订单状态/关键字筛选, 关键字支持商品名称或手机号, 分页查询） |
-| 75 | order | POST | `/order/leader/apply/refundList` | 团长售后订单列表（按团活动/审核状态/关键字筛选, 关键字支持商品名称或手机号, 分页查询） |
-| 76 | order | GET | `/order/leader/order/count` | 查询订单总数(待核销), 考虑提货点 |
-| 77 | order | GET | `/order/leader/order/status` | 查询订单状态数量 |
-| 78 | order | POST | `/order/leader/order/scanQRCode` | 团长扫用户订单码接口 |
-| 79 | order | GET | `/order/leader/order/query` | 根据订单号查询订单 |
-| 80 | order | POST | `/order/leader/order/writeOff` | 核销（整单核销） |
-| 81 | order | POST | `/order/leader/order/partWriteOff` | 部分核销订单 |
-| 82 | order | GET | `/order/leader/order/send` | 团长端-查询微信发货 |
-| 83 | order | GET | `/order/leader/home/show/orders` | 团长首页订单汇总(head部分): 返回有效订单总数/订单总金额/退款总金额; pointId 传 0 或不传表示不区分提货点, 传具体值则按提货点过滤 |
-| 84 | order | GET | `/order/leader/home/order/goodsSummary` | 团长端订单-商品统计: 返回商品种类总数/待核销总件数 + 每个商品的件数统计(含已核销/未核销), 支持商品名称搜索与分页 |
-| 85 | order | POST | `/order/get/groupActivity/totalOrder` | 根据团购活动id统计订单数（实时统计，团长端有需求时使用） |
-| 86 | order | GET | `/order/leader/refund/count` | 退款订单数量 |
-| 87 | order | POST | `/order/leader/refund/approve` | 售后订单审核（同意/不同意）。status: 1=同意, 2=不同意; 每单一行key=订单号, value.refundGoodsMap为本次申请的订单商品行(行内refundNum/refundAmount为本次申请值); 同意=保留申请时占坑的金额与数量, 订单转售后处理并通知退款; 不同意=自动恢复申请前(扣回订单refund_fee本次金额、按行回退商品退款/退货退款数量、商品售后状态置不同意); 团长端旧版本未回传refundFlag/金额时后端按该订单最近一笔售后记录兜底恢复 |
-| 88 | order | POST | `/order/leader/refund/notify` | 退款结果回调通知(占位接口) |
-| 89 | order | GET | `/order/payment/order/pay` | 发起支付 |
-| 90 | order | POST | `/order/payment/order/notify` | 支付回调 |
-| 91 | goods | GET | `/goods/group/goods/list` | 团购商品列表(包装, 规格, sku) |
-| 92 | goods | GET | `/goods/group/goods/stock` | 查询商品库存, 后期增加缓存 |
-| 93 | goods | POST | `/goods/member/groupActivity/list` | 用户查询所有在线的团购活动列表[新用户未绑定团长时leaderId=0]: 仅返回未下线(isClose=0)且当前时间处于开团时间窗内(已开团未结束)的在线活动; leaderId>0按团长过滤(排序值sortOrder升序置顶优先, 同级按活动id倒序, 分页在SQL层完成); leaderId=0时需传经纬度(longitude/latitude, 缺失返回空列表), 仅统计已绑定自提点(pointId>0)的活动并过滤出绑定自提点与定位点球面距离小于20km者, 按活动id倒序(先距离过滤再分页); page默认1, pageSize默认10最大100 |
-| 94 | goods | GET | `/goods/get/goods/cat` | 商品分类列表 |
-| 95 | goods | GET | `/goods/leader/goods/online` | 查询所有审核通过且未关闭的商品, 添加团购时使用 |
-| 96 | goods | GET | `/goods/leader/goods/list` | 分页查询团长下的所有商品(团长控制台-商品管理), 支持分类+商品名称关键字筛选 |
-| 97 | goods | GET | `/goods/leader/goods/count` | 查询团长下的所有商品数量, 支持分类+商品名称关键字筛选 |
-| 98 | goods | GET | `/goods/leader/goods/info` | 商品信息查询: 商品基本信息 + 分类名 + 图片 + 规格(含规格值) + SKU |
-| 99 | goods | POST | `/goods/leader/goods/addGoods` | 添加商品 |
-| 100 | goods | POST | `/goods/leader/goods/edit` | 修改商品, 如果该商品正在团购中, 则不允许修改 |
-| 101 | goods | GET | `/goods/leader/goods/close` | 关闭商品(上下架), 如果该商品正在团购中, 则不允许操作 |
-| 102 | goods | GET | `/goods/leader/goods/sku/spec` | 根据规格罗列所有SKU, 包括已经存在的sku信息 |
-| 103 | goods | POST | `/goods/leader/goods/sku/save` | 注: 前端不再单独调用此接口, SKU已随添加/修改商品接口(addGoods/edit)一并处理, 此处保留兼容 |
-| 104 | goods | POST | `/goods/Leader/get/groupActivity/list` | 团长端-查询所有团购活动列表 |
-| 105 | goods | GET | `/goods/Leader/get/groupActivity/count` | 查询所有团购活动总数(筛选条件与列表接口一致, 保证分页总页数正确) |
-| 106 | goods | GET | `/goods/Leader/groupActivity/tag/list` | 团购标签下拉列表(添加/编辑团购活动时选择标签) |
-| 107 | goods | POST | `/goods/Leader/groupActivity/add` | 添加团购活动 |
-| 108 | goods | GET | `/goods/Leader/get/groupActivity/info` | 查询团购信息, 还要查询商品列表(价格以团购商品表冗余的团购价为准) |
-| 109 | goods | POST | `/goods/Leader/groupActivity/edit` | 修改团购活动, 团购进行中, 不允许修改 |
-| 110 | goods | POST | `/goods/Leader/groupActivity/close` | 这样就不需要修改的时候同步Redis缓存了, 只需要关闭修改完, 打开上线的时候更新一次即可 |
-| 111 | goods | GET | `/goods/Leader/get/groupActivity/cat` | 团购分类列表 |
-| 112 | goods | POST | `/goods/Leader/share/groupActivity/poster` | 分享团购海报生成1 |
-| 113 | goods | POST | `/goods/Leader/share/groupActivity/make/poster` | 分享团购活动海报（带有logo的海报） |
-| 114 | admin | GET | `/admin/business/list` | 分页查询团长收款账户列表(含累计额度) |
-| 115 | admin | GET | `/admin/business/count` | 查询收款账户总数 |
-| 116 | admin | GET | `/admin/business/info` | 查询收款账户详情 |
-| 117 | admin | POST | `/admin/business/add` | 添加团长收款账户(商户编号需唯一) |
-| 118 | admin | GET | `/admin/goods/list` | 分页查询商品列表 |
-| 119 | admin | GET | `/admin/goods/count` | 查询商品总数 |
-| 120 | admin | GET | `/admin/goods/info` | 查询商品详情 |
-| 121 | admin | GET | `/admin/goods/img` | 查询商品缩略图列表(最多3张) |
-| 122 | admin | GET | `/admin/group/list` | 分页查询团购活动列表 |
-| 123 | admin | GET | `/admin/group/count` | 查询团购活动总数 |
-| 124 | admin | GET | `/admin/group/info` | 查询团购活动详情 |
-| 125 | admin | GET | `/admin/tag/list` | 分页查询标签列表(含停用, 名称模糊) |
-| 126 | admin | GET | `/admin/tag/count` | 标签总数(与列表筛选条件一致, 供分页) |
-| 127 | admin | GET | `/admin/tag/info` | 标签详情 |
-| 128 | admin | POST | `/admin/tag/add` | 新增标签 |
-| 129 | admin | POST | `/admin/tag/edit` | 编辑标签(可修改名称/颜色/排序/状态启停, 未传字段保留原值) |
-| 130 | admin | POST | `/admin/tag/delete` | 删除标签(被团购活动使用中禁止删除, 可改为停用) |
-| 131 | admin | GET | `/admin/leader/list` | 分页查询团长列表(可按手机号筛选) |
-| 132 | admin | GET | `/admin/leader/count` | 查询团长总数 |
-| 133 | admin | POST | `/admin/leader/add` | 添加团长(校验手机号/商户编号, 同步创建员工/店铺/收款账户) |
-| 134 | admin | GET | `/admin/leader/select` | 团长下拉选项列表(id/名称) |
-| 135 | admin | GET | `/admin/login/kaptcha` | 获取后台登录图形验证码(Base64图片, 5分钟有效) |
-| 136 | admin | POST | `/admin/login/submit` | 后台登录(验证码+账号密码, 返回token) |
-| 137 | admin | GET | `/admin/member/list` | 分页查询会员列表 |
-| 138 | admin | GET | `/admin/member/count` | 查询会员总数 |
-| 139 | admin | GET | `/admin/orderbusiness/list` | 分页查询订单列表 |
-| 140 | admin | GET | `/admin/orderbusiness/count` | 查询订单总数 |
-| 141 | admin | GET | `/admin/order/list` | 分页查询订单列表 |
-| 142 | admin | GET | `/admin/order/count` | 查询订单总数 |
-| 143 | task | GET | `/task/order/send` | 微信订单发货 |
-| 144 | task | GET | `/task/order/divide` | 订单分账 |
-| 145 | task | GET | `/task/order/query` | 查询订单 |
-| 146 | task | GET | `/task/order/refund` | 同步原始订单表和商户订单表的退款状态 |
-| 147 | task | GET | `/task/order/cash` | 提现 |
-| 148 | task | GET | `/task/order/verify` | 自动收货 |
-| 149 | task | GET | `/task/order/backstock` | 超时未支付订单自动取消并恢复库存(手动触发, 与定时任务同一套逻辑) |
-| 150 | task | GET | `/task/test/user` | 查询文章信息(联调测试接口) |
+| 52 | order | GET | `/order/group/groupActivity/info` | 团购详情(团长分享页面)---用户首页：团长更多好货也用 |
+| 53 | order | POST | `/order/group/groupActivity/view` | 用户查看团购详情-显式埋点上报(分享等场景前端调用; 首页进入详情会自动埋点, 可不上报) |
+| 54 | order | GET | `/order/group/groupActivity/shop` | 团长店铺详情 |
+| 55 | order | GET | `/order/group/groupActivity/logs` | 晚上时间只生成固定跟团记录（锁定在19:00-20:00生成的订单）。 |
+| 56 | order | GET | `/order/group/groupActivity/logs2` | 团购记录(跟团记录), 滚动部分 |
+| 57 | order | GET | `/order/group/order/records` | 真实跟团记录：基于支付成功订单数据 |
+| 58 | order | POST | `/order/group/order/list` | 用户订单列表（按订单状态/商品名称筛选, 分页查询） |
+| 59 | order | POST | `/order/group/order/applyRefundList` | 用户售后订单列表(支持按商品名称/售后审核状态筛选; 同一订单的商品可能处于不同售后状态, 按(订单,审核状态)拆分为多条返回, 每条goods仅含该状态的商品, 行状态见goods[].applyRefund; 分页在订单维度) |
+| 60 | order | GET | `/order/group/order/count` | 用户订单数量 |
+| 61 | order | GET | `/order/group/order/info` | 用户订单详情 |
+| 62 | order | GET | `/order/group/order/makeErcode` | 用户订单小程序码(微信小程序码, 扫码进入C端小程序对应订单页面) |
+| 63 | order | GET | `/order/group/order/receipt` | 用户订单收货 |
+| 64 | order | POST | `/order/group/order/apply/refund` | 用户申请订单退款。refundFlag: 1=退款(退"待收货"部分, 可退量=购买数-收货数-已申请退款数), 2=退货退款(退"已收货"部分, 可退量=收货数-已申请退货退款数); 申请成功后仅对应商品行退款/退货退款数量先占坑累计(可退量会相应扣减), 订单主表refund_fee不在申请时维护, 待团长审核: 同意且退款成功后才把本次金额累加到订单refund_fee, 不同意=主表金额天然不变回到申请前, 仅回退商品行数量并把售后状态置不同意; 出参data为本次申请退款总金额(单位:元) |
+| 65 | order | GET | `/order/group/order/refund/reasonList` | 用户退款原因下拉列表(申请退款时"选择退款原因") |
+| 66 | order | GET | `/order/group/order/refund/recodes` | 售后记录查询 |
+| 67 | order | GET | `/order/group/order/notAllReceiptList` | 用户端-查询还有商品未全部收货的订单列表(该用户在该团长/店铺下已支付, 且存在商品行收货数量小于购买数量的订单) |
+| 68 | order | POST | `/order/group/order/confirmShipping` | 用户点击确认收货组件后调用接口，更新订单已经操作按钮 |
+| 69 | order | POST | `/order/group/order/applyRefund/orderInfo` | 用户点击申请退货后调用接口 |
+| 70 | order | GET | `/order/group/wx/order` | 查询微信订单发货状态（查询订单状态枚举：(1) 待发货；(2) 已发货；(3) 确认收货；(4) 交易完成；(5) 已退款；(6) 资金待结算） |
+| 71 | order | POST | `/order/leader/myMember/list` | 我的团员列表（支持手机号/昵称搜索，分页） |
+| 72 | order | GET | `/order/leader/myMember/detail` | 团员详情（消费/退款/跟团次数/查看次数/动态） |
+| 73 | order | POST | `/order/leader/order/list` | 团长订单列表（按团活动/订单状态/关键字筛选, 关键字支持商品名称或手机号, 分页查询） |
+| 74 | order | POST | `/order/leader/apply/refundList` | 团长售后订单列表（按团活动/审核状态/关键字筛选, 关键字支持商品名称或手机号, 分页查询） |
+| 75 | order | GET | `/order/leader/order/count` | 查询订单总数(待核销), 考虑提货点 |
+| 76 | order | GET | `/order/leader/order/status` | 查询订单状态数量 |
+| 77 | order | POST | `/order/leader/order/scanQRCode` | 团长扫用户订单码接口 |
+| 78 | order | GET | `/order/leader/order/query` | 根据订单号查询订单 |
+| 79 | order | POST | `/order/leader/order/writeOff` | 核销（整单核销） |
+| 80 | order | POST | `/order/leader/order/partWriteOff` | 部分核销订单 |
+| 81 | order | GET | `/order/leader/order/send` | 团长端-查询微信发货 |
+| 82 | order | GET | `/order/leader/home/show/orders` | 团长首页订单汇总(head部分): 返回有效订单总数/订单总金额/退款总金额; pointId 传 0 或不传表示不区分提货点, 传具体值则按提货点过滤 |
+| 83 | order | GET | `/order/leader/home/order/goodsSummary` | 团长端订单-商品统计: 返回商品种类总数/待核销总件数 + 每个商品的件数统计(含已核销/未核销), 支持商品名称搜索与分页 |
+| 84 | order | POST | `/order/get/groupActivity/totalOrder` | 根据团购活动id统计订单数（实时统计，团长端有需求时使用） |
+| 85 | order | GET | `/order/leader/refund/count` | 退款订单数量: 订单中存在商品发生过退款(部分退/整单全退, 审核同意)即计入 |
+| 86 | order | POST | `/order/leader/refund/approve` | 售后订单审核（同意/不同意）。status: 1=同意, 2=不同意; 每单一行key=订单号, value.refundGoodsMap为本次申请的订单商品行(行内refundNum/refundAmount为本次申请值); 同意=保留申请时占坑的商品数量, 退款成功后把本次金额累计到订单refund_fee并转售后处理通知退款; 不同意=主表退款金额申请阶段未累加无需回退(天然回到申请前), 仅按行回退商品退款/退货退款数量并把商品售后状态置不同意; 团长端旧版本未回传refundFlag/金额时后端按该订单最近一笔售后记录兜底 |
+| 87 | order | POST | `/order/leader/refund/notify` | 退款结果回调通知(占位接口) |
+| 88 | order | GET | `/order/payment/order/pay` | 发起支付 |
+| 89 | order | POST | `/order/payment/order/notify` | 支付回调 |
+| 90 | goods | GET | `/goods/group/goods/list` | 团购商品列表(包装, 规格, sku) |
+| 91 | goods | GET | `/goods/group/goods/stock` | 查询商品库存, 后期增加缓存 |
+| 92 | goods | POST | `/goods/member/groupActivity/list` | 用户查询所有在线的团购活动列表[新用户未绑定团长时leaderId=0]: 仅返回未下线(isClose=0)且当前时间处于开团时间窗内(已开团未结束)的在线活动; leaderId>0按团长过滤(排序值sortOrder升序置顶优先, 同级按活动id倒序, 分页在SQL层完成); leaderId=0时需传经纬度(longitude/latitude, 缺失返回空列表), 仅统计已绑定自提点(pointId>0)的活动并过滤出绑定自提点与定位点球面距离小于20km者, 按活动id倒序(先距离过滤再分页); page默认1, pageSize默认10最大100 |
+| 93 | goods | GET | `/goods/get/goods/cat` | 商品分类列表 |
+| 94 | goods | GET | `/goods/leader/goods/online` | 查询所有审核通过且未关闭的商品, 添加团购时使用 |
+| 95 | goods | GET | `/goods/leader/goods/list` | 分页查询团长下的所有商品(团长控制台-商品管理), 支持分类+商品名称关键字筛选 |
+| 96 | goods | GET | `/goods/leader/goods/count` | 查询团长下的所有商品数量, 支持分类+商品名称关键字筛选 |
+| 97 | goods | GET | `/goods/leader/goods/info` | 商品信息查询: 商品基本信息 + 分类名 + 图片 + 规格(含规格值) + SKU |
+| 98 | goods | POST | `/goods/leader/goods/addGoods` | 添加商品 |
+| 99 | goods | POST | `/goods/leader/goods/edit` | 修改商品, 如果该商品正在团购中, 则不允许修改 |
+| 100 | goods | GET | `/goods/leader/goods/close` | 关闭商品(上下架), 如果该商品正在团购中, 则不允许操作 |
+| 101 | goods | GET | `/goods/leader/goods/sku/spec` | 根据规格罗列所有SKU, 包括已经存在的sku信息 |
+| 102 | goods | POST | `/goods/leader/goods/sku/save` | 注: 前端不再单独调用此接口, SKU已随添加/修改商品接口(addGoods/edit)一并处理, 此处保留兼容 |
+| 103 | goods | POST | `/goods/Leader/get/groupActivity/list` | 团长端-查询所有团购活动列表 |
+| 104 | goods | GET | `/goods/Leader/get/groupActivity/count` | 查询所有团购活动总数(筛选条件与列表接口一致, 保证分页总页数正确) |
+| 105 | goods | GET | `/goods/Leader/groupActivity/tag/list` | 团购标签下拉列表(添加/编辑团购活动时选择标签) |
+| 106 | goods | POST | `/goods/Leader/groupActivity/add` | 添加团购活动 |
+| 107 | goods | GET | `/goods/Leader/get/groupActivity/info` | 查询团购信息, 还要查询商品列表(价格以团购商品表冗余的团购价为准) |
+| 108 | goods | POST | `/goods/Leader/groupActivity/edit` | 修改团购活动, 团购进行中, 不允许修改 |
+| 109 | goods | POST | `/goods/Leader/groupActivity/close` | 这样就不需要修改的时候同步Redis缓存了, 只需要关闭修改完, 打开上线的时候更新一次即可 |
+| 110 | goods | GET | `/goods/Leader/get/groupActivity/cat` | 团购分类列表 |
+| 111 | goods | POST | `/goods/Leader/share/groupActivity/poster` | 分享团购海报生成1 |
+| 112 | goods | POST | `/goods/Leader/share/groupActivity/make/poster` | 分享团购活动海报（带有logo的海报） |
+| 113 | admin | GET | `/admin/business/list` | 分页查询团长收款账户列表(含累计额度) |
+| 114 | admin | GET | `/admin/business/count` | 查询收款账户总数 |
+| 115 | admin | GET | `/admin/business/info` | 查询收款账户详情 |
+| 116 | admin | POST | `/admin/business/add` | 添加团长收款账户(商户编号需唯一) |
+| 117 | admin | GET | `/admin/goods/list` | 分页查询商品列表 |
+| 118 | admin | GET | `/admin/goods/count` | 查询商品总数 |
+| 119 | admin | GET | `/admin/goods/info` | 查询商品详情 |
+| 120 | admin | GET | `/admin/goods/img` | 查询商品缩略图列表(最多3张) |
+| 121 | admin | GET | `/admin/group/list` | 分页查询团购活动列表 |
+| 122 | admin | GET | `/admin/group/count` | 查询团购活动总数 |
+| 123 | admin | GET | `/admin/group/info` | 查询团购活动详情 |
+| 124 | admin | GET | `/admin/tag/list` | 分页查询标签列表(含停用, 名称模糊) |
+| 125 | admin | GET | `/admin/tag/count` | 标签总数(与列表筛选条件一致, 供分页) |
+| 126 | admin | GET | `/admin/tag/info` | 标签详情 |
+| 127 | admin | POST | `/admin/tag/add` | 新增标签 |
+| 128 | admin | POST | `/admin/tag/edit` | 编辑标签(可修改名称/颜色/排序/状态启停, 未传字段保留原值) |
+| 129 | admin | POST | `/admin/tag/delete` | 删除标签(被团购活动使用中禁止删除, 可改为停用) |
+| 130 | admin | GET | `/admin/leader/list` | 分页查询团长列表(可按手机号筛选) |
+| 131 | admin | GET | `/admin/leader/count` | 查询团长总数 |
+| 132 | admin | POST | `/admin/leader/add` | 添加团长(校验手机号/商户编号, 同步创建员工/店铺/收款账户) |
+| 133 | admin | GET | `/admin/leader/select` | 团长下拉选项列表(id/名称) |
+| 134 | admin | GET | `/admin/login/kaptcha` | 获取后台登录图形验证码(Base64图片, 5分钟有效) |
+| 135 | admin | POST | `/admin/login/submit` | 后台登录(验证码+账号密码, 返回token) |
+| 136 | admin | GET | `/admin/member/list` | 分页查询会员列表 |
+| 137 | admin | GET | `/admin/member/count` | 查询会员总数 |
+| 138 | admin | GET | `/admin/orderbusiness/list` | 分页查询订单列表 |
+| 139 | admin | GET | `/admin/orderbusiness/count` | 查询订单总数 |
+| 140 | admin | GET | `/admin/order/list` | 分页查询订单列表 |
+| 141 | admin | GET | `/admin/order/count` | 查询订单总数 |
+| 142 | task | GET | `/task/order/send` | 微信订单发货 |
+| 143 | task | GET | `/task/order/divide` | 订单分账 |
+| 144 | task | GET | `/task/order/query` | 查询订单 |
+| 145 | task | GET | `/task/order/refund` | 同步原始订单表和商户订单表的退款状态 |
+| 146 | task | GET | `/task/order/cash` | 提现 |
+| 147 | task | GET | `/task/order/verify` | 自动完成收货(手动触发, 与定时任务同一套逻辑): 已分账核销、核销满7天仍未完成收货的订单自动完成 |
+| 148 | task | GET | `/task/order/backstock` | 超时未支付订单自动取消并恢复库存(手动触发, 与定时任务同一套逻辑) |
+| 149 | task | GET | `/task/test/user` | 查询文章信息(联调测试接口) |
 
 ---
 
@@ -946,7 +945,7 @@ data 类型：`Object`（未能静态推断，以接口实际返回为准）
 
 #### 2. POST `/user/leader/shop/save`
 
-**功能说明**：修改店铺信息
+**功能说明**：修改/保存-店铺信息
 
 **入参**
 
@@ -1363,6 +1362,7 @@ data 类型：`LoginMemberResponse`（字段说明见下）
 | mobile | `String` | 否 | — |
 | openid | `String` | 否 | — |
 | token | `String` | 否 | — |
+| leaderId | `Long` | 否 | — |
 
 
 #### 4. POST `/user/reg`
@@ -1426,6 +1426,7 @@ data 类型：`LoginMemberResponse`（字段说明见下）
 | mobile | `String` | 否 | — |
 | openid | `String` | 否 | — |
 | token | `String` | 否 | — |
+| leaderId | `Long` | 否 | — |
 
 
 #### 5. POST `/user/logout`
@@ -1477,6 +1478,7 @@ data 类型：`LoginMemberResponse`（字段说明见下）
 | mobile | `String` | 否 | — |
 | openid | `String` | 否 | — |
 | token | `String` | 否 | — |
+| leaderId | `Long` | 否 | — |
 
 
 #### 2. GET `/user/member/isleader`
@@ -1646,7 +1648,7 @@ data 类型：`String`（基本类型，无子字段）
 
 > 类路径：`cn.com.shopgroup.order.controller.group.MemberGroupController`
 
-> 接口数量：9
+> 接口数量：8
 
 #### 1. GET `/order/group/groupActivity/cat`
 
@@ -1753,28 +1755,7 @@ data 类型：`List<MemberHomeGroupActResponse>`（数组，元素类型 `Member
 | userGoodsNum | `String` | 否 | — |
 
 
-#### 3. GET `/order/group/groupActivity/count`
-
-**功能说明**：团购数量（首页）
-
-**入参**
-
-| 参数 | 类型 | 位置 | 必填 | 说明 |
-| --- | --- | --- | --- | --- |
-| leaderId | `Long` | Query 参数 | 是 | 团长 ID |
-| catId | `Long` | Query 参数 | 是 | 团购分类 ID |
-
-**出参（JsonResult 统一返回体）**
-
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| code | `Integer` | 状态码：200=成功，300=失败，400=无权限，500=错误 |
-| msg | `String` | 提示信息 |
-| data | `Object` | 返回数据（类型见下） |
-
-data 类型：`Object`（未能静态推断，以接口实际返回为准）
-
-#### 4. GET `/order/group/groupActivity/info`
+#### 3. GET `/order/group/groupActivity/info`
 
 **功能说明**：团购详情(团长分享页面)---用户首页：团长更多好货也用
 
@@ -1814,7 +1795,7 @@ data 类型：`GroupActivityResponse`（字段说明见下）
 | isClose | `Byte` | 否 | 是否关闭 |
 
 
-#### 5. POST `/order/group/groupActivity/view`
+#### 4. POST `/order/group/groupActivity/view`
 
 **功能说明**：用户查看团购详情-显式埋点上报(分享等场景前端调用; 首页进入详情会自动埋点, 可不上报)
 
@@ -1842,7 +1823,7 @@ data 类型：`GroupActivityResponse`（字段说明见下）
 
 data 类型：`Boolean`（基本类型，无子字段）
 
-#### 6. GET `/order/group/groupActivity/shop`
+#### 5. GET `/order/group/groupActivity/shop`
 
 **功能说明**：团长店铺详情
 
@@ -1876,7 +1857,7 @@ data 类型：`ShopResponse`（字段说明见下）
 | shopLogo | `String` | 否 | 店铺logo |
 
 
-#### 7. GET `/order/group/groupActivity/logs`
+#### 6. GET `/order/group/groupActivity/logs`
 
 **功能说明**：晚上时间只生成固定跟团记录（锁定在19:00-20:00生成的订单）。
 
@@ -1907,7 +1888,7 @@ data 类型：`List<GroupLogs>`（数组，元素类型 `GroupLogs`，字段说�
 | userGoodsNum | `String` | 否 | — |
 
 
-#### 8. GET `/order/group/groupActivity/logs2`
+#### 7. GET `/order/group/groupActivity/logs2`
 
 **功能说明**：团购记录(跟团记录), 滚动部分
 
@@ -1938,7 +1919,7 @@ data 类型：`List<GroupLogs>`（数组，元素类型 `GroupLogs`，字段说�
 | userGoodsNum | `String` | 否 | — |
 
 
-#### 9. GET `/order/group/order/records`
+#### 8. GET `/order/group/order/records`
 
 **功能说明**：真实跟团记录：基于支付成功订单数据
 
@@ -2048,20 +2029,20 @@ data 类型：`List<OrderResponse>`（数组，元素类型 `OrderResponse`，�
 | goodsName | `String` | 否 | — |
 | goodsImg | `String` | 否 | — |
 | goodsPrice | `Double` | 否 | — |
-| goodsNum | `Integer` | 否 | — |
-| receiptNum | `Integer` | 否 | — |
-| applyRefund | `Integer` | 否 | — |
+| goodsNum | `Integer` | 否 | 购买数量 |
+| receiptNum | `Integer` | 否 | 收货数量 |
+| applyRefund | `Integer` | 否 | 售后(审核)状态:0 无 1 待审核 2 同意 3 不同意 |
 | refundGoodsNum | `Integer` | 否 | 退货退款数量(退已收货部分, 申请累计) |
 | refundNum | `Integer` | 否 | 退款数量(退待收货部分, 申请累计) |
-| goodsUnit | `String` | 否 | — |
-| goodsInfo | `String` | 否 | — |
+| goodsUnit | `String` | 否 | 商品单位 |
+| goodsInfo | `String` | 否 | 规格信息(普通商品=SKU名称, 称重商品=包装名称) |
 | skuId | `Long` | 否 | SKU信息(订单商品冗余字段, 用户选择规格时输出, 供前端识别规格) |
 | skuIds | `String` | 否 | — |
 
 
 #### 2. POST `/order/group/order/applyRefundList`
 
-**功能说明**：用户售后订单列表（支持商品名称筛选; 同一订单的商品可能处于不同售后/审核状态, 结果按商品的售后状态拆分返回, 每种状态一条(该条goods为该状态商品子集), 例如同一订单三个商品状态分别为 1待审核/2同意/3不同意 时返回三条; 分页查询, 分页发生在订单维度, 拆分行数不做二次截断）
+**功能说明**：用户售后订单列表(支持按商品名称/售后审核状态筛选; 同一订单的商品可能处于不同售后状态, 按(订单,审核状态)拆分为多条返回, 每条goods仅含该状态的商品, 行状态见goods[].applyRefund; 分页在订单维度)
 
 **入参**
 
@@ -2074,10 +2055,10 @@ data 类型：`List<OrderResponse>`（数组，元素类型 `OrderResponse`，�
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| status | `Integer` | 否 | 1 待审核 2 同意 3 不同意 |
-| goodsName | `String` | 否 | 商品名称（模糊查询; 仅返回包含命中商品售后行的订单/记录） |
-| page | `Integer` | 否 | 不传 |
-| pageSize | `Integer` | 否 | — |
+| status | `Integer` | 否 | 售后审核状态:1 待审核 2 同意 3 不同意(不传=查询全部售后状态) |
+| goodsName | `String` | 否 | 商品名称(模糊查询, 可选; 仅返回包含该商品售后行的记录) |
+| page | `Integer` | 否 | 页码(从 1 开始, 不传默认 1) |
+| pageSize | `Integer` | 否 | 每页条数(默认 10) |
 
 **出参（JsonResult 统一返回体）**
 
@@ -2128,13 +2109,13 @@ data 类型：`List<OrderResponse>`（数组，元素类型 `OrderResponse`，�
 | goodsName | `String` | 否 | — |
 | goodsImg | `String` | 否 | — |
 | goodsPrice | `Double` | 否 | — |
-| goodsNum | `Integer` | 否 | — |
-| receiptNum | `Integer` | 否 | — |
-| applyRefund | `Integer` | 否 | — |
+| goodsNum | `Integer` | 否 | 购买数量 |
+| receiptNum | `Integer` | 否 | 收货数量 |
+| applyRefund | `Integer` | 否 | 售后(审核)状态:0 无 1 待审核 2 同意 3 不同意 |
 | refundGoodsNum | `Integer` | 否 | 退货退款数量(退已收货部分, 申请累计) |
 | refundNum | `Integer` | 否 | 退款数量(退待收货部分, 申请累计) |
-| goodsUnit | `String` | 否 | — |
-| goodsInfo | `String` | 否 | — |
+| goodsUnit | `String` | 否 | 商品单位 |
+| goodsInfo | `String` | 否 | 规格信息(普通商品=SKU名称, 称重商品=包装名称) |
 | skuId | `Long` | 否 | SKU信息(订单商品冗余字段, 用户选择规格时输出, 供前端识别规格) |
 | skuIds | `String` | 否 | — |
 
@@ -2218,13 +2199,13 @@ data 类型：`OrderResponse`（字段说明见下）
 | goodsName | `String` | 否 | — |
 | goodsImg | `String` | 否 | — |
 | goodsPrice | `Double` | 否 | — |
-| goodsNum | `Integer` | 否 | — |
-| receiptNum | `Integer` | 否 | — |
-| applyRefund | `Integer` | 否 | — |
+| goodsNum | `Integer` | 否 | 购买数量 |
+| receiptNum | `Integer` | 否 | 收货数量 |
+| applyRefund | `Integer` | 否 | 售后(审核)状态:0 无 1 待审核 2 同意 3 不同意 |
 | refundGoodsNum | `Integer` | 否 | 退货退款数量(退已收货部分, 申请累计) |
 | refundNum | `Integer` | 否 | 退款数量(退待收货部分, 申请累计) |
-| goodsUnit | `String` | 否 | — |
-| goodsInfo | `String` | 否 | — |
+| goodsUnit | `String` | 否 | 商品单位 |
+| goodsInfo | `String` | 否 | 规格信息(普通商品=SKU名称, 称重商品=包装名称) |
 | skuId | `Long` | 否 | SKU信息(订单商品冗余字段, 用户选择规格时输出, 供前端识别规格) |
 | skuIds | `String` | 否 | — |
 
@@ -2272,7 +2253,7 @@ data 类型：`String`（基本类型，无子字段）
 
 #### 7. POST `/order/group/order/apply/refund`
 
-**功能说明**：用户申请订单退款。refundFlag: 1=退款(退"待收货"部分, 可退量=购买数-收货数-已申请退款数), 2=退货退款(退"已收货"部分, 可退量=收货数-已申请退货退款数); 申请成功后订单refund_fee与对应商品行退款/退货退款数量先占坑累计(可退量会相应扣减), 待团长审核: 同意=保留占坑并转正式退款, 不同意=自动恢复申请前(扣回订单refund_fee、回退商品行数量、售后状态置不同意); 出参data为本次申请退款总金额(单位:元)
+**功能说明**：用户申请订单退款。refundFlag: 1=退款(退"待收货"部分, 可退量=购买数-收货数-已申请退款数), 2=退货退款(退"已收货"部分, 可退量=收货数-已申请退货退款数); 申请成功后仅对应商品行退款/退货退款数量先占坑累计(可退量会相应扣减), 订单主表refund_fee不在申请时维护, 待团长审核: 同意且退款成功后才把本次金额累加到订单refund_fee, 不同意=主表金额天然不变回到申请前, 仅回退商品行数量并把售后状态置不同意; 出参data为本次申请退款总金额(单位:元)
 
 **入参**
 
@@ -2340,7 +2321,7 @@ data 类型：`List<GbRefundReason>`（数组，元素类型 `GbRefundReason`，
 
 #### 9. GET `/order/group/order/refund/recodes`
 
-**功能说明**：申请售后记录查询
+**功能说明**：售后记录查询
 
 **入参**
 
@@ -2354,23 +2335,48 @@ data 类型：`List<GbRefundReason>`（数组，元素类型 `GbRefundReason`，
 | --- | --- | --- |
 | code | `Integer` | 状态码：200=成功，300=失败，400=无权限，500=错误 |
 | msg | `String` | 提示信息 |
-| data | `Object` | 返回数据，类型：`List<OrderRefundRecordResponse>`（具体字段见下方表格） |
+| data | `Object` | 返回数据，类型：`OrderMainRefundResponse`（具体字段见下方表格） |
 
-data 类型：`List<OrderRefundRecordResponse>`（数组，元素类型 `OrderRefundRecordResponse`，字段说明见下）
+data 类型：`OrderMainRefundResponse`（字段说明见下）
 
-**OrderRefundRecordResponse 字段**
+**OrderMainRefundResponse 字段**
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| id | `Long` | 否 | id主键自增 |
-| orderNo | `String` | 否 | 订单号 |
-| refundGoodsMsg | `String` | 否 | 退款商品描述 |
-| operateId | `Long` | 否 | 操作人id |
-| operateName | `String` | 否 | 操作人姓名 |
-| isAgree | `Integer` | 否 | 状态 0 待审核 1 同意 2 不同意 |
-| actionReason | `String` | 否 | 申请原因 |
-| extraReason | `String` | 否 | 补充原因 |
-| addTime | `Integer` | 否 | 添加时间 |
+| orderNo | `String` | 否 | 订单信息 |
+| orderPrice | `Double` | 否 | 订单金额 |
+| refundFee | `Integer` | 否 | 退款金额,单位：分 |
+| leaderId | `Long` | 否 | 团长信息id |
+| groupId | `Long` | 否 | 团购信息 |
+| groupName | `String` | 否 | — |
+| status | `Integer` | 否 | 订单状态:0 待支付,1 待收货 2 部分收货 3 已提货 4 已退款, 5 售后 6 已取消 |
+| pointId | `Long` | 否 | 自提点信息 |
+| pointName | `String` | 否 | — |
+| pointAddress | `String` | 否 | — |
+| receiptCode | `String` | 否 | — |
+| nickname | `String` | 否 | 下单用户信息（内部调用使用） |
+| mobile | `String` | 否 | — |
+| goods | `List<OrderGoodsReponse>` | 否 | 订单商品列表 |
+
+
+**→OrderGoodsReponse 字段**（字段 `goods`（List<OrderGoodsReponse>））
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| id | `Long` | 否 | — |
+| goodsId | `Long` | 否 | — |
+| goodsName | `String` | 否 | — |
+| goodsImg | `String` | 否 | — |
+| goodsPrice | `Double` | 否 | — |
+| goodsNum | `Integer` | 否 | 购买数量 |
+| receiptNum | `Integer` | 否 | 收货数量 |
+| applyRefund | `Integer` | 否 | 售后(审核)状态:0 无 1 待审核 2 同意 3 不同意 |
+| refundGoodsNum | `Integer` | 否 | 退货退款数量(退已收货部分, 申请累计) |
+| refundNum | `Integer` | 否 | 退款数量(退待收货部分, 申请累计) |
+| goodsUnit | `String` | 否 | 商品单位 |
+| goodsInfo | `String` | 否 | 规格信息(普通商品=SKU名称, 称重商品=包装名称) |
+| skuId | `Long` | 否 | SKU信息(订单商品冗余字段, 用户选择规格时输出, 供前端识别规格) |
+| skuIds | `String` | 否 | — |
 
 
 #### 10. GET `/order/group/order/notAllReceiptList`
@@ -2432,13 +2438,13 @@ data 类型：`List<OrderResponse>`（数组，元素类型 `OrderResponse`，�
 | goodsName | `String` | 否 | — |
 | goodsImg | `String` | 否 | — |
 | goodsPrice | `Double` | 否 | — |
-| goodsNum | `Integer` | 否 | — |
-| receiptNum | `Integer` | 否 | — |
-| applyRefund | `Integer` | 否 | — |
+| goodsNum | `Integer` | 否 | 购买数量 |
+| receiptNum | `Integer` | 否 | 收货数量 |
+| applyRefund | `Integer` | 否 | 售后(审核)状态:0 无 1 待审核 2 同意 3 不同意 |
 | refundGoodsNum | `Integer` | 否 | 退货退款数量(退已收货部分, 申请累计) |
 | refundNum | `Integer` | 否 | 退款数量(退待收货部分, 申请累计) |
-| goodsUnit | `String` | 否 | — |
-| goodsInfo | `String` | 否 | — |
+| goodsUnit | `String` | 否 | 商品单位 |
+| goodsInfo | `String` | 否 | 规格信息(普通商品=SKU名称, 称重商品=包装名称) |
 | skuId | `Long` | 否 | SKU信息(订单商品冗余字段, 用户选择规格时输出, 供前端识别规格) |
 | skuIds | `String` | 否 | — |
 
@@ -2746,13 +2752,13 @@ data 类型：`List<OrderResponse>`（数组，元素类型 `OrderResponse`，�
 | goodsName | `String` | 否 | — |
 | goodsImg | `String` | 否 | — |
 | goodsPrice | `Double` | 否 | — |
-| goodsNum | `Integer` | 否 | — |
-| receiptNum | `Integer` | 否 | — |
-| applyRefund | `Integer` | 否 | — |
+| goodsNum | `Integer` | 否 | 购买数量 |
+| receiptNum | `Integer` | 否 | 收货数量 |
+| applyRefund | `Integer` | 否 | 售后(审核)状态:0 无 1 待审核 2 同意 3 不同意 |
 | refundGoodsNum | `Integer` | 否 | 退货退款数量(退已收货部分, 申请累计) |
 | refundNum | `Integer` | 否 | 退款数量(退待收货部分, 申请累计) |
-| goodsUnit | `String` | 否 | — |
-| goodsInfo | `String` | 否 | — |
+| goodsUnit | `String` | 否 | 商品单位 |
+| goodsInfo | `String` | 否 | 规格信息(普通商品=SKU名称, 称重商品=包装名称) |
 | skuId | `Long` | 否 | SKU信息(订单商品冗余字段, 用户选择规格时输出, 供前端识别规格) |
 | skuIds | `String` | 否 | — |
 
@@ -2828,13 +2834,13 @@ data 类型：`List<OrderResponse>`（数组，元素类型 `OrderResponse`，�
 | goodsName | `String` | 否 | — |
 | goodsImg | `String` | 否 | — |
 | goodsPrice | `Double` | 否 | — |
-| goodsNum | `Integer` | 否 | — |
-| receiptNum | `Integer` | 否 | — |
-| applyRefund | `Integer` | 否 | — |
+| goodsNum | `Integer` | 否 | 购买数量 |
+| receiptNum | `Integer` | 否 | 收货数量 |
+| applyRefund | `Integer` | 否 | 售后(审核)状态:0 无 1 待审核 2 同意 3 不同意 |
 | refundGoodsNum | `Integer` | 否 | 退货退款数量(退已收货部分, 申请累计) |
 | refundNum | `Integer` | 否 | 退款数量(退待收货部分, 申请累计) |
-| goodsUnit | `String` | 否 | — |
-| goodsInfo | `String` | 否 | — |
+| goodsUnit | `String` | 否 | 商品单位 |
+| goodsInfo | `String` | 否 | 规格信息(普通商品=SKU名称, 称重商品=包装名称) |
 | skuId | `Long` | 否 | SKU信息(订单商品冗余字段, 用户选择规格时输出, 供前端识别规格) |
 | skuIds | `String` | 否 | — |
 
@@ -2959,13 +2965,13 @@ data 类型：`OrderResponse`（字段说明见下）
 | goodsName | `String` | 否 | — |
 | goodsImg | `String` | 否 | — |
 | goodsPrice | `Double` | 否 | — |
-| goodsNum | `Integer` | 否 | — |
-| receiptNum | `Integer` | 否 | — |
-| applyRefund | `Integer` | 否 | — |
+| goodsNum | `Integer` | 否 | 购买数量 |
+| receiptNum | `Integer` | 否 | 收货数量 |
+| applyRefund | `Integer` | 否 | 售后(审核)状态:0 无 1 待审核 2 同意 3 不同意 |
 | refundGoodsNum | `Integer` | 否 | 退货退款数量(退已收货部分, 申请累计) |
 | refundNum | `Integer` | 否 | 退款数量(退待收货部分, 申请累计) |
-| goodsUnit | `String` | 否 | — |
-| goodsInfo | `String` | 否 | — |
+| goodsUnit | `String` | 否 | 商品单位 |
+| goodsInfo | `String` | 否 | 规格信息(普通商品=SKU名称, 称重商品=包装名称) |
 | skuId | `Long` | 否 | SKU信息(订单商品冗余字段, 用户选择规格时输出, 供前端识别规格) |
 | skuIds | `String` | 否 | — |
 
@@ -3029,13 +3035,13 @@ data 类型：`OrderResponse`（字段说明见下）
 | goodsName | `String` | 否 | — |
 | goodsImg | `String` | 否 | — |
 | goodsPrice | `Double` | 否 | — |
-| goodsNum | `Integer` | 否 | — |
-| receiptNum | `Integer` | 否 | — |
-| applyRefund | `Integer` | 否 | — |
+| goodsNum | `Integer` | 否 | 购买数量 |
+| receiptNum | `Integer` | 否 | 收货数量 |
+| applyRefund | `Integer` | 否 | 售后(审核)状态:0 无 1 待审核 2 同意 3 不同意 |
 | refundGoodsNum | `Integer` | 否 | 退货退款数量(退已收货部分, 申请累计) |
 | refundNum | `Integer` | 否 | 退款数量(退待收货部分, 申请累计) |
-| goodsUnit | `String` | 否 | — |
-| goodsInfo | `String` | 否 | — |
+| goodsUnit | `String` | 否 | 商品单位 |
+| goodsInfo | `String` | 否 | 规格信息(普通商品=SKU名称, 称重商品=包装名称) |
 | skuId | `Long` | 否 | SKU信息(订单商品冗余字段, 用户选择规格时输出, 供前端识别规格) |
 | skuIds | `String` | 否 | — |
 
@@ -3224,7 +3230,7 @@ data 类型：`Integer`（基本类型，无子字段）
 
 #### 1. GET `/order/leader/refund/count`
 
-**功能说明**：退款订单数量
+**功能说明**：退款订单数量: 订单中存在商品发生过退款(部分退/整单全退, 审核同意)即计入
 
 **入参**
 
@@ -3245,7 +3251,7 @@ data 类型：`Long`（基本类型，无子字段）
 
 #### 2. POST `/order/leader/refund/approve`
 
-**功能说明**：售后订单审核（同意/不同意）。status: 1=同意, 2=不同意; 每单一行key=订单号, value.refundGoodsMap为本次申请的订单商品行(行内refundNum/refundAmount为本次申请值); 同意=保留申请时占坑的金额与数量, 订单转售后处理并通知退款; 不同意=自动恢复申请前(扣回订单refund_fee本次金额、按行回退商品退款/退货退款数量、商品售后状态置不同意); 团长端旧版本未回传refundFlag/金额时后端按该订单最近一笔售后记录兜底恢复
+**功能说明**：售后订单审核（同意/不同意）。status: 1=同意, 2=不同意; 每单一行key=订单号, value.refundGoodsMap为本次申请的订单商品行(行内refundNum/refundAmount为本次申请值); 同意=保留申请时占坑的商品数量, 退款成功后把本次金额累计到订单refund_fee并转售后处理通知退款; 不同意=主表退款金额申请阶段未累加无需回退(天然回到申请前), 仅按行回退商品退款/退货退款数量并把商品售后状态置不同意; 团长端旧版本未回传refundFlag/金额时后端按该订单最近一笔售后记录兜底
 
 **入参**
 
@@ -5469,7 +5475,7 @@ data 类型：`Object`（未能静态推断，以接口实际返回为准）
 
 #### 6. GET `/task/order/verify`
 
-**功能说明**：自动收货
+**功能说明**：自动完成收货(手动触发, 与定时任务同一套逻辑): 已分账核销、核销满7天仍未完成收货的订单自动完成
 
 **入参**：无
 

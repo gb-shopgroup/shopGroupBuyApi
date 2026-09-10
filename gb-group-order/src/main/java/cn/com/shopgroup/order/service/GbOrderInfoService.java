@@ -1,6 +1,5 @@
 package cn.com.shopgroup.order.service;
 
-import cn.com.shopgroup.common.utils.MoneyUtil;
 import cn.com.shopgroup.common.utils.TimeUtils;
 import cn.com.shopgroup.order.constants.OrderStatusEnum;
 import cn.com.shopgroup.order.http.response.GroupOrderRecordResponse;
@@ -216,18 +215,20 @@ public class GbOrderInfoService {
 
 
         LambdaQueryWrapper<GbOrderInfo> queryWrapper = Wrappers.lambdaQuery();
-        queryWrapper.eq(GbOrderInfo::getMemberId, memberId);
+        if (memberId != null && memberId.intValue() > 0) {
+            queryWrapper.eq(GbOrderInfo::getMemberId, memberId);
+        }
         queryWrapper.eq(GbOrderInfo::getOrderNo, orderNo);
         GbOrderInfo data = mapper.selectOne(queryWrapper);
-
-
+        if (ObjectUtils.isEmpty(data)) {
+            return null;
+        }
         LambdaQueryWrapper<GbOrderGoodsInfo> queryWrapper2 = Wrappers.lambdaQuery();
         queryWrapper2.eq(GbOrderGoodsInfo::getOrderNo, orderNo);
         queryWrapper2.orderByAsc(GbOrderGoodsInfo::getId);
         List<GbOrderGoodsInfo> goodsList = goodsMapper.selectList(queryWrapper2);
 
-
-        if (data != null && goodsList != null) {
+        if (!CollectionUtils.isEmpty(goodsList)) {
             data.setGoodsInfoList(goodsList);
         }
 
@@ -242,6 +243,7 @@ public class GbOrderInfoService {
         updateWrapper.eq(GbOrderInfo::getOrderNo, orderNo);
         updateWrapper.set(GbOrderInfo::getBusId, busId);
         updateWrapper.set(GbOrderInfo::getMerchantNo, merchantNo);
+        updateWrapper.set(GbOrderInfo::getUpdateTime, TimeUtils.getTimeStamp());
         int flag = mapper.update(updateWrapper);
         return flag > 0 ? true : false;
     }
@@ -255,6 +257,7 @@ public class GbOrderInfoService {
         updateWrapper.set(GbOrderInfo::getPayTime, TimeUtils.getTimeStamp());
         updateWrapper.set(GbOrderInfo::getPayNo, payNo);
         updateWrapper.set(GbOrderInfo::getPayFee, payFee);
+        updateWrapper.set(GbOrderInfo::getUpdateTime, TimeUtils.getTimeStamp());
         int flag = mapper.update(updateWrapper);
         return flag > 0 ? true : false;
     }
@@ -270,6 +273,7 @@ public class GbOrderInfoService {
 
         updateWrapper.set(GbOrderInfo::getPointId2, pointId);
         updateWrapper.set(GbOrderInfo::getPointName2, pointName);
+        updateWrapper.set(GbOrderInfo::getUpdateTime, TimeUtils.getTimeStamp());
         int flag = mapper.update(updateWrapper);
         return flag > 0 ? true : false;
     }
@@ -295,6 +299,7 @@ public class GbOrderInfoService {
         }
         LambdaUpdateWrapper<GbOrderInfo> updateWrapper = Wrappers.lambdaUpdate();
         updateWrapper.eq(GbOrderInfo::getOrderNo, orderNo);
+        updateWrapper.set(GbOrderInfo::getUpdateTime, TimeUtils.getTimeStamp());
         updateWrapper.setSql("refund_fee = IFNULL(refund_fee, 0) + " + addRefundFee);
         int flag = mapper.update(updateWrapper);
         return flag > 0 ? true : false;
@@ -402,8 +407,8 @@ public class GbOrderInfoService {
     /**
      * 退款订单数量统计(团长端 /leader/refund/count):
      * 只要订单中存在商品发生过退款(审核同意)即计入, 不要求整单全部退完:
-     *   1) 整单已退款: status=4(含历史老数据商品行未标售后状态的全退单)
-     *   2) 仅部分商品退款成功: 订单主状态已恢复流转(1/2/3), 但商品行售后状态 apply_refund=2 保留
+     * 1) 整单已退款: status=4(含历史老数据商品行未标售后状态的全退单)
+     * 2) 仅部分商品退款成功: 订单主状态已恢复流转(1/2/3), 但商品行售后状态 apply_refund=2 保留
      * 注: 不限制 verify_time=0, 已核销后退货退款成功的订单同样计入; 售后待审核(apply_refund=1)/被拒(apply_refund=3)未产生真实退款, 不计入
      */
     public Long getMiniLeaderRefundOrderCount(Long leaderId, Long groupId, Long pointId) {
@@ -537,6 +542,7 @@ public class GbOrderInfoService {
         updateWrapper.set(GbOrderInfo::getPointName2, pointName);
         updateWrapper.eq(GbOrderInfo::getOrderNo, orderNo);
         updateWrapper.eq(GbOrderInfo::getLeaderId, leaderId);
+        updateWrapper.set(GbOrderInfo::getUpdateTime, TimeUtils.getTimeStamp());
         int flag = mapper.update(updateWrapper);
         byte type = 2;
         String oper = "核销了";
@@ -573,6 +579,7 @@ public class GbOrderInfoService {
 
         updateWrapper.eq(GbOrderInfo::getOrderNo, orderNo);
         updateWrapper.eq(GbOrderInfo::getLeaderId, leaderId);
+        updateWrapper.set(GbOrderInfo::getUpdateTime, TimeUtils.getTimeStamp());
 
 
         int flag = mapper.update(updateWrapper);
@@ -624,9 +631,9 @@ public class GbOrderInfoService {
      * 售后审核结束(拒绝退款 / 仅部分商品退款成功)后, 把仍停留在售后(5)的订单恢复为正常流转状态:
      * 前提: 订单状态仍为售后(5) 且 该订单已无待审核售后(apply_refund=1)的商品行, 避免打断仍在途的其它售后申请
      * 规则: 按用户确认收货时间(receipt_time)与商品行核销/退款完整度推算申请前状态
-     *   1) receipt_time=0(未确认过收货): 恢复待收货(1), 用户可继续核销/确认收货; 已分账核销满7天的由定时任务自动完成
-     *   2) receipt_time>0(确认过收货): 每行 核销量(receipt_num)+已退未收货量(refund_num)+已退已收货量(refund_goods_num) >= 购买量
-     *      => 全部商品已处理完, 恢复已提货(3); 否则恢复部分收货(2), 剩余部分继续核销并由定时任务自动完成
+     * 1) receipt_time=0(未确认过收货): 恢复待收货(1), 用户可继续核销/确认收货; 已分账核销满7天的由定时任务自动完成
+     * 2) receipt_time>0(确认过收货): 每行 核销量(receipt_num)+已退未收货量(refund_num)+已退已收货量(refund_goods_num) >= 购买量
+     * => 全部商品已处理完, 恢复已提货(3); 否则恢复部分收货(2), 剩余部分继续核销并由定时任务自动完成
      */
     public void restoreOrderStatusAfterRefundReview(String orderNo) {
         if (orderNo == null) {
@@ -788,6 +795,7 @@ public class GbOrderInfoService {
         LambdaUpdateWrapper<GbOrderInfo> updateWrapper = Wrappers.lambdaUpdate();
         updateWrapper.eq(GbOrderInfo::getOrderNo, orderNo);
         updateWrapper.set(GbOrderInfo::getWxShipment, 1);
+        updateWrapper.set(GbOrderInfo::getUpdateTime, TimeUtils.getTimeStamp());
         int flag = mapper.update(updateWrapper);
         return flag > 0 ? true : false;
     }
@@ -798,6 +806,7 @@ public class GbOrderInfoService {
         LambdaUpdateWrapper<GbOrderInfo> updateWrapper = Wrappers.lambdaUpdate();
         updateWrapper.eq(GbOrderInfo::getOrderNo, orderNo);
         updateWrapper.set(GbOrderInfo::getClickConfirmFlag, flag);
+        updateWrapper.set(GbOrderInfo::getUpdateTime, TimeUtils.getTimeStamp());
         int result = mapper.update(updateWrapper);
         return result > 0 ? true : false;
     }
@@ -1589,6 +1598,29 @@ public class GbOrderInfoService {
         // 4. 组装响应: 订单信息 + 可退款商品列表(含各商品可退数量)
         RefundOrderInfoResponse data = new RefundOrderInfoResponse(orderInfo);
         data.setRefundGoods(refundGoods);
+        return data;
+    }
+
+    public GbOrderInfo getApplyRefunOrderInfo(String orderNo) {
+
+
+        LambdaQueryWrapper<GbOrderInfo> queryWrapper = Wrappers.lambdaQuery();
+        queryWrapper.eq(GbOrderInfo::getStatus, 5);
+        queryWrapper.eq(GbOrderInfo::getOrderNo, orderNo);
+        GbOrderInfo data = mapper.selectOne(queryWrapper);
+        if (ObjectUtils.isEmpty(data)) {
+            return null;
+        }
+        LambdaQueryWrapper<GbOrderGoodsInfo> queryWrapper2 = Wrappers.lambdaQuery();
+        queryWrapper2.eq(GbOrderGoodsInfo::getOrderNo, orderNo);
+        queryWrapper2.orderByAsc(GbOrderGoodsInfo::getId);
+        List<GbOrderGoodsInfo> goodsList = goodsMapper.selectList(queryWrapper2);
+
+        if (!CollectionUtils.isEmpty(goodsList)) {
+            data.setGoodsInfoList(goodsList);
+        }
+
+
         return data;
     }
 

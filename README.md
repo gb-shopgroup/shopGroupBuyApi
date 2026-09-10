@@ -135,7 +135,7 @@ Maven 依赖仓库使用阿里云镜像（`https://maven.aliyun.com/repository/p
 
 ### 4.5 gb-group-order — 订单 / 支付 / 分账服务
 
-覆盖：下单、订单查询、核销（整单 / 部分核销）、退款（申请 / 审批 / 回调）、微信发货、易宝支付发起与回调、团长数据汇总、报表查询，以及团长端「我的团员」（含团购查看埋点，数据表 `gb_group_view_log`）等。**44 个接口**。
+覆盖：下单、订单查询、核销（整单 / 部分核销）、退款（申请 / 审批 / 回调）、微信发货、易宝支付发起与回调、团长数据汇总、报表查询，以及团长端「我的团员」（含团购查看埋点，数据表 `gb_group_view_log`）等。**43 个接口**。
 
 ### 4.6 gb-group-admin — 平台管理后台服务
 
@@ -288,7 +288,7 @@ mvn -pl gb-group-task spring-boot:run
 | `page` / `pageSize` | 页码（从 1 开始）/ 每页条数 |
 | `start` / `end` | 开始时间 / 结束时间（如 yyyy-MM-dd） |
 
-- **接口数量统计**：user 46 个、order 44 个、goods 23 个、admin 29 个、task 8 个，合计 **150 个**。
+- **接口数量统计**：user 46 个、order 43 个、goods 23 个、admin 29 个、task 8 个，合计 **149 个**。
 - **详细版接口文档**（含每个接口的完整入参 / 出参字段说明，参数含义、必填、嵌套字段均已细化）见根目录 **`API接口文档.md`**，可通过 `python3 generate_api_doc.py` 扫描各模块 `*Controller.java` 重新生成。下方为接口总览清单。
 
 ### 8.2 接口清单
@@ -360,7 +360,7 @@ mvn -pl gb-group-task spring-boot:run
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
 | 1 | GET | `/user/leader/shop/info` | 查看店铺信息 | 无 |
-| 2 | POST | `/user/leader/shop/save` | 修改店铺信息 | Body: **request** (ShopRequest, JSON) |
+| 2 | POST | `/user/leader/shop/save` | 修改/保存-店铺信息 | Body: **request** (ShopRequest, JSON) |
 | 3 | POST | `/user/leader/shop/update` | 更新店铺码图片地址（保存店铺二维码上传后的访问URL） | Body: **request** (ShopErCodeRequest, JSON) |
 | 4 | GET | `/user/leader/getGroup/shop` | 通过leaderId团长店铺详情 | **leaderId** (Long) |
 | 5 | POST | `/user/leader/shop/makeQrCode` | 团长-我的店铺二维码,上传到服务器返回URL | **shopId** (Long) |
@@ -401,7 +401,7 @@ mvn -pl gb-group-task spring-boot:run
 | 1 | GET | `/user/member/info` | 根据 token 获取用户信息 | 无 |
 | 2 | GET | `/user/member/isleader` | 是否团长身份 | 无 |
 
-#### 8.2.2 gb-group-order（订单/退款/分账）— 44 个接口
+#### 8.2.2 gb-group-order（订单/退款/分账）— 43 个接口
 
 **OrderBusinessController**（`cn.com.shopgroup.order.controller`）
 
@@ -422,27 +422,26 @@ mvn -pl gb-group-task spring-boot:run
 | --- | --- | --- | --- | --- |
 | 1 | GET | `/order/group/groupActivity/cat` | 团购分类列表（首页） | 无 |
 | 2 | POST | `/order/group/get/groupActivity/list` | 用户首页-查询所有团购活动列表 | Body: **request** (MemberGroupListRequest, JSON) |
-| 3 | GET | `/order/group/groupActivity/count` | 团购数量（首页） | **leaderId** (Long); **catId** (Long) |
-| 4 | GET | `/order/group/groupActivity/info` | 团购详情(团长分享页面)---用户首页：团长更多好货也用 | **groupId** (Long) |
-| 5 | POST | `/order/group/groupActivity/view` | 用户查看团购详情-显式埋点上报(分享等场景前端调用; 首页进入详情会自动埋点, 可不上报) | Body: **request** (MemberGroupViewRequest, JSON) |
-| 6 | GET | `/order/group/groupActivity/shop` | 团长店铺详情 | **leaderId** (Long) |
-| 7 | GET | `/order/group/groupActivity/logs` | 晚上时间只生成固定跟团记录（锁定在19:00-20:00生成的订单）。 | **groupId** (Long) |
-| 8 | GET | `/order/group/groupActivity/logs2` | 团购记录(跟团记录), 滚动部分 | **id** (Long) |
-| 9 | GET | `/order/group/order/records` | 真实跟团记录：基于支付成功订单数据 | **groupId** (Long); **limit** (Integer) |
+| 3 | GET | `/order/group/groupActivity/info` | 团购详情(团长分享页面)---用户首页：团长更多好货也用 | **groupId** (Long) |
+| 4 | POST | `/order/group/groupActivity/view` | 用户查看团购详情-显式埋点上报(分享等场景前端调用; 首页进入详情会自动埋点, 可不上报) | Body: **request** (MemberGroupViewRequest, JSON) |
+| 5 | GET | `/order/group/groupActivity/shop` | 团长店铺详情 | **leaderId** (Long) |
+| 6 | GET | `/order/group/groupActivity/logs` | 晚上时间只生成固定跟团记录（锁定在19:00-20:00生成的订单）。 | **groupId** (Long) |
+| 7 | GET | `/order/group/groupActivity/logs2` | 团购记录(跟团记录), 滚动部分 | **id** (Long) |
+| 8 | GET | `/order/group/order/records` | 真实跟团记录：基于支付成功订单数据 | **groupId** (Long); **limit** (Integer) |
 
 **MemberOrderController**（`cn.com.shopgroup.order.controller.group`）
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
 | 1 | POST | `/order/group/order/list` | 用户订单列表（按订单状态/商品名称筛选, 分页查询） | Body: **request** (MemberOrderListRequest, JSON) |
-| 2 | POST | `/order/group/order/applyRefundList` | 用户售后订单列表（按订单状态筛选, 分页查询） | Body: **request** (MemberOrderRefundListRequest, JSON) |
+| 2 | POST | `/order/group/order/applyRefundList` | 用户售后订单列表(支持按商品名称/售后审核状态筛选; 同一订单的商品可能处于不同售后状态, 按(订单,审核状态)拆分为多条返回, 每条goods仅含该状态的商品, 行状态见goods[].applyRefund; 分页在订单维度) | Body: **request** (MemberOrderRefundListRequest, JSON) |
 | 3 | GET | `/order/group/order/count` | 用户订单数量 | **pid** (Long) |
 | 4 | GET | `/order/group/order/info` | 用户订单详情 | **orderNo** (String) |
 | 5 | GET | `/order/group/order/makeErcode` | 用户订单小程序码(微信小程序码, 扫码进入C端小程序对应订单页面) | **orderNo** (String) |
 | 6 | GET | `/order/group/order/receipt` | 用户订单收货 | **orderNo** (String); **point** (Long) |
-| 7 | POST | `/order/group/order/apply/refund` | 用户申请订单退款。refundFlag: 1=退款(退"待收货"部分, 可退量=购买数-收货数-已申请退款数), 2=退货退款(退"已收货"部分, 可退量=收货数-已申请退货退款数); 申请成功后订单refund_fee与对应商品行退款/退货退款数量先占坑累计(可退量会相应扣减), 待团长审核: 同意=保留占坑并转正式退款, 不同意=自动恢复申请前(扣回订单refund_fee、回退商品行数量、售后状态置不同意); 出参data为本次申请退款总金额(单位:元) | Body: **refundApplyRequest** (OrderRefundApplyRequest, JSON) |
+| 7 | POST | `/order/group/order/apply/refund` | 用户申请订单退款。refundFlag: 1=退款(退"待收货"部分, 可退量=购买数-收货数-已申请退款数), 2=退货退款(退"已收货"部分, 可退量=收货数-已申请退货退款数); 申请成功后仅对应商品行退款/退货退款数量先占坑累计(可退量会相应扣减), 订单主表refund_fee不在申请时维护, 待团长审核: 同意且退款成功后才把本次金额累加到订单refund_fee, 不同意=主表金额天然不变回到申请前, 仅回退商品行数量并把售后状态置不同意; 出参data为本次申请退款总金额(单位:元) | Body: **refundApplyRequest** (OrderRefundApplyRequest, JSON) |
 | 8 | GET | `/order/group/order/refund/reasonList` | 用户退款原因下拉列表(申请退款时"选择退款原因") | 无 |
-| 9 | GET | `/order/group/order/refund/recodes` | 申请售后记录查询 | **orderNo** (String) |
+| 9 | GET | `/order/group/order/refund/recodes` | 售后记录查询 | **orderNo** (String) |
 | 10 | GET | `/order/group/order/notAllReceiptList` | 用户端-查询还有商品未全部收货的订单列表(该用户在该团长/店铺下已支付, 且存在商品行收货数量小于购买数量的订单) | **shopId** (Long) |
 | 11 | POST | `/order/group/order/confirmShipping` | 用户点击确认收货组件后调用接口，更新订单已经操作按钮 | **orderNo** (String) |
 | 12 | POST | `/order/group/order/applyRefund/orderInfo` | 用户点击申请退货后调用接口 | Body: **request** (MemberOrderRefundRequest, JSON) |
@@ -481,8 +480,8 @@ mvn -pl gb-group-task spring-boot:run
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/order/leader/refund/count` | 退款订单数量 | **gid** (Long); **pid** (Long) |
-| 2 | POST | `/order/leader/refund/approve` | 售后订单审核（同意/不同意）。status: 1=同意, 2=不同意; 每单一行key=订单号, value.refundGoodsMap为本次申请的订单商品行(行内refundNum/refundAmount为本次申请值); 同意=保留申请时占坑的金额与数量, 订单转售后处理并通知退款; 不同意=自动恢复申请前(扣回订单refund_fee本次金额、按行回退商品退款/退货退款数量、商品售后状态置不同意); 团长端旧版本未回传refundFlag/金额时后端按该订单最近一笔售后记录兜底恢复 | Body: **approveRequest** (OrderApproveRequest, JSON) |
+| 1 | GET | `/order/leader/refund/count` | 退款订单数量: 订单中存在商品发生过退款(部分退/整单全退, 审核同意)即计入 | **gid** (Long); **pid** (Long) |
+| 2 | POST | `/order/leader/refund/approve` | 售后订单审核（同意/不同意）。status: 1=同意, 2=不同意; 每单一行key=订单号, value.refundGoodsMap为本次申请的订单商品行(行内refundNum/refundAmount为本次申请值); 同意=保留申请时占坑的商品数量, 退款成功后把本次金额累计到订单refund_fee并转售后处理通知退款; 不同意=主表退款金额申请阶段未累加无需回退(天然回到申请前), 仅按行回退商品退款/退货退款数量并把商品售后状态置不同意; 团长端旧版本未回传refundFlag/金额时后端按该订单最近一笔售后记录兜底 | Body: **approveRequest** (OrderApproveRequest, JSON) |
 
 **OrderRefundNotifyController**（`cn.com.shopgroup.order.controller.leader`）
 
@@ -624,7 +623,7 @@ mvn -pl gb-group-task spring-boot:run
 | 3 | GET | `/task/order/query` | 查询订单 | **orderNo** (String) |
 | 4 | GET | `/task/order/refund` | 同步原始订单表和商户订单表的退款状态 | **orderNo** (String) |
 | 5 | GET | `/task/order/cash` | 提现 | **id** (int); **val** (int) |
-| 6 | GET | `/task/order/verify` | 自动收货 | 无 |
+| 6 | GET | `/task/order/verify` | 自动完成收货(手动触发, 与定时任务同一套逻辑): 已分账核销、核销满7天仍未完成收货的订单自动完成 | 无 |
 | 7 | GET | `/task/order/backstock` | 超时未支付订单自动取消并恢复库存(手动触发, 与定时任务同一套逻辑) | 无 |
 | 8 | GET | `/task/test/user` | 查询文章信息(联调测试接口) | **aId** (Long) |
 

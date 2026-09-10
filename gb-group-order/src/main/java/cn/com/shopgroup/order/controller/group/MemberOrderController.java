@@ -14,6 +14,7 @@ import cn.com.shopgroup.order.http.request.MemberOrderRefundListRequest;
 import cn.com.shopgroup.order.http.request.MemberOrderRefundRequest;
 import cn.com.shopgroup.order.http.request.OrderRefundApplyRequest;
 import cn.com.shopgroup.order.http.request.OrderRefundGoodsRequest;
+import cn.com.shopgroup.order.http.response.OrderMainRefundResponse;
 import cn.com.shopgroup.order.http.response.OrderRefundRecordResponse;
 import cn.com.shopgroup.order.http.response.OrderResponse;
 import cn.com.shopgroup.order.http.response.RefundOrderInfoResponse;
@@ -118,7 +119,7 @@ public class MemberOrderController {
         return JsonResult.success(data);
     }
 
-    // 用户售后订单列表(支持商品名称筛选; 同一订单商品售后状态不同时按状态拆分多条返回, 分页查询)
+    // 用户售后订单列表(支持按商品名称/售后审核状态筛选; 同一订单的商品可能处于不同售后状态, 按(订单,审核状态)拆分为多条返回, 每条goods仅含该状态的商品, 行状态见goods[].applyRefund; 分页在订单维度)
     @PostMapping("/group/order/applyRefundList")
     public JsonResult applyRefundList(@RequestBody MemberOrderRefundListRequest request) {
         log.info("用户端查询售后订单列表接口-参数request:{}", JSON.toJSONString(request));
@@ -504,17 +505,24 @@ public class MemberOrderController {
         return JsonResult.success(reasonList);
     }
 
-    // 申请售后记录查询
+    // 售后记录查询
     @GetMapping("/group/order/refund/recodes")
     public JsonResult getRefundRecords(@RequestParam("orderNo") String orderNo) {
-        log.info("申请售后记录查询,orderNo:{}", orderNo);
-        List<GbOrderGoodsRefundRecord> recordList = refundRecordService.getRefundRecordListByOrderNo(orderNo);
-        log.info("申请售后记录查询,返回recordList:{}", JSON.toJSONString(recordList));
-        if (CollectionUtils.isEmpty(recordList)) {
+        log.info("售后记录查询,orderNo:{}", orderNo);
+        // 查询订单信息
+        GbOrderInfo orderInfo = orderInfoService.getApplyRefunOrderInfo(orderNo);
+        if (ObjectUtils.isEmpty(orderInfo)) {
             return JsonResult.success();
         }
-        List<OrderRefundRecordResponse> result = OrderRefundRecordResponse.getOrderRefundRecordResponseList(recordList);
-        return JsonResult.success(result);
+        OrderMainRefundResponse response = new OrderMainRefundResponse(orderInfo);
+        List<GbOrderGoodsRefundRecord> recordList = refundRecordService.getRefundRecordListByOrderNo(orderNo);
+        log.info("申请售后记录查询orderNo:{},返回recordList:{}", orderNo, JSON.toJSONString(recordList));
+        if (!CollectionUtils.isEmpty(recordList)) {
+            List<OrderRefundRecordResponse> refundRecordResponses = OrderRefundRecordResponse.getOrderRefundRecordResponseList(recordList);
+            response.setRefundRecords(refundRecordResponses);
+        }
+
+        return JsonResult.success(response);
     }
 
 
