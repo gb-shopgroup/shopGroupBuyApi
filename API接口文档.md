@@ -57,7 +57,7 @@
 | 27 | user | POST | `/user/leader/shop/save` | 修改/保存-店铺信息 |
 | 28 | user | POST | `/user/leader/shop/update` | 更新店铺码图片地址（保存店铺二维码上传后的访问URL） |
 | 29 | user | GET | `/user/leader/getGroup/shop` | 通过leaderId团长店铺详情 |
-| 30 | user | POST | `/user/leader/shop/makeQrCode` | 团长-我的店铺二维码,上传到服务器返回URL |
+| 30 | user | POST | `/user/leader/shop/makeQrCode` | 团长-我的店铺小程序码(微信小程序码,page=`pages/order/index`,scene=`shopId=xx`),上传到服务器返回URL |
 | 31 | user | GET | `/user/leader/message/list` | 消息列表(团长查看所有消息) |
 | 32 | user | GET | `/user/leader/message/count` | 消息列表总数量(团长查看所有消息) |
 | 33 | user | GET | `/user/leader/message/unread` | 未读消息总数量(团长查看所有消息) |
@@ -1027,7 +1027,7 @@ data 类型：`Object`（未能静态推断，以接口实际返回为准）
 
 #### 5. POST `/user/leader/shop/makeQrCode`
 
-**功能说明**：团长-我的店铺二维码,上传到服务器返回URL
+**功能说明**：团长-我的店铺小程序码(微信小程序码,page=`pages/order/index`,scene=`shopId=xx`),上传到服务器返回URL
 
 **入参**
 

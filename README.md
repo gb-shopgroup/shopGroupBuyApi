@@ -46,7 +46,7 @@
 | 构建工具 | Maven | — |
 | 支付 | 易宝支付（Yeepay） | — |
 | 对象存储 | 华为云 OBS | — |
-| 二维码 | ZXing | — |
+| 二维码/小程序码 | 微信小程序码（`getwxacodeunlimit`） | — |
 
 Maven 依赖仓库使用阿里云镜像（`https://maven.aliyun.com/repository/public`）。
 
@@ -363,7 +363,7 @@ mvn -pl gb-group-task spring-boot:run
 | 2 | POST | `/user/leader/shop/save` | 修改/保存-店铺信息 | Body: **request** (ShopRequest, JSON) |
 | 3 | POST | `/user/leader/shop/update` | 更新店铺码图片地址（保存店铺二维码上传后的访问URL） | Body: **request** (ShopErCodeRequest, JSON) |
 | 4 | GET | `/user/leader/getGroup/shop` | 通过leaderId团长店铺详情 | **leaderId** (Long) |
-| 5 | POST | `/user/leader/shop/makeQrCode` | 团长-我的店铺二维码,上传到服务器返回URL | **shopId** (Long) |
+| 5 | POST | `/user/leader/shop/makeQrCode` | 团长-我的店铺小程序码(微信小程序码,page=`pages/order/index`,scene=`shopId=xx`),上传到服务器返回URL | **shopId** (Long) |
 
 **MessageController**（`cn.com.shopgroup.user.controller.leader`）
 
