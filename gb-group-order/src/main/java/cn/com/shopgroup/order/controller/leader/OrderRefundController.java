@@ -90,7 +90,7 @@ public class OrderRefundController {
         return JsonResult.success(total);
     }
 
-    //售后订单审核（同意/不同意）。status: 1=同意, 2=不同意; 每单一行key=订单号, value.refundGoodsMap为本次申请的订单商品行(行内refundNum/refundAmount为本次申请值); 同意=保留申请时占坑的商品数量, 退款成功后把本次金额累计到订单refund_fee并转售后处理通知退款; 不同意=主表退款金额申请阶段未累加无需回退(天然回到申请前), 仅按行回退商品退款/退货退款数量并把商品售后状态置不同意; 团长端旧版本未回传refundFlag/金额时后端按该订单最近一笔售后记录兜底
+    //售后订单审核（同意/不同意）。status: 1=同意, 2=不同意; 每单一行key=订单号, value.refundGoodsMap为本次申请的订单商品行(行内refundNum/refundAmount为本次申请值); 同意=按本次申请金额向易宝发起退款(支持部分退款)、保留申请时占坑的商品数量并把商品售后状态置同意(主表退款金额refund_fee不在此累加, 统一由退款回调成功后按实际退款金额累加; 商品行退款以退款数量体现, 不单独落库金额); 不同意=主表退款金额申请/审核阶段均未累加无需回退(天然回到申请前), 仅按行回退商品退款/退货退款数量并把商品售后状态置不同意; 团长端旧版本未回传refundFlag/金额时后端按该订单最近一笔售后记录兜底
     @PostMapping("/leader/refund/approve")
     public JsonResult approveRefundOrder(@Validated @RequestBody OrderApproveRequest approveRequest) {
         log.info("团长管理-审核退款订单处理.../order/refund/approve,参数:{}", JSON.toJSONString(approveRequest));
@@ -240,7 +240,7 @@ public class OrderRefundController {
         refundRecord.setAddTime(TimeUtils.getTimeStamp());
         refundRecordService.addRefundRecord(refundRecord);
         // 同步分账订单表, 核销之后的订单才能分账, 这样只要不核销订单, 就可以随时退款
-        businessService.updateBusinessOrderCheckStatus(request.getOrderNo());
+        //businessService.updateBusinessOrderCheckStatus(request.getOrderNo());
         // 3. 恢复订单主状态: 拒绝并不产生真实退款, 该订单无其它待审核售后时从售后(5)恢复为申请前状态, 否则订单一直卡在售后
         orderInfoService.restoreOrderStatusAfterRefundReview(request.getOrderNo());
 
@@ -251,13 +251,22 @@ public class OrderRefundController {
         messageService.addMiniLeaderMessageInfo(leaderId, opId, type, content);
     }
 
-    //同意退款处理
+    //同意退款处理: 按本次申请金额发起退款, 主表refund_fee留待退款回调成功后累加
     public int handleAgree(Long leaderId, Long opId, String opName, GbOrderInfo orderInfo, OrderRefundInfoRequest request, String reason) {
         // 申请退款账户
         String merchantNo = orderInfo.getMerchantNo();
         String orderNo = orderInfo.getOrderNo();
-        // 订单金额, 分转元
-        double amount = MoneyUtil.centToYuan(orderInfo.getPayFee());
+        // 本次审核同意的退款金额(单位:分): 优先取审核请求回传的本次申请金额, 团长端旧版本未回传时按最近一笔申请记录兜底
+        int agreeRefundCent = getApplyRefundCent(orderNo, request);
+        // 按本次申请金额发起退款(支持部分退款); 申请金额缺失时退化为整单实付金额, 避免向易宝发起0元退款
+        int requestRefundCent = agreeRefundCent > 0 ? agreeRefundCent
+                : (orderInfo.getPayFee() == null ? 0 : orderInfo.getPayFee());
+        if (requestRefundCent <= 0) {
+            log.warn("退款发起终止: 订单{}本次可退金额为0", orderNo);
+            return 0;
+        }
+        // 退款金额, 分转元
+        double amount = MoneyUtil.centToYuan(requestRefundCent);
         Map<String, String> res = YeePayUtils.refund(merchantNo, orderNo, String.valueOf(amount));
         //插入交易流水表
         OrderTransactionLog transactionLog = new OrderTransactionLog();
@@ -278,11 +287,8 @@ public class OrderRefundController {
         } else {
             // 同步原始订单表和商户订单表的退款状态
             orderBusinessInfoService.editMiniLeaderOrderBusinessRefundStatus(orderNo);
-            // 主表退费金额维护: 退款金额仅在团长同意且退款成功后, 才把本次申请金额累计到订单refund_fee(申请阶段不累加, 拒绝无需回退)
-            int agreeRefundCent = getApplyRefundCent(orderNo, request);
-            if (agreeRefundCent > 0) {
-                orderInfoService.addMiniOrderRefundFee(orderNo, agreeRefundCent);
-            }
+            // 注: 主表退款金额refund_fee不在此维护, 申请/审核阶段都不累加;
+            //     统一由退款回调成功后按易宝回传的实际退款金额累加(见 OrderRefundNotifyController#handleRefundResult)
             // 退款成功, 按实际退款数量回补库存(商品总库存 + SKU库存), 支持部分退款
             // 注: 商品行的退款/退货退款数量已在用户申请时累计占坑, 审核同意后保留不再重复累加
             List<GbOrderGoodsInfo> goodsList = orderInfoService.getOrderGoodsList(orderNo);

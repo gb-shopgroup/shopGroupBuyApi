@@ -43,6 +43,11 @@ public class RedisConstant {
     public final static String RedisOrderPayKey = "OrderPay:";
 
 
+    // 退款结果回调幂等键(按易宝退款单号), 防止易宝重复通知导致重复落库
+    public final static long RedisRefundNotifyExpired = 7*24*60*60;
+    public final static String RedisRefundNotifyKey = "RefundNotify:";
+
+
 
     public final static long RedisOrderCodeExpired = 1*24*60*60;
     public final static String RedisOrderCodeKey = "OrderCode:";

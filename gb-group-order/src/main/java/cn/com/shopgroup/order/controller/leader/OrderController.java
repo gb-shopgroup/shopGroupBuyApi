@@ -31,6 +31,7 @@ import cn.com.shopgroup.user.service.GbOrgStaffInfoService;
 import cn.com.shopgroup.user.utils.RequestParamsUtils;
 import com.alibaba.fastjson2.JSON;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
 import org.springframework.validation.annotation.Validated;
@@ -82,7 +83,7 @@ public class OrderController {
         String keyword = request.getKeyword();
         Integer status = request.getStatus();
         // 查询订单列表
-        List<GbOrderInfo> result = orderInfoService.getLeaderOrderList(leaderId, groupId, request.getPointId(),keyword, status, page, pageSize);
+        List<GbOrderInfo> result = orderInfoService.getLeaderOrderList(leaderId, groupId, request.getPointId(), keyword, status, page, pageSize);
         List<OrderResponse> data = OrderResponse.getOrderResponseList(result);
         return JsonResult.success(data);
     }
@@ -237,7 +238,8 @@ public class OrderController {
             int m = orderInfoService.updateGoodsNum(goodsList);
             //核销成功后，订单对应的团长的cashType[结算到账方式,0=支付时延迟到账型,1=核销时延迟到账型]
             int type = leaderInfo.getCashType().intValue();
-            if (type == 1 && orderInfo.getWxShipment().intValue() == 0) {
+            // 核销时延迟到账型(1) 且未调用过微信发货的订单, 核销后补调用微信发货(同步发货状态)
+            if (type == 1 && !isWxShipmentCalled(orderInfo)) {
                 handleCalledWxUploadShippingInfo(orderInfo);
             }
             return JsonResult.success("核销成功");
@@ -291,8 +293,10 @@ public class OrderController {
             Long tempId = goods.getId();
             Integer tempGoodNum = goods.getGoodsNum(); // 订单商品数量
             Integer tempReceiptNum = goods.getReceiptNum(); // 收货数量
+            //已经退款-支付数量
+            int refundNum = goods.getRefundNum() == null ? 0 : goods.getRefundNum().intValue();
             //未核销商品数量
-            int remainNum = tempGoodNum.intValue() - tempReceiptNum.intValue();
+            int remainNum = tempGoodNum.intValue() - tempReceiptNum.intValue()-refundNum;
             if (remainNum < 0) {
                 throw new BusinessException(OrderErrorCodeEnum.VERIFY_NUM_EXCEED);
             }
@@ -318,7 +322,8 @@ public class OrderController {
         if (flag) {
             //订单对应的团长的cashType[结算到账方式,0=支付时延迟到账型,1=核销时延迟到账型]
             int type = leaderInfo.getCashType().intValue();
-            if (type == 1 && orderInfo.getWxShipment().intValue() == 0) {
+            // 核销时延迟到账型(1) 且未调用过微信发货的订单, 核销后补调用微信发货(同步发货状态)
+            if (type == 1 && !isWxShipmentCalled(orderInfo)) {
                 handleCalledWxUploadShippingInfo(orderInfo);
             }
             return JsonResult.success("核销成功");
@@ -327,22 +332,60 @@ public class OrderController {
         }
     }
 
-    //调用微信发货
+    // 是否已调用过微信发货(wx_shipment:0=未调用,1=已调用)
+    private boolean isWxShipmentCalled(GbOrderInfo orderInfo) {
+        Integer wxShipment = orderInfo.getWxShipment();
+        return wxShipment != null && wxShipment.intValue() == 1;
+    }
+
+    // 核销时调用微信发货(团长结算到账方式=1 核销时延迟到账型): 核销成功后补调用微信发货
+    // 与支付回调/团长手动发货/定时任务口径一致: 发货成功同时同步 微信发货标记(wx_shipment) + 收款账户表发货状态(is_send/comm_status)
     private void handleCalledWxUploadShippingInfo(GbOrderInfo orderInfo) {
         String orderNo = orderInfo.getOrderNo();
+        // 微信单号优先取收款账户表, 兜底取支付流水号
         GbOrderBusinessInfo orderBusinessInfo = businessService.getOrderBusinessInfo(orderNo);
-        if (ObjectUtils.isEmpty(orderBusinessInfo)) {
+        String transactionId = ObjectUtils.isEmpty(orderBusinessInfo) ? null : orderBusinessInfo.getTransactionId();
+        if (StringUtils.isEmpty(transactionId)) {
+            transactionId = orderInfo.getPayNo();
+        }
+        if (StringUtils.isEmpty(transactionId)) {
+            log.warn("[核销微信发货]未获取到微信单号, orderNo:{}", orderNo);
             return;
         }
-        // 再获取访问令牌
-        String accessToken = wxAccessTokenHelper.getAccessToken(false);
-        int flag = WxMiniProgramHelper.uploadShippingInfo(accessToken, orderBusinessInfo.getTransactionId(),
-                orderInfo.getGroupName(), orderInfo.getOpenid());
-        //返回1说明该订单已经调用过微信的发货
-        if (flag == 1) {
-            // 标记订单已调用微信发货(wx_shipment:0=未调用,1=已调用)
-            orderInfoService.updateWxShipment(orderNo);
+        // 微信发货失败不影响核销主流程(核销已完成), 仅记录日志, 由后续自动发货任务兜底重试
+        try {
+            // 首次调用(使用缓存access_token)
+            int wxFlag = callWxUploadShippingInfo(orderNo, transactionId, orderInfo.getGroupName(), orderInfo.getOpenid(), false);
+            // access_token失效(微信返回40001/42001, 对应-1)时, 清除缓存并强制刷新后重试一次
+            if (wxFlag == -1) {
+                wxAccessTokenHelper.removeAccessToken();
+                log.warn("[核销微信发货]access_token失效, 清除缓存并强制刷新后重试, orderNo:{}", orderNo);
+                wxFlag = callWxUploadShippingInfo(orderNo, transactionId, orderInfo.getGroupName(), orderInfo.getOpenid(), true);
+            }
+            // 1=微信发货成功
+            if (wxFlag == 1) {
+                // 标记订单已调用微信发货(wx_shipment:0=未调用,1=已调用)
+                orderInfoService.updateWxShipment(orderNo);
+                // 同步收款账户订单发货状态(is_send=1, send_time, comm_status=1 已发货), 避免自动发货任务重复发货
+                businessService.updateBusinessOrderSendStatus(orderNo);
+                log.info("[核销微信发货]核销调用微信发货成功, orderNo:{}", orderNo);
+            } else {
+                log.error("[核销微信发货]核销调用微信发货失败, orderNo:{}, wxFlag:{}", orderNo, wxFlag);
+            }
+        } catch (Exception e) {
+            log.error("[核销微信发货]核销调用微信发货异常, orderNo:{}", orderNo, e);
         }
+    }
+
+    // 调用微信发货信息录入(可强制刷新access_token), 返回: 1=成功, 0=业务失败, -1=access_token失效(40001/42001)
+    private int callWxUploadShippingInfo(String orderNo, String transactionId, String groupName, String openid, boolean forceRefreshToken) {
+        // forceRefreshToken=true 时忽略Redis缓存, 强制向微信重新获取access_token
+        String accessToken = wxAccessTokenHelper.getAccessToken(forceRefreshToken);
+        if (StringUtils.isEmpty(accessToken)) {
+            log.warn("[核销微信发货]获取access_token失败, orderNo:{}", orderNo);
+            return -1;
+        }
+        return WxMiniProgramHelper.uploadShippingInfo(accessToken, transactionId, groupName, openid);
     }
 
     // 团长端-查询微信发货
@@ -400,7 +443,7 @@ public class OrderController {
         // 订单数量
         Double refundAmountTotal = 0D;
         // 订单总数（取消除外）
-        List<GbOrderInfo> list = orderInfoService.getAllByLeaderIdAndPointId(leaderId,pointId);
+        List<GbOrderInfo> list = orderInfoService.getAllByLeaderIdAndPointId(leaderId, pointId);
         if (!CollectionUtils.isEmpty(list)) {
             orderTotal = list.size();
             amountTotal = list.stream().mapToDouble(GbOrderInfo::getOrderPrice).sum();

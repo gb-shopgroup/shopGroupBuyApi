@@ -343,7 +343,7 @@ public class MemberOrderController {
         }
     }
 
-    // 用户申请订单退款。refundFlag: 1=退款(退"待收货"部分, 可退量=购买数-收货数-已申请退款数), 2=退货退款(退"已收货"部分, 可退量=收货数-已申请退货退款数); 申请成功后仅对应商品行退款/退货退款数量先占坑累计(可退量会相应扣减), 订单主表refund_fee不在申请时维护, 待团长审核: 同意且退款成功后才把本次金额累加到订单refund_fee, 不同意=主表金额天然不变回到申请前, 仅回退商品行数量并把售后状态置不同意; 出参data为本次申请退款总金额(单位:元)
+    // 用户申请订单退款。refundFlag: 1=退款(退"待收货"部分, 可退量=购买数-收货数-已申请退款数), 2=退货退款(退"已收货"部分, 可退量=收货数-已申请退货退款数); 申请成功后仅对应商品行退款/退货退款数量先占坑累计(可退量会相应扣减), 订单主表refund_fee在申请/审核阶段都不维护, 待团长审核: 同意仅按本次申请金额发起退款(主表金额改由退款回调成功后按实际退款金额累加), 不同意=主表金额天然不变回到申请前, 仅回退商品行数量并把售后状态置不同意; 出参data为本次申请退款总金额(单位:元)
     @PostMapping("/group/order/apply/refund")
     public JsonResult orderApplyRefund(@Validated @RequestBody OrderRefundApplyRequest refundApplyRequest) {
         log.info("[用户申请订单退款操作],params->{}", JSON.toJSONString(refundApplyRequest));
@@ -470,7 +470,7 @@ public class MemberOrderController {
             throw new BusinessException(OrderErrorCodeEnum.REFUND_AMOUNT_EXCEED);
         }
 
-        // 申请退款: 订单状态置为售后(5)待团长审核(主表refund_fee不在申请时累加, 待团长同意且退款成功后才维护)
+        // 申请退款: 订单状态置为售后(5)待团长审核(主表refund_fee在申请/审核阶段都不累加, 待退款回调成功后才维护)
         Boolean flag = orderInfoService.miniRefundOrder(memberId, orderNo);
         // 订单商品变更: 仅本次申请的商品行累加退款/退货退款数量(占坑); 审核同意保留, 审核拒绝时回退
         orderInfoService.updateOrderGoodsRefundByOrderNo(applyGoodsList, isReturnGoods);
@@ -482,7 +482,7 @@ public class MemberOrderController {
             refundRecord.setOperateName(memberName);
             refundRecord.setIsAgree(0);
             refundRecord.setOrderNo(orderNo);
-            // 落库本次申请的类型与金额(单位:分), 团长端审核未回传类型/金额时, 审核处理据此兜底(拒绝回退商品数量/同意累加主表退费金额)
+            // 落库本次申请的类型与金额(单位:分), 团长端审核未回传类型/金额时, 审核处理据此兜底(拒绝回退商品数量/同意按此金额发起退款)
             refundRecord.setRefundFlag(isReturnGoods);
             refundRecord.setRefundAmount(MoneyUtil.yuanToCent(allRefundAmount));
             refundRecord.setActionReason(refundApplyRequest.getActionReason());

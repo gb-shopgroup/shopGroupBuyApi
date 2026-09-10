@@ -279,8 +279,8 @@ public class GbOrderInfoService {
     }
 
 
-    // 用户申请退款: 仅把订单置为售后(5)待团长审核并记录申请时间; 主表退费金额refund_fee不在申请时维护(占坑),
-    // 待团长同意且退款成功后, 才由 addMiniOrderRefundFee 累加到订单主表; 拒绝时金额无需回退即回到申请前
+    // 用户申请退款: 仅把订单置为售后(5)待团长审核并记录申请时间; 主表退费金额refund_fee在申请/审核阶段都不维护(占坑),
+    // 待退款回调成功后才由 addMiniOrderRefundFee 按实际退款金额累加到订单主表; 拒绝/退款失败时金额无需回退即回到申请前
     public Boolean miniRefundOrder(Long memberId, String orderNo) {
 
         LambdaUpdateWrapper<GbOrderInfo> updateWrapper = Wrappers.lambdaUpdate();
@@ -292,7 +292,27 @@ public class GbOrderInfoService {
         return flag > 0 ? true : false;
     }
 
-    // 团长审核同意且退款成功后, 把本次申请退款金额(单位:分)累计维护到订单表refund_fee
+    // 退款结果回调: 补全订单的退款流水号(来自退款接口)与退款时间;
+    // 已记录相同退款流水号时不重复更新, 保证易宝重复通知时回调落库幂等
+    public Boolean updateOrderRefundInfo(String orderNo, String refundNo, Integer refundTime) {
+        if (StringUtils.isEmpty(orderNo) || StringUtils.isEmpty(refundNo)) {
+            return false;
+        }
+        LambdaUpdateWrapper<GbOrderInfo> updateWrapper = Wrappers.lambdaUpdate();
+        updateWrapper.eq(GbOrderInfo::getOrderNo, orderNo);
+        // 幂等: 未记录退款流水号 或 与本次退款流水号不一致时才更新
+        updateWrapper.and(wrapper -> wrapper.isNull(GbOrderInfo::getRefundNo)
+                .or().ne(GbOrderInfo::getRefundNo, refundNo));
+        updateWrapper.set(GbOrderInfo::getRefundNo, refundNo);
+        updateWrapper.set(GbOrderInfo::getRefundTime, refundTime == null ? TimeUtils.getTimeStamp() : refundTime);
+        updateWrapper.set(GbOrderInfo::getUpdateTime, TimeUtils.getTimeStamp());
+        int flag = mapper.update(updateWrapper);
+        return flag > 0;
+    }
+
+
+    // 退款回调成功后, 把本次实际退款金额(单位:分)累计维护到订单表refund_fee;
+    // 申请与审核阶段都不调用, 只在退款资金最终成功时调用一次(幂等由调用方 OrderRefundNotifyController 保证)
     public Boolean addMiniOrderRefundFee(String orderNo, Integer addRefundFee) {
         if (orderNo == null || addRefundFee == null || addRefundFee <= 0) {
             return false;
@@ -866,7 +886,7 @@ public class GbOrderInfoService {
      */
     /**
      * 审核拒绝时回退商品行本次申请累计的退款/退货退款数量
-     * 申请时商品行数量占坑(主表refund_fee金额改为团长同意后才累加, 不在申请时占坑),
+     * 申请时商品行数量占坑(主表refund_fee金额改为退款回调成功后才累加, 不在申请时占坑),
      * 拒绝则按本次申请量回退, 否则占坑导致无法再次申请/数量虚高
      *
      * @param refundNumMap  key=订单商品id, value=本次申请数量(审核拒绝时从请求回传)
