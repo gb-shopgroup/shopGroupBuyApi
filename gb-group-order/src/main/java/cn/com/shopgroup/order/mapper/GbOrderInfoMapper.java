@@ -328,4 +328,36 @@ public interface GbOrderInfoMapper extends BaseMapper<GbOrderInfo> {
      */
     List<GbOrderInfo> getLeaderMemberOrderList(@Param("leaderId") Long leaderId,
                                                @Param("memberId") Long memberId);
+
+    /**
+     * 团长端-对账单: 统计时间范围内的有效订单数(orderTotal)/订单总金额(amountTotal,分)/退款总金额(refundAmountTotal,分)
+     */
+    Map<String, Object> getLeaderBillTotal(@Param("leaderId") Long leaderId,
+                                           @Param("startTime") int startTime,
+                                           @Param("endTime") int endTime);
+
+    /**
+     * 团长端-对账单: 按订单维度分页明细(订单号/订单金额,分/退款金额,分)
+     */
+    List<Map<String, Object>> getLeaderBillOrderPageList(@Param("leaderId") Long leaderId,
+                                                         @Param("startTime") int startTime,
+                                                         @Param("endTime") int endTime,
+                                                         @Param("offset") int offset,
+                                                         @Param("limit") int limit);
+
+    /**
+     * 团长端-对账单: 按商品维度分页明细(商品id/商品名称/订单金额,元/退款金额,元)
+     */
+    List<Map<String, Object>> getLeaderBillGoodsPageList(@Param("leaderId") Long leaderId,
+                                                         @Param("startTime") int startTime,
+                                                         @Param("endTime") int endTime,
+                                                         @Param("offset") int offset,
+                                                         @Param("limit") int limit);
+
+    /**
+     * 团长端-对账单: 按商品维度统计商品种类总数(分页总条数)
+     */
+    Integer getLeaderBillGoodsCount(@Param("leaderId") Long leaderId,
+                                    @Param("startTime") int startTime,
+                                    @Param("endTime") int endTime);
 }

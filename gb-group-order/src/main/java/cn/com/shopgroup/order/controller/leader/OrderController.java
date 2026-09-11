@@ -77,7 +77,7 @@ public class OrderController {
         // 请求参数矫正
         int page = Optional.ofNullable(request.getPage()).orElse(1);
         int pageSize = Optional.ofNullable(request.getPageSize())
-                .map(size -> Math.min(size, 100))
+                .map(size -> Math.min(size, 20))
                 .orElse(10);
         Long groupId = request.getGroupId();
         String keyword = request.getKeyword();
@@ -100,7 +100,7 @@ public class OrderController {
         // 请求参数矫正
         int page = Optional.ofNullable(request.getPage()).orElse(1);
         int pageSize = Optional.ofNullable(request.getPageSize())
-                .map(size -> Math.min(size, 100))
+                .map(size -> Math.min(size, 20))
                 .orElse(10);
         Long groupId = request.getGroupId();
         String keyword = request.getKeyword();
@@ -296,7 +296,7 @@ public class OrderController {
             //已经退款-支付数量
             int refundNum = goods.getRefundNum() == null ? 0 : goods.getRefundNum().intValue();
             //未核销商品数量
-            int remainNum = tempGoodNum.intValue() - tempReceiptNum.intValue()-refundNum;
+            int remainNum = tempGoodNum.intValue() - tempReceiptNum.intValue() - refundNum;
             if (remainNum < 0) {
                 throw new BusinessException(OrderErrorCodeEnum.VERIFY_NUM_EXCEED);
             }
@@ -431,6 +431,7 @@ public class OrderController {
     @GetMapping("/leader/home/show/orders")
     public JsonResult homeShowOrderTotal(@RequestParam("pointId") Long pointId) {
         // 从请求头中获取团长id
+        log.info("团长获取订单统计情况/leader/home/show/orders,pointId:{}", pointId);
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
             throw new BusinessException(OrderErrorCodeEnum.LEADER_NOT_EXIST);
@@ -446,16 +447,16 @@ public class OrderController {
         List<GbOrderInfo> list = orderInfoService.getAllByLeaderIdAndPointId(leaderId, pointId);
         if (!CollectionUtils.isEmpty(list)) {
             orderTotal = list.size();
-            amountTotal = list.stream().mapToDouble(GbOrderInfo::getOrderPrice).sum();
+            amountTotal = list.stream().mapToDouble(GbOrderInfo::getPayFee).sum();
             // refundFee 单位:分, 汇总前需转元
             refundAmountTotal = list.stream()
-                    .mapToDouble(o -> MoneyUtil.centToYuan(o.getRefundFee()))
-                    .sum();
+                    .mapToDouble(o -> MoneyUtil.centToYuan(o.getRefundFee())).sum();
         }
         response.setAmountTotal(amountTotal);
         response.setOrderTotal(orderTotal);
         response.setRefundAmountTotal(refundAmountTotal);
         // 返回
+        log.info("返回详情response:{}", JSON.toJSONString(response));
         return JsonResult.success(response);
     }
 
@@ -472,7 +473,7 @@ public class OrderController {
         }
         // 请求参数矫正
         int currentPage = Optional.ofNullable(page).orElse(1);
-        int size = Optional.ofNullable(pageSize).map(s -> Math.min(s, 100)).orElse(10);
+        int size = Optional.ofNullable(pageSize).map(s -> Math.min(s, 20)).orElse(10);
         int offset = (currentPage - 1) * size;
 
         // 商品种类总数 + 待核销总件数(不受分页影响)

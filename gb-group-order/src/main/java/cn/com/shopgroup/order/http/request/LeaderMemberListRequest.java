@@ -17,6 +17,6 @@ public class LeaderMemberListRequest {
     @ApiModelProperty("页码，默认1")
     private Integer page;
 
-    @ApiModelProperty("每页数量，默认10，最大100")
+    @ApiModelProperty("每页数量，默认10，最大20")
     private Integer pageSize;
 }

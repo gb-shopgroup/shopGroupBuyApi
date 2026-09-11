@@ -108,7 +108,7 @@ public class MemberOrderController {
         // 请求参数矫正
         int page = Optional.ofNullable(request.getPage()).orElse(1);
         int pageSize = Optional.ofNullable(request.getPageSize())
-                .map(size -> Math.min(size, 100))
+                .map(size -> Math.min(size, 20))
                 .orElse(10);
         // 查询订单信息
         List<GbOrderInfo> list = orderInfoService.getMemberOrderList(memberId, request.getStatus(), request.getGoodsName(), page, pageSize);
@@ -144,7 +144,7 @@ public class MemberOrderController {
         // 请求参数矫正
         int page = Optional.ofNullable(request.getPage()).orElse(1);
         int pageSize = Optional.ofNullable(request.getPageSize())
-                .map(size -> Math.min(size, 100))
+                .map(size -> Math.min(size, 20))
                 .orElse(10);
         // 查询订单信息(支持商品名称过滤, 并按商品售后状态拆分)
         List<GbOrderInfo> list = orderInfoService.getMemberApplyRefundOrderList(

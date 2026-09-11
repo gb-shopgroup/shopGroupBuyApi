@@ -112,7 +112,7 @@ public class GroupGoodsController {
         return JsonResult.success(stock);
     }
 
-    // 用户查询所有在线的团购活动列表[新用户未绑定团长时leaderId=0]: 仅返回未下线(isClose=0)且当前时间处于开团时间窗内(已开团未结束)的在线活动; leaderId>0按团长过滤(排序值sortOrder升序置顶优先, 同级按活动id倒序, 分页在SQL层完成); leaderId=0时需传经纬度(longitude/latitude, 缺失返回空列表), 仅统计已绑定自提点(pointId>0)的活动并过滤出绑定自提点与定位点球面距离小于20km者, 按活动id倒序(先距离过滤再分页); page默认1, pageSize默认10最大100
+    // 用户查询所有在线的团购活动列表[新用户未绑定团长时leaderId=0]: 仅返回未下线(isClose=0)且当前时间处于开团时间窗内(已开团未结束)的在线活动; leaderId>0按团长过滤(排序值sortOrder升序置顶优先, 同级按活动id倒序, 分页在SQL层完成); leaderId=0时需传经纬度(longitude/latitude, 缺失返回空列表), 仅统计已绑定自提点(pointId>0)的活动并过滤出绑定自提点与定位点球面距离小于20km者, 按活动id倒序(先距离过滤再分页); page默认1, pageSize默认10最大20
     @PostMapping("/member/groupActivity/list")
     public JsonResult getGroupActiveList(@Validated @RequestBody MemberGroupListRequest request) {
         log.info("用户-查询所有在线的团购活动列表,request:{}", JSON.toJSONString(request));
@@ -123,7 +123,7 @@ public class GroupGoodsController {
         // 请求参数矫正
         int page = Optional.ofNullable(request.getPage()).orElse(1);
         int pageSize = Optional.ofNullable(request.getPageSize())
-                .map(size -> Math.min(size, 100))
+                .map(size -> Math.min(size, 20))
                 .orElse(10);
         List<GbGroupActivityInfo> result = groupService.getMemberGroupActivityList(leaderId, longitude, latitude, page, pageSize);
         List<GroupActResponse> data = GroupActResponse.getGroupResponseList(result);

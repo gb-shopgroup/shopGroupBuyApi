@@ -170,7 +170,7 @@ public class LeaderShopController {
         return handleGetShop(leaderId);
     }
 
-    // 团长-我的店铺小程序码(微信小程序码),上传到服务器返回URL
+    // 团长-我的店铺小程序码(微信小程序码,page=pages/order/index,scene=shopId=xx),上传到服务器返回URL
     @PostMapping("/leader/shop/makeQrCode")
     public JsonResult shopMakeQrcode(@RequestParam("shopId") Long shopId) {
         log.info("【团长-我的店铺二维码生成】/leader/shop/makeQrCode shopId:{}", shopId);

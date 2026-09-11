@@ -104,7 +104,7 @@ public class LeaderGoodsManageController {
         // 请求参数矫正
         if (page == 0) page = 1;
         if (pageSize == 0) pageSize = 10;
-        if (pageSize > 100) pageSize = 100;
+        if (pageSize > 20) pageSize = 20;
 
         // 查询数据库
         List<GbGoodsInfo> result = goodsService.getMiniLeaderGoodsList(leaderId, catId, keyword, page, pageSize);

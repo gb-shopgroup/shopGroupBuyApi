@@ -62,7 +62,7 @@ public class GbGroupTagServiceImpl implements GbGroupTagService {
         queryWrapper.orderByAsc(GbGroupTag::getSortOrder);
         queryWrapper.orderByDesc(GbGroupTag::getAddTime);
         int curPage = page < 1 ? 1 : page;
-        int curSize = pageSize < 1 ? 10 : (pageSize > 100 ? 100 : pageSize);
+        int curSize = pageSize < 1 ? 10 : (pageSize > 20 ? 20 : pageSize);
         queryWrapper.last("limit " + (curPage - 1) * curSize + "," + curSize);
         List<GbGroupTag> result = tagMapper.selectList(queryWrapper);
         return result == null ? new ArrayList<>() : result;

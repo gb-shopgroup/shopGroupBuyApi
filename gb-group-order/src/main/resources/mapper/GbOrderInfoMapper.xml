@@ -162,4 +162,65 @@
         ORDER BY add_time DESC
     </select>
 
+    <!-- 团长端-对账单: 统计时间范围内的有效订单数/订单总金额(分)/退款总金额(分)
+         口径: 有效订单=已支付(pay_time>0)且未取消(status<>6), 按下单时间(add_time)归集 -->
+    <select id="getLeaderBillTotal" resultType="java.util.HashMap">
+        SELECT
+            COUNT(*) AS orderTotal,
+            IFNULL(SUM(o.pay_fee), 0) AS amountTotal,
+            IFNULL(SUM(o.refund_fee), 0) AS refundAmountTotal
+        FROM gb_order_info o
+        WHERE o.leader_id = #{leaderId}
+          AND o.pay_time &gt; 0
+          AND o.status &lt;&gt; 6
+          AND o.add_time BETWEEN #{startTime} AND #{endTime}
+    </select>
+
+    <!-- 团长端-对账单: 按订单维度分页明细
+         订单金额=实付金额(pay_fee,分), 退款金额=退款成功累计(refund_fee,分) -->
+    <select id="getLeaderBillOrderPageList" resultType="java.util.HashMap">
+        SELECT
+            o.order_no AS orderNo,
+            IFNULL(o.pay_fee, 0) AS amountTotal,
+            IFNULL(o.refund_fee, 0) AS refundAmountTotal
+        FROM gb_order_info o
+        WHERE o.leader_id = #{leaderId}
+          AND o.pay_time &gt; 0
+          AND o.status &lt;&gt; 6
+          AND o.add_time BETWEEN #{startTime} AND #{endTime}
+        ORDER BY o.add_time DESC, o.id DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <!-- 团长端-对账单: 按商品维度分页明细(按商品分组汇总)
+         订单金额=Σ(商品单价×购买数量), 退款金额=Σ(商品单价×(退款数量+退货退款数量));
+         商品行退款数量为"申请累计"(审核拒绝会回退, 故不含被拒部分) -->
+    <select id="getLeaderBillGoodsPageList" resultType="java.util.HashMap">
+        SELECT
+            g.goods_id AS goodsId,
+            MAX(g.goods_name) AS goodsName,
+            IFNULL(SUM(g.goods_price * g.goods_num), 0) AS amountTotal,
+            IFNULL(SUM(g.goods_price * (IFNULL(g.refund_num, 0) + IFNULL(g.refund_goods_num, 0))), 0) AS refundAmountTotal
+        FROM gb_order_goods_info g
+        JOIN gb_order_info o ON g.order_no = o.order_no
+        WHERE o.leader_id = #{leaderId}
+          AND o.pay_time &gt; 0
+          AND o.status &lt;&gt; 6
+          AND o.add_time BETWEEN #{startTime} AND #{endTime}
+        GROUP BY g.goods_id
+        ORDER BY amountTotal DESC, g.goods_id ASC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <!-- 团长端-对账单: 按商品维度统计商品种类总数(分页总条数) -->
+    <select id="getLeaderBillGoodsCount" resultType="java.lang.Integer">
+        SELECT COUNT(DISTINCT g.goods_id)
+        FROM gb_order_goods_info g
+        JOIN gb_order_info o ON g.order_no = o.order_no
+        WHERE o.leader_id = #{leaderId}
+          AND o.pay_time &gt; 0
+          AND o.status &lt;&gt; 6
+          AND o.add_time BETWEEN #{startTime} AND #{endTime}
+    </select>
+
 </mapper>

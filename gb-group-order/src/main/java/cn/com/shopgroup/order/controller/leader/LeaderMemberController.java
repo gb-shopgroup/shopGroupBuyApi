@@ -44,7 +44,7 @@ public class LeaderMemberController {
         }
         int page = Optional.ofNullable(request.getPage()).orElse(1);
         int pageSize = Optional.ofNullable(request.getPageSize())
-                .map(size -> Math.min(size, 100))
+                .map(size -> Math.min(size, 20))
                 .orElse(10);
         List<LeaderMemberListResponse> data = orderInfoService.getLeaderMemberList(
                 leaderId, request.getKeyword(), page, pageSize);

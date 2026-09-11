@@ -34,7 +34,7 @@ public class AdminBusinessController {
 
         if (page == 0) page = 1;
         if (pageSize == 0) pageSize = 10;
-        if (pageSize > 100) pageSize = 100;
+        if (pageSize > 20) pageSize = 20;
         List<GbOrgBusinessInfo> data = service.getAdminBusinessList(leaderId, page, pageSize);
 
         // 从Redis中获取累计额度

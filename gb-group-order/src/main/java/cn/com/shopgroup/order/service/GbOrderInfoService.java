@@ -1,8 +1,12 @@
 package cn.com.shopgroup.order.service;
 
+import cn.com.shopgroup.common.utils.MoneyUtil;
 import cn.com.shopgroup.common.utils.TimeUtils;
 import cn.com.shopgroup.order.constants.OrderStatusEnum;
+import cn.com.shopgroup.order.http.request.LeaderBillListRequest;
 import cn.com.shopgroup.order.http.response.GroupOrderRecordResponse;
+import cn.com.shopgroup.order.http.response.LeaderBillItemResponse;
+import cn.com.shopgroup.order.http.response.LeaderBillListResponse;
 import cn.com.shopgroup.order.http.response.LeaderMemberDetailResponse;
 import cn.com.shopgroup.order.http.response.LeaderMemberListResponse;
 import cn.com.shopgroup.order.http.response.MemberDynamicGroup;
@@ -1019,7 +1023,7 @@ public class GbOrderInfoService {
     public List<GbOrderInfo> getMemberApplyRefundOrderList(Long memberId, Integer status, String goodsName, int page, int pageSize) {
         // 参数防御: 避免 limit 偏移量出现负数, pageSize 限制上限
         page = Math.max(page, 1);
-        pageSize = Math.min(Math.max(pageSize, 1), 100);
+        pageSize = Math.min(Math.max(pageSize, 1), 20);
         String trimGoodsName = StringUtils.isEmpty(goodsName) ? null : goodsName.trim();
         // 售后(审核)状态: 1 待审核 2 同意 3 不同意; 不传=查询该用户所有存在售后记录(1/2/3)的订单
         List<Integer> statusScope = (status != null && status >= 1 && status <= 3)
@@ -1119,7 +1123,7 @@ public class GbOrderInfoService {
                                                 Integer status, int page, int pageSize) {
         // 参数防御: 避免 limit 偏移量出现负数, pageSize 限制上限
         page = Math.max(page, 1);
-        pageSize = Math.min(Math.max(pageSize, 1), 100);
+        pageSize = Math.min(Math.max(pageSize, 1), 20);
 
         String trimKeyword = StringUtils.isEmpty(keyword) ? null : keyword.trim();
         // keyword 为纯数字时视为手机号, 否则视为商品名称
@@ -1383,7 +1387,7 @@ public class GbOrderInfoService {
             return result;
         }
         int currentPage = page == null || page <= 0 ? 1 : page;
-        int size = pageSize == null || pageSize <= 0 ? 10 : Math.min(pageSize, 100);
+        int size = pageSize == null || pageSize <= 0 ? 10 : Math.min(pageSize, 20);
         int offset = (currentPage - 1) * size;
 
         List<Map<String, Object>> summaryList = mapper.getLeaderMemberSummaryList(leaderId, keyword, offset, size);
@@ -1656,6 +1660,131 @@ public class GbOrderInfoService {
             this.timestamp = timestamp;
             this.action = action;
             this.content = content;
+        }
+    }
+
+    // ======================= 团长端-对账单相关接口 =======================
+
+    // 对账单统计维度: 1=按商品
+    private static final int BILL_TYPE_GOODS = 1;
+    // 对账单统计维度: 2=按订单
+    private static final int BILL_TYPE_ORDER = 2;
+
+    /**
+     * 团长端-对账单: 按选择的时间范围统计"有效订单数/订单总金额/退款总金额",
+     * 并按统计维度(1=按商品, 2=按订单)返回明细分页列表;
+     * 口径: 有效订单=已支付(pay_time>0)且未取消(status<>6), 按下单时间(add_time)归集;
+     * 未选择时间范围(开始/结束日期未成对传入)时不执行查询, 直接返回空账单
+     */
+    public LeaderBillListResponse getLeaderBillList(Long leaderId, LeaderBillListRequest request) {
+
+        // 统计维度: 默认按订单, 非法值兜底为按订单
+        int type = request == null || request.getType() == null ? BILL_TYPE_ORDER : request.getType().intValue();
+        if (type != BILL_TYPE_GOODS && type != BILL_TYPE_ORDER) {
+            type = BILL_TYPE_ORDER;
+        }
+        // 分页参数矫正
+        int page = request == null || request.getPage() == null || request.getPage() <= 0 ? 1 : request.getPage();
+        int pageSize = request == null || request.getPageSize() == null || request.getPageSize() <= 0
+                ? 10 : Math.min(request.getPageSize(), 20);
+
+        // 返回结构, 统计值默认为0
+        LeaderBillListResponse response = new LeaderBillListResponse();
+        response.setType(type);
+        response.setPage(page);
+        response.setPageSize(pageSize);
+        response.setOrderTotal(0);
+        response.setAmountTotal(0.00);
+        response.setRefundAmountTotal(0.00);
+        response.setTotal(0);
+
+        // 团长id非法时不查询
+        if (leaderId == null || leaderId <= 0) {
+            return response;
+        }
+
+        // 时间范围: 开始/结束日期需成对传入, 不输入时间则不查询
+        String startDate = request == null ? null : request.getStartDate();
+        String endDate = request == null ? null : request.getEndDate();
+        if (StringUtils.isEmpty(startDate) || StringUtils.isEmpty(endDate)) {
+            log.info("[团长端-对账单]未选择时间范围, 不执行查询, leaderId:{}", leaderId);
+            return response;
+        }
+        // 日期转秒级时间戳: 开始日期取当天00:00:00, 结束日期取当天23:59:59
+        int startTime = TimeUtils.toFormatTimeStamp(startDate);
+        int endTime = TimeUtils.toFormatTimeStamp(endDate);
+        if (startTime <= 0 || endTime <= 0 || startTime > endTime) {
+            log.warn("[团长端-对账单]时间范围不合法, 不执行查询, leaderId:{}, startDate:{}, endDate:{}", leaderId, startDate, endDate);
+            return response;
+        }
+
+        // 顶部统计: 有效订单数 / 订单总金额 / 退款总金额(金额单位: 分 -> 元)
+        Map<String, Object> totalMap = mapper.getLeaderBillTotal(leaderId, startTime, endTime);
+        if (totalMap != null && !totalMap.isEmpty()) {
+            response.setOrderTotal(toInt(totalMap.get("orderTotal")));
+            response.setAmountTotal(MoneyUtil.centToYuan(toInt(totalMap.get("amountTotal"))));
+            response.setRefundAmountTotal(MoneyUtil.centToYuan(toInt(totalMap.get("refundAmountTotal"))));
+        }
+
+        // 明细分页列表: 按商品 或 按订单
+        int offset = (page - 1) * pageSize;
+        if (type == BILL_TYPE_GOODS) {
+            response.setTotal(toInt(mapper.getLeaderBillGoodsCount(leaderId, startTime, endTime)));
+            response.setList(this.getLeaderBillGoodsItemList(leaderId, startTime, endTime, offset, pageSize));
+        } else {
+            // 按订单: 明细总条数即有效订单数
+            response.setTotal(response.getOrderTotal());
+            response.setList(this.getLeaderBillOrderItemList(leaderId, startTime, endTime, offset, pageSize));
+        }
+        return response;
+    }
+
+    // 对账单-按商品维度明细分页列表(商品名称/订单金额/退款金额, 金额单位: 元)
+    private List<LeaderBillItemResponse> getLeaderBillGoodsItemList(Long leaderId, int startTime, int endTime, int offset, int limit) {
+
+        List<LeaderBillItemResponse> data = new ArrayList<>();
+        List<Map<String, Object>> results = mapper.getLeaderBillGoodsPageList(leaderId, startTime, endTime, offset, limit);
+        if (CollectionUtils.isEmpty(results)) {
+            return data;
+        }
+        for (Map<String, Object> item : results) {
+            LeaderBillItemResponse billItem = new LeaderBillItemResponse();
+            billItem.setGoodsId(toLong(item.get("goodsId")));
+            billItem.setGoodsName(toStr(item.get("goodsName")));
+            billItem.setAmount(roundYuan(item.get("amountTotal")));
+            billItem.setRefundAmount(roundYuan(item.get("refundAmountTotal")));
+            data.add(billItem);
+        }
+        return data;
+    }
+
+    // 对账单-按订单维度明细分页列表(订单号/订单金额/退款金额, 金额单位: 分 -> 元)
+    private List<LeaderBillItemResponse> getLeaderBillOrderItemList(Long leaderId, int startTime, int endTime, int offset, int limit) {
+
+        List<LeaderBillItemResponse> data = new ArrayList<>();
+        List<Map<String, Object>> results = mapper.getLeaderBillOrderPageList(leaderId, startTime, endTime, offset, limit);
+        if (CollectionUtils.isEmpty(results)) {
+            return data;
+        }
+        for (Map<String, Object> item : results) {
+            LeaderBillItemResponse billItem = new LeaderBillItemResponse();
+            billItem.setOrderNo(toStr(item.get("orderNo")));
+            billItem.setAmount(MoneyUtil.centToYuan(toInt(item.get("amountTotal"))));
+            billItem.setRefundAmount(MoneyUtil.centToYuan(toInt(item.get("refundAmountTotal"))));
+            data.add(billItem);
+        }
+        return data;
+    }
+
+    // 元金额保留2位小数(四舍五入), 避免浮点误差
+    private Double roundYuan(Object value) {
+        if (ObjectUtils.isEmpty(value)) {
+            return 0.00;
+        }
+        try {
+            return new BigDecimal(value.toString()).setScale(2, RoundingMode.HALF_UP).doubleValue();
+        } catch (NumberFormatException e) {
+            return 0.00;
         }
     }
 

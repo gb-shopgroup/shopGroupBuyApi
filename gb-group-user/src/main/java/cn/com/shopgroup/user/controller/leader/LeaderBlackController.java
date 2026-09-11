@@ -144,7 +144,7 @@ public class LeaderBlackController {
         // 请求参数矫正
         if (page == 0) page = 1;
         if (pageSize == 0) pageSize = 10;
-        if (pageSize > 100) pageSize = 100;
+        if (pageSize > 20) pageSize = 20;
 
         // 分页查询
         List<GbMemberBlackList> results = blackService.getMemberBlackList(leaderId, page, pageSize);

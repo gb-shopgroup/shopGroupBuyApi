@@ -135,7 +135,7 @@ Maven 依赖仓库使用阿里云镜像（`https://maven.aliyun.com/repository/p
 
 ### 4.5 gb-group-order — 订单 / 支付 / 分账服务
 
-覆盖：下单、订单查询、核销（整单 / 部分核销）、退款（申请 / 审批 / 回调）、微信发货、易宝支付发起与回调、团长数据汇总、报表查询，以及团长端「我的团员」（含团购查看埋点，数据表 `gb_group_view_log`）等。**43 个接口**。
+覆盖：下单、订单查询、核销（整单 / 部分核销）、退款（申请 / 审批 / 回调）、微信发货、易宝支付发起与回调、团长数据汇总、报表查询，以及团长端「我的团员」（含团购查看埋点，数据表 `gb_group_view_log`）、团长端「对账单」（按时间范围 + 按商品 / 按订单维度统计）等。**44 个接口**。
 
 ### 4.6 gb-group-admin — 平台管理后台服务
 
@@ -288,7 +288,7 @@ mvn -pl gb-group-task spring-boot:run
 | `page` / `pageSize` | 页码（从 1 开始）/ 每页条数 |
 | `start` / `end` | 开始时间 / 结束时间（如 yyyy-MM-dd） |
 
-- **接口数量统计**：user 46 个、order 43 个、goods 23 个、admin 29 个、task 8 个，合计 **149 个**。
+- **接口数量统计**：user 46 个、order 44 个、goods 23 个、admin 29 个、task 8 个，合计 **150 个**。
 - **详细版接口文档**（含每个接口的完整入参 / 出参字段说明，参数含义、必填、嵌套字段均已细化）见根目录 **`API接口文档.md`**，可通过 `python3 generate_api_doc.py` 扫描各模块 `*Controller.java` 重新生成。下方为接口总览清单。
 
 ### 8.2 接口清单
@@ -363,7 +363,7 @@ mvn -pl gb-group-task spring-boot:run
 | 2 | POST | `/user/leader/shop/save` | 修改/保存-店铺信息 | Body: **request** (ShopRequest, JSON) |
 | 3 | POST | `/user/leader/shop/update` | 更新店铺码图片地址（保存店铺二维码上传后的访问URL） | Body: **request** (ShopErCodeRequest, JSON) |
 | 4 | GET | `/user/leader/getGroup/shop` | 通过leaderId团长店铺详情 | **leaderId** (Long) |
-| 5 | POST | `/user/leader/shop/makeQrCode` | 团长-我的店铺小程序码(微信小程序码,page=`pages/order/index`,scene=`shopId=xx`),上传到服务器返回URL | **shopId** (Long) |
+| 5 | POST | `/user/leader/shop/makeQrCode` | 团长-我的店铺小程序码(微信小程序码,page=pages/order/index,scene=shopId=xx),上传到服务器返回URL | **shopId** (Long) |
 
 **MessageController**（`cn.com.shopgroup.user.controller.leader`）
 
@@ -401,7 +401,7 @@ mvn -pl gb-group-task spring-boot:run
 | 1 | GET | `/user/member/info` | 根据 token 获取用户信息 | 无 |
 | 2 | GET | `/user/member/isleader` | 是否团长身份 | 无 |
 
-#### 8.2.2 gb-group-order（订单/退款/分账）— 43 个接口
+#### 8.2.2 gb-group-order（订单/退款/分账）— 44 个接口
 
 **OrderBusinessController**（`cn.com.shopgroup.order.controller`）
 
@@ -452,6 +452,12 @@ mvn -pl gb-group-task spring-boot:run
 | --- | --- | --- | --- | --- |
 | 1 | GET | `/order/group/wx/order` | 查询微信订单发货状态（查询订单状态枚举：(1) 待发货；(2) 已发货；(3) 确认收货；(4) 交易完成；(5) 已退款；(6) 资金待结算） | **orderNo** (String) |
 
+**LeaderBillController**（`cn.com.shopgroup.order.controller.leader`）
+
+| 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
+| --- | --- | --- | --- | --- |
+| 1 | POST | `/order/leader/bill/list` | 金额单位:元; 按订单维度订单金额=实付金额, 按商品维度订单金额=Σ商品单价×购买数量、退款金额=Σ商品单价×退款数量 | Body: **request** (LeaderBillListRequest, JSON) |
+
 **LeaderMemberController**（`cn.com.shopgroup.order.controller.leader`）
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
@@ -487,7 +493,7 @@ mvn -pl gb-group-task spring-boot:run
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | POST | `/order/leader/refund/notify` | 退款结果回调通知(占位接口) | 无 |
+| 1 | POST | `/order/leader/refund/notify` | 退款结果回调通知: 易宝退款最终结果异步通知(与支付回调一致, 为 RSA2048 数字信封加密的 form 报文) | 无 |
 
 **OrderPaymentController**（`cn.com.shopgroup.order.controller.payment`）
 
@@ -504,7 +510,7 @@ mvn -pl gb-group-task spring-boot:run
 | --- | --- | --- | --- | --- |
 | 1 | GET | `/goods/group/goods/list` | 团购商品列表(包装, 规格, sku) | **lid** (Long); **groupId** (Long) |
 | 2 | GET | `/goods/group/goods/stock` | 查询商品库存, 后期增加缓存 | **gid** (String) |
-| 3 | POST | `/goods/member/groupActivity/list` | 用户查询所有在线的团购活动列表[新用户未绑定团长时leaderId=0]: 仅返回未下线(isClose=0)且当前时间处于开团时间窗内(已开团未结束)的在线活动; leaderId>0按团长过滤(排序值sortOrder升序置顶优先, 同级按活动id倒序, 分页在SQL层完成); leaderId=0时需传经纬度(longitude/latitude, 缺失返回空列表), 仅统计已绑定自提点(pointId>0)的活动并过滤出绑定自提点与定位点球面距离小于20km者, 按活动id倒序(先距离过滤再分页); page默认1, pageSize默认10最大100 | Body: **request** (MemberGroupListRequest, JSON) |
+| 3 | POST | `/goods/member/groupActivity/list` | 用户查询所有在线的团购活动列表[新用户未绑定团长时leaderId=0]: 仅返回未下线(isClose=0)且当前时间处于开团时间窗内(已开团未结束)的在线活动; leaderId>0按团长过滤(排序值sortOrder升序置顶优先, 同级按活动id倒序, 分页在SQL层完成); leaderId=0时需传经纬度(longitude/latitude, 缺失返回空列表), 仅统计已绑定自提点(pointId>0)的活动并过滤出绑定自提点与定位点球面距离小于20km者, 按活动id倒序(先距离过滤再分页); page默认1, pageSize默认10最大20 | Body: **request** (MemberGroupListRequest, JSON) |
 
 **LeaderGoodsManageController**（`cn.com.shopgroup.goods.controller`）
 

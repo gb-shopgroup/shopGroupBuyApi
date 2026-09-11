@@ -14,6 +14,6 @@ public class MemberGroupListRequest {
 
     // 页码, 默认1
     private Integer page;
-    // 每页条数, 默认10, 最大100
+    // 每页条数, 默认10, 最大20
     private Integer pageSize;
 }

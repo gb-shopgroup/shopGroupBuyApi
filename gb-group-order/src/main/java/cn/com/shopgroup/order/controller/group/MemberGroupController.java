@@ -89,7 +89,7 @@ public class MemberGroupController {
         // 请求参数矫正
         int page = Optional.ofNullable(request.getPage()).orElse(1);
         int pageSize = Optional.ofNullable(request.getPageSize())
-                .map(size -> Math.min(size, 100))
+                .map(size -> Math.min(size, 20))
                 .orElse(10);
         String activityName = request.getName();
         Long leaderId = request.getLeaderId();
