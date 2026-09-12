@@ -11,6 +11,7 @@ import cn.com.shopgroup.goods.service.GbGoodsSkuInfoService;
 import cn.com.shopgroup.order.model.GbOrderBusinessInfo;
 import cn.com.shopgroup.order.model.GbOrderGoodsInfo;
 import cn.com.shopgroup.order.service.GbOrderBusinessInfoService;
+import cn.com.shopgroup.order.service.GbOrderCommissionInfoService;
 import cn.com.shopgroup.order.service.GbOrderInfoService;
 import cn.com.shopgroup.service.BusinessOrderService;
 import cn.com.shopgroup.service.TaskOrderService;
@@ -39,6 +40,9 @@ public class TaskController {
 
     @Resource
     private GbOrderInfoService orderInfoService;
+
+    @Resource
+    private GbOrderCommissionInfoService commissionInfoService;
 
     @Resource
     private WxMiniAccessTokenHelper helper;
@@ -131,7 +135,12 @@ public class TaskController {
 
             String status = res.get("data");
             String uniqueDivideNo = res.get("uniqueDivideNo");
-            service.updateBusinessOrderDivideStatus(orderNo, status, uniqueDivideNo);
+            // CAS 更新成功才视为首次分账成功; 与定时任务同口径维护分账信息明细
+            if (Boolean.TRUE.equals(service.updateBusinessOrderDivideStatus(orderNo, status, uniqueDivideNo))) {
+                commissionInfoService.saveDivideCommissionInfo(orderInfo, uniqueDivideNo);
+            } else {
+                log.warn("/task/order/divide 订单分账状态未更新(已分账)：订单号 = " + orderNo);
+            }
             return "ok";
         }
     }

@@ -10,12 +10,19 @@ import java.util.List;
 @Data
 public class GroupActGoodsResponse {
 
+    // 商品id
     private Long gid;
+    // 商品名称
     private String gname;
+    // 商品类型
     private Byte gtype;
+    // 商品图片
     private String img;
+    // 团购价
     private Double price;
+    // 市场价
     private Double price2;
+    // 库存(商品数量+单位, 如 100斤)
     private String stock;
 
     public GroupActGoodsResponse() {

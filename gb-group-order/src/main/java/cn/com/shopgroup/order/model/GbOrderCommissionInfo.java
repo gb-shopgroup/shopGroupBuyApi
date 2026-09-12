@@ -14,9 +14,9 @@ public class GbOrderCommissionInfo {
     // 明细id,主键自增
     @TableId(type = IdType.AUTO)
     private Long commId;
-    // 订单id,外键
-    @TableField("order_id")
-    private Long orderId;
+    // 订单号,冗余
+    @TableField("order_no")
+    private String orderNo;
     // 分账方类型,1=商户货款2=平台抽成3=分账佣金4=帮卖佣金
     @TableField("comm_type")
     private Byte commType;

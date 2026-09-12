@@ -6,6 +6,7 @@ import cn.com.shopgroup.common.utils.MoneyUtil;
 import cn.com.shopgroup.common.utils.TimeUtils;
 import cn.com.shopgroup.yeepay.YeePayUtils;
 import cn.com.shopgroup.order.model.GbOrderBusinessInfo;
+import cn.com.shopgroup.order.service.GbOrderCommissionInfoService;
 import cn.com.shopgroup.service.BusinessOrderService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -22,6 +23,9 @@ public class OrderDivideTaskScheduled {
 
     @Resource
     private BusinessOrderService service;
+
+    @Resource
+    private GbOrderCommissionInfoService commissionInfoService;
 
     @Resource
     private RedisHelper redisHelper;
@@ -91,7 +95,12 @@ public class OrderDivideTaskScheduled {
             } else {
                 String status = res.get("data");
                 String uniqueDivideNo = res.get("uniqueDivideNo");
-                service.updateBusinessOrderDivideStatus(orderNo, status, uniqueDivideNo);
+                // CAS 更新成功才视为首次分账成功; 分账信息明细随之维护, 重复轮次/并发触发不重复写入
+                if (Boolean.TRUE.equals(service.updateBusinessOrderDivideStatus(orderNo, status, uniqueDivideNo))) {
+                    commissionInfoService.saveDivideCommissionInfo(item, uniqueDivideNo);
+                } else {
+                    log.warn("订单分账状态未更新(已被其他轮次分账)：订单号 = " + orderNo + " , 跳过分账信息维护");
+                }
                 log.info("订单分账成功：订单号 = " + orderNo);
             }
         }

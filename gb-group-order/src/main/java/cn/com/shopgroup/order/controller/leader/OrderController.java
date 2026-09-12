@@ -68,7 +68,7 @@ public class OrderController {
     // 团长订单列表（按团活动/订单状态/关键字筛选, 关键字支持商品名称或手机号, 分页查询）
     @PostMapping("/leader/order/list")
     public JsonResult leaderOrderList(@RequestBody LeaderOrderListRequest request) {
-        log.info("用户端查询订单列表接口-参数request:{}", JSON.toJSONString(request));
+        log.info("团长端查询订单列表接口-参数request:{}", JSON.toJSONString(request));
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
@@ -106,7 +106,7 @@ public class OrderController {
         String keyword = request.getKeyword();
         Integer applyStatus = request.getApplyStatus();
         // 查询订单列表
-        List<GbOrderInfo> result = orderInfoService.getLeaderApplyRefundOrderList(leaderId, groupId, keyword, applyStatus, page, pageSize);
+        List<GbOrderInfo> result = orderInfoService.getLeaderApplyRefundOrderList(leaderId, groupId, request.getPointId(), keyword, applyStatus, page, pageSize);
         List<OrderResponse> data = OrderResponse.getOrderResponseList(result);
         return JsonResult.success(data);
     }
@@ -447,8 +447,9 @@ public class OrderController {
         List<GbOrderInfo> list = orderInfoService.getAllByLeaderIdAndPointId(leaderId, pointId);
         if (!CollectionUtils.isEmpty(list)) {
             orderTotal = list.size();
-            amountTotal = list.stream().mapToDouble(GbOrderInfo::getPayFee).sum();
             // refundFee 单位:分, 汇总前需转元
+            amountTotal = list.stream()
+                    .mapToDouble(o -> MoneyUtil.centToYuan(o.getPayFee())).sum();
             refundAmountTotal = list.stream()
                     .mapToDouble(o -> MoneyUtil.centToYuan(o.getRefundFee())).sum();
         }
@@ -460,13 +461,14 @@ public class OrderController {
         return JsonResult.success(response);
     }
 
-    // 团长端订单-商品统计: 返回商品种类总数/待核销总件数 + 每个商品的件数统计(含已核销/未核销), 支持商品名称搜索与分页
+    // 团长端订单-商品统计: 返回订单商品总件数/待核销总件数 + 每个商品的总件数/待核销件数, 支持商品名称+自提点pointId搜索与分页
     @GetMapping("/leader/home/order/goodsSummary")
     public JsonResult homeGoodsSummary(@RequestParam(value = "pointId", defaultValue = "0") Long pointId,
                                        @RequestParam(value = "keyword", required = false) String keyword,
                                        @RequestParam(value = "page", defaultValue = "1") Integer page,
                                        @RequestParam(value = "pageSize", defaultValue = "10") Integer pageSize) {
         // 从请求头中获取团长id
+        log.info("团长端订单-商品统计/leader/home/order/goodsSummary,pointId:{},keyword:{}", pointId, keyword);
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
             throw new BusinessException(OrderErrorCodeEnum.LEADER_NOT_EXIST);
@@ -476,7 +478,7 @@ public class OrderController {
         int size = Optional.ofNullable(pageSize).map(s -> Math.min(s, 20)).orElse(10);
         int offset = (currentPage - 1) * size;
 
-        // 商品种类总数 + 待核销总件数(不受分页影响)
+        // 订单商品总件数 + 待核销总件数(不受分页影响)
         Map<String, Object> totalMap = orderInfoService.getSummaryGoodsTotal(leaderId, pointId, keyword);
         long goodsTotal = 0l;
         long unVerifyTotal = 0l;
@@ -495,10 +497,11 @@ public class OrderController {
                 resp.setName((String) item.get("goods_name"));
                 resp.setUnit((String) item.get("goods_unit"));
                 long numTotal = ((Number) item.get("num_total")).longValue();
+                long receiptTotal = item.get("receipt_total") == null ? 0L : ((Number) item.get("receipt_total")).longValue();
                 long unVerifyNum = ((Number) item.get("unverify_num")).longValue();
                 resp.setTotal(numTotal);          // 总件数
-                resp.setNum2(unVerifyNum);        // 未核销件数
-                resp.setNum1(numTotal - unVerifyNum); // 已核销件数
+                resp.setNum1(receiptTotal);       // 已核销件数(商品行 receipt_num 汇总)
+                resp.setNum2(unVerifyNum);        // 待核销件数(已扣除退款数量)
                 itemList.add(resp);
             }
         }

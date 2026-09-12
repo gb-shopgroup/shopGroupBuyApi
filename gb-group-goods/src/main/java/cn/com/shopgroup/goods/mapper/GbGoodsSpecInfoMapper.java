@@ -12,6 +12,6 @@ import java.util.List;
 @Repository
 public interface GbGoodsSpecInfoMapper extends BaseMapper<GbGoodsSpecInfo> {
 
-    // 按规格值id列表更新商品id
-    int updateGoodsIdByIds(@Param("leaderId") Long leaderId, @Param("goodsId") Long goodsId, @Param("specValIds") List<Long> specValIds);
+    // 按规格id列表更新商品id
+    int updateGoodsIdByIds(@Param("leaderId") Long leaderId, @Param("goodsId") Long goodsId, @Param("specInfoIds") List<Long> specInfoIds);
 }

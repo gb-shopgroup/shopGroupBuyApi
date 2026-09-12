@@ -131,7 +131,7 @@ Maven 依赖仓库使用阿里云镜像（`https://maven.aliyun.com/repository/p
 
 ### 4.4 gb-group-goods — 商品 / 团购服务
 
-覆盖：商品（分类、图片、包装、规格、规格值、SKU、库存）、团长商品管理、团购活动查询等。**23 个接口**。
+覆盖：商品（分类、图片、包装、规格、规格值、SKU、库存）、团长商品管理、团购活动查询等。**22 个接口**。
 
 ### 4.5 gb-group-order — 订单 / 支付 / 分账服务
 
@@ -288,7 +288,7 @@ mvn -pl gb-group-task spring-boot:run
 | `page` / `pageSize` | 页码（从 1 开始）/ 每页条数 |
 | `start` / `end` | 开始时间 / 结束时间（如 yyyy-MM-dd） |
 
-- **接口数量统计**：user 46 个、order 44 个、goods 23 个、admin 29 个、task 8 个，合计 **150 个**。
+- **接口数量统计**：user 46 个、order 44 个、goods 22 个、admin 29 个、task 8 个，合计 **149 个**。
 - **详细版接口文档**（含每个接口的完整入参 / 出参字段说明，参数含义、必填、嵌套字段均已细化）见根目录 **`API接口文档.md`**，可通过 `python3 generate_api_doc.py` 扫描各模块 `*Controller.java` 重新生成。下方为接口总览清单。
 
 ### 8.2 接口清单
@@ -421,7 +421,7 @@ mvn -pl gb-group-task spring-boot:run
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
 | 1 | GET | `/order/group/groupActivity/cat` | 团购分类列表（首页） | 无 |
-| 2 | POST | `/order/group/get/groupActivity/list` | 用户首页-查询所有团购活动列表 | Body: **request** (MemberGroupListRequest, JSON) |
+| 2 | POST | `/order/member/groupActivity/list` | 用户查询所有在线的团购活动列表[新用户未绑定团长时leaderId=0]: 仅返回未下线(isClose=0)且当前时间处于开团时间窗内(已开团未结束)的在线活动; 支持团购名称模糊搜索(groupName, 非空时生效)与团购分类过滤(catId, 非空且大于0时生效); leaderId>0按团长过滤(排序值sortOrder升序置顶优先, 同级按活动id倒序, 分页在SQL层完成); leaderId=0时需传经纬度(longitude/latitude, 缺失返回空列表), 仅统计已绑定自提点(pointId>0)的活动并过滤出绑定自提点与定位点球面距离小于20km者, 按活动id倒序(先按名称/分类过滤, 再距离过滤, 最后分页); page默认1, pageSize默认10最大20; 每个团购活动一并返回其商品列表(goods: 团购价取团购商品表冗余价, 库存/单位取自商品表, 批量查询, 无商品的团购返回空数组) | Body: **request** (MemberGroupActListRequest, JSON) |
 | 3 | GET | `/order/group/groupActivity/info` | 团购详情(团长分享页面)---用户首页：团长更多好货也用 | **groupId** (Long) |
 | 4 | POST | `/order/group/groupActivity/view` | 用户查看团购详情-显式埋点上报(分享等场景前端调用; 首页进入详情会自动埋点, 可不上报) | Body: **request** (MemberGroupViewRequest, JSON) |
 | 5 | GET | `/order/group/groupActivity/shop` | 团长店铺详情 | **leaderId** (Long) |
@@ -439,7 +439,7 @@ mvn -pl gb-group-task spring-boot:run
 | 4 | GET | `/order/group/order/info` | 用户订单详情 | **orderNo** (String) |
 | 5 | GET | `/order/group/order/makeErcode` | 用户订单小程序码(微信小程序码, 扫码进入C端小程序对应订单页面) | **orderNo** (String) |
 | 6 | GET | `/order/group/order/receipt` | 用户订单收货 | **orderNo** (String); **point** (Long) |
-| 7 | POST | `/order/group/order/apply/refund` | 用户申请订单退款。refundFlag: 1=退款(退"待收货"部分, 可退量=购买数-收货数-已申请退款数), 2=退货退款(退"已收货"部分, 可退量=收货数-已申请退货退款数); 申请成功后仅对应商品行退款/退货退款数量先占坑累计(可退量会相应扣减), 订单主表refund_fee在申请/审核阶段都不维护, 待团长审核: 同意仅按本次申请金额发起退款(主表金额改由退款回调成功后按实际退款金额累加), 不同意=主表金额天然不变回到申请前, 仅回退商品行数量并把售后状态置不同意; 出参data为本次申请退款总金额(单位:元) | Body: **refundApplyRequest** (OrderRefundApplyRequest, JSON) |
+| 7 | POST | `/order/group/order/apply/refund` | 事务保证"订单置售后(5) + 商品行退款数量占坑 + 售后申请记录"三步一致, 避免中途异常导致订单已售后但商品行退款数量未维护(待核销统计虚高) | Body: **refundApplyRequest** (OrderRefundApplyRequest, JSON) |
 | 8 | GET | `/order/group/order/refund/reasonList` | 用户退款原因下拉列表(申请退款时"选择退款原因") | 无 |
 | 9 | GET | `/order/group/order/refund/recodes` | 售后记录查询 | **orderNo** (String) |
 | 10 | GET | `/order/group/order/notAllReceiptList` | 用户端-查询还有商品未全部收货的订单列表(该用户在该团长/店铺下已支付, 且存在商品行收货数量小于购买数量的订单) | **shopId** (Long) |
@@ -479,7 +479,7 @@ mvn -pl gb-group-task spring-boot:run
 | 8 | POST | `/order/leader/order/partWriteOff` | 部分核销订单 | Body: **request** (OrderVerifyRequest, JSON) |
 | 9 | GET | `/order/leader/order/send` | 团长端-查询微信发货 | **orderNo** (String) |
 | 10 | GET | `/order/leader/home/show/orders` | 团长首页订单汇总(head部分): 返回有效订单总数/订单总金额/退款总金额; pointId 传 0 或不传表示不区分提货点, 传具体值则按提货点过滤 | **pointId** (Long) |
-| 11 | GET | `/order/leader/home/order/goodsSummary` | 团长端订单-商品统计: 返回商品种类总数/待核销总件数 + 每个商品的件数统计(含已核销/未核销), 支持商品名称搜索与分页 | **pointId** (Long); **keyword** (String); **page** (Integer); **pageSize** (Integer) |
+| 11 | GET | `/order/leader/home/order/goodsSummary` | 团长端订单-商品统计: 返回订单商品总件数/待核销总件数 + 每个商品的总件数/待核销件数, 支持商品名称+自提点pointId搜索与分页 | **pointId** (Long); **keyword** (String); **page** (Integer); **pageSize** (Integer) |
 | 12 | POST | `/order/get/groupActivity/totalOrder` | 根据团购活动id统计订单数（实时统计，团长端有需求时使用） | **groupId** (Long) |
 
 **OrderRefundController**（`cn.com.shopgroup.order.controller.leader`）
@@ -487,7 +487,7 @@ mvn -pl gb-group-task spring-boot:run
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
 | 1 | GET | `/order/leader/refund/count` | 退款订单数量: 订单中存在商品发生过退款(部分退/整单全退, 审核同意)即计入 | **gid** (Long); **pid** (Long) |
-| 2 | POST | `/order/leader/refund/approve` | 售后订单审核（同意/不同意）。status: 1=同意, 2=不同意; 每单一行key=订单号, value.refundGoodsMap为本次申请的订单商品行(行内refundNum/refundAmount为本次申请值); 同意=按本次申请金额向易宝发起退款(支持部分退款)、保留申请时占坑的商品数量并把商品售后状态置同意(主表退款金额refund_fee不在此累加, 统一由退款回调成功后按实际退款金额累加; 商品行退款以退款数量体现, 不单独落库金额); 不同意=主表退款金额申请/审核阶段均未累加无需回退(天然回到申请前), 仅按行回退商品退款/退货退款数量并把商品售后状态置不同意; 团长端旧版本未回传refundFlag/金额时后端按该订单最近一笔售后记录兜底 | Body: **approveRequest** (OrderApproveRequest, JSON) |
+| 2 | POST | `/order/leader/refund/approve` | 售后订单审核（同意/不同意）。status: 1=同意, 2=不同意; 每单一行key=订单号, value.refundGoodsMap为本次申请的订单商品行(行内refundNum/refundAmount为本次申请值); 同意=按本次申请金额向易宝发起退款(支持部分退款)、保留申请时占坑的商品数量并把商品售后状态置同意, 同时维护订单主状态: 订单商品全部退完=已退款(4), 否则只要有未退完的=售后(5)(主表退款金额refund_fee不在此累加, 统一由退款回调成功后按实际退款金额累加; 商品维度退款金额以退款数量体现, 可由 退款数量×商品单价 推算); 不同意=主表退款金额不变(申请/审核阶段均未累加, 天然回到申请前), 按行回退商品退款/退货退款数量并把商品售后状态置不同意; 团长端旧版本未回传refundFlag/金额时后端按该订单最近一笔售后记录兜底 | Body: **approveRequest** (OrderApproveRequest, JSON) |
 
 **OrderRefundNotifyController**（`cn.com.shopgroup.order.controller.leader`）
 
@@ -502,7 +502,7 @@ mvn -pl gb-group-task spring-boot:run
 | 1 | GET | `/order/payment/order/pay` | 发起支付 | **orderNo** (String); **openid** (String) |
 | 2 | POST | `/order/payment/order/notify` | 支付回调 | 无 |
 
-#### 8.2.3 gb-group-goods（商品/团购）— 23 个接口
+#### 8.2.3 gb-group-goods（商品/团购）— 22 个接口
 
 **GroupGoodsController**（`cn.com.shopgroup.goods.controller`）
 
@@ -510,7 +510,6 @@ mvn -pl gb-group-task spring-boot:run
 | --- | --- | --- | --- | --- |
 | 1 | GET | `/goods/group/goods/list` | 团购商品列表(包装, 规格, sku) | **lid** (Long); **groupId** (Long) |
 | 2 | GET | `/goods/group/goods/stock` | 查询商品库存, 后期增加缓存 | **gid** (String) |
-| 3 | POST | `/goods/member/groupActivity/list` | 用户查询所有在线的团购活动列表[新用户未绑定团长时leaderId=0]: 仅返回未下线(isClose=0)且当前时间处于开团时间窗内(已开团未结束)的在线活动; leaderId>0按团长过滤(排序值sortOrder升序置顶优先, 同级按活动id倒序, 分页在SQL层完成); leaderId=0时需传经纬度(longitude/latitude, 缺失返回空列表), 仅统计已绑定自提点(pointId>0)的活动并过滤出绑定自提点与定位点球面距离小于20km者, 按活动id倒序(先距离过滤再分页); page默认1, pageSize默认10最大20 | Body: **request** (MemberGroupListRequest, JSON) |
 
 **LeaderGoodsManageController**（`cn.com.shopgroup.goods.controller`）
 

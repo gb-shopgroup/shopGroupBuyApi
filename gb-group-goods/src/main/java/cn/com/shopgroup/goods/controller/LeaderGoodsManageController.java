@@ -28,6 +28,7 @@ import cn.com.shopgroup.goods.service.GbGroupActivityInfoService;
 import cn.com.shopgroup.goods.utils.SkuGenerateUtils;
 import cn.com.shopgroup.user.utils.RequestParamsUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
 import org.springframework.validation.annotation.Validated;
@@ -40,10 +41,13 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 //团长端-商品管理
 @RestController
@@ -163,6 +167,7 @@ public class LeaderGoodsManageController {
 
     // 添加商品
     @PostMapping("/leader/goods/addGoods")
+    @Transactional(rollbackFor = Exception.class)
     public JsonResult addGoods(@Validated @RequestBody LeaderAddGoodsRequest request) {
         log.info("添加商品:/goods/leader/goods/addGoods request:{}", request);
         Long leaderId = getLeaderId();
@@ -178,11 +183,11 @@ public class LeaderGoodsManageController {
         data.setMarketPrice(Optional.ofNullable(request.getMarketPrice()).orElse(0D));
         // 库存: 启用库存时使用提交库存, 否则默认 10000(产品要求)
         data.setIsStock(request.getIsStock());
-        int stockNum = 10000;
-        if (request.getIsStock() != null && request.getIsStock() == 1
-                && request.getStockNum() != null && request.getStockNum() > 0) {
-            stockNum = request.getStockNum();
-        }
+        int stockNum = 10000;//先统统设置10000；
+//        if (request.getIsStock() != null && request.getIsStock() == 1
+//                && request.getStockNum() != null && request.getStockNum() > 0) {
+//            stockNum = request.getStockNum();
+//        }
         data.setGoodsNum(stockNum);
         // 限购
         data.setIsLimit(request.getIsLimit());
@@ -200,7 +205,7 @@ public class LeaderGoodsManageController {
         // 3. 写入商品表
         Long goodsId = goodsService.addMiniLeaderGoodsInfo(leaderId, data, imgList);
 
-        // 4. 商品规格 + 规格值 -> gb_goods_spec_info / gb_goods_spec_value
+        // 4. 商品规格 + 规格值 -> gb_goods_spec_info / gb_goods_spec_value(按提交内容新增或修改)
         saveGoodsSpec(leaderId, goodsId, request.getAddSpecList());
 
         // 5. 商品SKU -> gb_goods_sku_info(随商品保存一并写入; 未提交SKU时按规格自动生成)
@@ -212,6 +217,7 @@ public class LeaderGoodsManageController {
 
     // 修改商品, 如果该商品正在团购中, 则不允许修改
     @PostMapping("/leader/goods/edit")
+    @Transactional(rollbackFor = Exception.class)
     public JsonResult editGoods(@Validated @RequestBody LeaderGoodsRequest request) {
         log.info("修改商品:/goods/leader/goods/edit request:{}", request);
         Long leaderId = getLeaderId();
@@ -251,8 +257,8 @@ public class LeaderGoodsManageController {
             throw new BusinessException(GoodsErrorCodeEnum.UPDATE_FAILED);
         }
 
-        // 4. 商品规格重建 -> gb_goods_spec_info / gb_goods_spec_value
-        // 提交了规格则先删除该商品原有规格再按提交内容重建, 未提交则保留原有规格
+        // 4. 商品规格 -> gb_goods_spec_info / gb_goods_spec_value
+        // 提交了规格则按提交内容新增/修改, 并清理该商品下本次未提交的旧规格/规格值; 未提交则保留原有规格
         rebuildGoodsSpec(leaderId, request.getId(), request.getAddSpecList());
 
         // 5. 商品SKU重建 -> gb_goods_sku_info
@@ -450,93 +456,161 @@ public class LeaderGoodsManageController {
     }
 
     /**
-     * 保存商品规格和规格值(添加商品时使用)
+     * 保存商品规格和规格值(新增/修改商品通用)
      * <p>
-     * 支持两种模式:
-     * - 规格携带 specId: 关联已有的规格模板(goods_id 更新到规格/规格值表)
-     * - 规格未携带 specId: 为商品新建专属规格和规格值(goods_id 直接写入)
+     * 按提交内容逐条做「新增或修改」, 不再一律删除重建:
+     * - 规格携带 specId 且该规格属于当前商品或尚未归属商品(goods_id=0 的规格模板): 修改规格内容并绑定到当前商品
+     * - 规格携带 specId 但已归属其他商品: 为当前商品复制一份, 不影响原商品
+     * - 规格未携带 specId(或记录不存在): 为当前商品新建规格
+     * - 规格值同理: 属于本次规格且未归属其他商品则修改, 否则新建
+     *
+     * @return key=实际落库的规格id, value=该规格下实际落库的规格值id集合(供修改商品时清理未提交数据)
      */
-    private void saveGoodsSpec(Long leaderId, Long goodsId, List<LeaderAddSpecRequest> specList) {
+    private Map<Long, Set<Long>> saveGoodsSpec(Long leaderId, Long goodsId, List<LeaderAddSpecRequest> specList) {
+        Map<Long, Set<Long>> savedMap = new HashMap<>();
         if (CollectionUtils.isEmpty(specList)) {
-            return;
+            return savedMap;
         }
         int nowTime = TimeUtils.getTimeStamp();
-        // 需要关联已有规格模板的id集合
-        List<Long> existSpecIds = new ArrayList<>();
-        List<Long> existValIds = new ArrayList<>();
-
         for (LeaderAddSpecRequest spec : specList) {
-            List<LeaderAddSpecValRequest> valList = spec.getSpecValLists();
-
-            // 1. 关联已有的规格模板
-            if (spec.getSpecId() != null && spec.getSpecId() > 0) {
-                existSpecIds.add(spec.getSpecId());
-                if (!CollectionUtils.isEmpty(valList)) {
-                    for (LeaderAddSpecValRequest val : valList) {
-                        if (val.getValId() != null && val.getValId() > 0) {
-                            existValIds.add(val.getValId());
-                        }
-                    }
-                }
+            // 1. 规格 -> gb_goods_spec_info(新增或修改)
+            Long specId = saveGoodsSpecInfo(leaderId, goodsId, spec, nowTime);
+            if (specId == null) {
                 continue;
             }
+            Set<Long> savedValIds = savedMap.computeIfAbsent(specId, key -> new HashSet<>());
 
-            // 2. 新建商品专属规格 -> gb_goods_spec_info
-            GbGoodsSpecInfo specInfo = new GbGoodsSpecInfo();
-            specInfo.setGoodsId(goodsId);
-            specInfo.setLeaderId(leaderId);
-            specInfo.setSpecName(spec.getName());
-            specInfo.setIsPrice(spec.getPrice() == null ? (byte) 0 : spec.getPrice());
-            specInfo.setIsStock(spec.getStock() == null ? (byte) 0 : spec.getStock());
-            specInfo.setSortOrder(255);
-            specInfo.setIsClose((byte) 0);
-            specInfo.setAddTime(nowTime);
-            Long specId = specService.addMiniLeaderGoodsSpec(specInfo);
-
-            // 3. 新建规格值 -> gb_goods_spec_value
-            if (!CollectionUtils.isEmpty(valList)) {
-                for (LeaderAddSpecValRequest val : valList) {
-                    GbGoodsSpecValue specVal = new GbGoodsSpecValue();
-                    specVal.setGoodsId(goodsId);
-                    specVal.setLeaderId(leaderId);
-                    specVal.setSpecId(specId);
-                    specVal.setSpecVal(val.getVal());
-                    specVal.setIsClose((byte) 0);
-                    specVal.setAddTime(nowTime);
-                    specValueService.addGoodsSpecVal(specVal);
+            // 2. 规格值 -> gb_goods_spec_value(新增或修改)
+            List<LeaderAddSpecValRequest> valList = spec.getSpecValLists();
+            if (CollectionUtils.isEmpty(valList)) {
+                continue;
+            }
+            for (LeaderAddSpecValRequest val : valList) {
+                Long valId = saveGoodsSpecValue(leaderId, goodsId, specId, val, nowTime);
+                if (valId != null) {
+                    savedValIds.add(valId);
                 }
             }
         }
-
-        // 4. 关联已有规格模板到当前商品
-        if (!existSpecIds.isEmpty()) {
-            specService.updateGoodsIdByIds(leaderId, goodsId, existSpecIds);
-        }
-        if (!existValIds.isEmpty()) {
-            specValueService.updateGoodsIdByIds(leaderId, goodsId, existValIds);
-        }
+        return savedMap;
     }
 
     /**
-     * 重建商品规格和规格值(修改商品时使用)
+     * 新增或修改单个规格, 返回实际落库的规格id
+     */
+    private Long saveGoodsSpecInfo(Long leaderId, Long goodsId, LeaderAddSpecRequest spec, int nowTime) {
+        byte isPrice = spec.getPrice() == null ? (byte) 0 : spec.getPrice();
+        byte isStock = spec.getStock() == null ? (byte) 0 : spec.getStock();
+
+        // 1. 命中已有规格: 属于当前商品或尚未归属商品(规格模板) -> 修改内容并绑定到当前商品
+        if (spec.getSpecId() != null && spec.getSpecId() > 0) {
+            GbGoodsSpecInfo exist = specService.getGoodsSpecInfo(spec.getSpecId());
+            if (exist != null && (isUnboundGoodsId(exist.getGoodsId()) || exist.getGoodsId().equals(goodsId))) {
+                GbGoodsSpecInfo update = new GbGoodsSpecInfo();
+                update.setSpecId(exist.getSpecId());
+                update.setSpecName(spec.getName());
+                update.setIsPrice(isPrice);
+                update.setIsStock(isStock);
+                specService.editMiniLeaderGoodsSpec(update);
+                if (isUnboundGoodsId(exist.getGoodsId())) {
+                    specService.updateGoodsIdByIds(leaderId, goodsId, Collections.singletonList(exist.getSpecId()));
+                }
+                return exist.getSpecId();
+            }
+        }
+
+        // 2. 新建规格(未传specId / 记录不存在 / 已归属其他商品时复制一份给当前商品)
+        GbGoodsSpecInfo data = new GbGoodsSpecInfo();
+        data.setGoodsId(goodsId);
+        data.setLeaderId(leaderId);
+        data.setSpecName(spec.getName());
+        data.setIsPrice(isPrice);
+        data.setIsStock(isStock);
+        data.setSortOrder(255);
+        data.setIsClose((byte) 0);
+        data.setAddTime(nowTime);
+        return specService.addMiniLeaderGoodsSpec(data);
+    }
+
+    /**
+     * 新增或修改单个规格值, 返回实际落库的规格值id
+     */
+    private Long saveGoodsSpecValue(Long leaderId, Long goodsId, Long specId, LeaderAddSpecValRequest val, int nowTime) {
+        // 1. 命中已有规格值: 属于本次规格且未归属其他商品 -> 修改内容并绑定到当前商品
+        if (val.getValId() != null && val.getValId() > 0) {
+            GbGoodsSpecValue exist = specValueService.getGoodsSpecValInfo(val.getValId());
+            if (exist != null && specId.equals(exist.getSpecId())
+                    && (isUnboundGoodsId(exist.getGoodsId()) || exist.getGoodsId().equals(goodsId))) {
+                GbGoodsSpecValue update = new GbGoodsSpecValue();
+                update.setValId(exist.getValId());
+                update.setSpecVal(val.getVal());
+                specValueService.editGoodsSpecVal(update);
+                if (isUnboundGoodsId(exist.getGoodsId())) {
+                    specValueService.updateGoodsIdByIds(leaderId, goodsId, Collections.singletonList(exist.getValId()));
+                }
+                return exist.getValId();
+            }
+        }
+
+        // 2. 新建规格值
+        GbGoodsSpecValue data = new GbGoodsSpecValue();
+        data.setGoodsId(goodsId);
+        data.setLeaderId(leaderId);
+        data.setSpecId(specId);
+        data.setSpecVal(val.getVal());
+        data.setIsClose((byte) 0);
+        data.setAddTime(nowTime);
+        return specValueService.addGoodsSpecVal(data);
+    }
+
+    /**
+     * 编辑商品规格和规格值
      * <p>
-     * 提交了规格则先删除该商品原有的规格和规格值, 再按提交内容重建;
+     * 提交了规格则先按提交内容新增/修改, 再清理本次未提交的旧规格和旧规格值;
      * 未提交规格则保持原有规格不变。
      */
     private void rebuildGoodsSpec(Long leaderId, Long goodsId, List<LeaderAddSpecRequest> specList) {
         if (CollectionUtils.isEmpty(specList)) {
             return;
         }
-        // 1. 删除该商品原有的规格和规格值
+        // 1. 按提交内容新增或修改(本次提交且落库成功的规格/规格值)
+        Map<Long, Set<Long>> savedMap = saveGoodsSpec(leaderId, goodsId, specList);
+
+        // 2. 清理该商品下本次未提交的旧规格和旧规格值
         List<GbGoodsSpecInfo> oldSpecList = specService.getMiniGoodsSpecList(goodsId);
-        if (!CollectionUtils.isEmpty(oldSpecList)) {
-            for (GbGoodsSpecInfo oldSpec : oldSpecList) {
-                specValueService.removeMiniLeaderGoodsSpecValList(oldSpec.getSpecId());
-                specService.removeMiniLeaderGoodsSpec(oldSpec.getSpecId());
+        if (CollectionUtils.isEmpty(oldSpecList)) {
+            return;
+        }
+        for (GbGoodsSpecInfo oldSpec : oldSpecList) {
+            Long oldSpecId = oldSpec.getSpecId();
+            // 未提交的规格: 连同其规格值一起删除
+            if (!savedMap.containsKey(oldSpecId)) {
+                specValueService.removeMiniLeaderGoodsSpecValList(oldSpecId);
+                specService.removeMiniLeaderGoodsSpec(oldSpecId);
+                continue;
+            }
+            // 保留的规格: 只删除本次未提交、且确实归属当前商品的旧规格值
+            Set<Long> savedValIds = savedMap.get(oldSpecId);
+            List<GbGoodsSpecValue> oldValList = specValueService.getMiniLeaderGoodsSpecValList(oldSpecId);
+            if (CollectionUtils.isEmpty(oldValList)) {
+                continue;
+            }
+            for (GbGoodsSpecValue oldVal : oldValList) {
+                if (savedValIds.contains(oldVal.getValId())) {
+                    continue;
+                }
+                if (goodsId.equals(oldVal.getGoodsId())) {
+                    specValueService.removeMiniLeaderGoodsSpecVal(oldVal.getValId());
+                }
             }
         }
-        // 2. 按提交内容重建
-        saveGoodsSpec(leaderId, goodsId, specList);
+    }
+
+    /**
+     * 规格/规格值是否尚未归属任何商品(0 表示全局规格模板)
+     */
+    private boolean isUnboundGoodsId(Long goodsId) {
+        return goodsId == null || goodsId == 0L;
     }
 
     /**

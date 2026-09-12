@@ -106,10 +106,7 @@ public class GbOrderInfoService {
         LambdaQueryWrapper<GbOrderInfo> queryWrapper = Wrappers.lambdaQuery();
         queryWrapper.select(GbOrderInfo::getOrderNo);
         queryWrapper.eq(GbOrderInfo::getGroupId, groupId);
-        queryWrapper.eq(GbOrderInfo::getStatus, 2);
-        queryWrapper.eq(GbOrderInfo::getStatus, 5);
-        queryWrapper.eq(GbOrderInfo::getStatus, 6);
-        //queryWrapper.eq(GbOrderInfo::getIsRefund, 0);
+        queryWrapper.gt(GbOrderInfo::getStatus, 0);
         return mapper.selectCount(queryWrapper);
     }
 
@@ -652,7 +649,46 @@ public class GbOrderInfoService {
     }
 
     /**
-     * 售后审核结束(拒绝退款 / 仅部分商品退款成功)后, 把仍停留在售后(5)的订单恢复为正常流转状态:
+     * 售后审核同意且退款成功后维护订单主状态:
+     * 1) 订单商品全部退完 -> 已退款(4)
+     * 2) 只要有商品尚未退完 -> 售后(5)(不再恢复为申请前状态, 剩余商品仍可继续申请售后)
+     * 调用时机: 团长审核同意且退款接口同步返回成功, 或易宝退款回调最终成功
+     *
+     * @return true=本次已置为已退款(4), false=仍有未退完的商品, 订单保持售后(5)
+     */
+    public boolean updateOrderStatusAfterRefundAgree(String orderNo) {
+        if (StringUtils.isEmpty(orderNo)) {
+            return false;
+        }
+        // 全部商品已退完 -> 已退款(4)
+        if (getOrderGoodsStatus(orderNo) == 0) {
+            editMiniLeaderRefundOrder(orderNo);
+            return true;
+        }
+        // 还有未退完的商品 -> 订单保持售后(5)
+        keepOrderStatusApplyRefund(orderNo);
+        return false;
+    }
+
+    /**
+     * 订单仍有未退完的商品时, 保持(或置回)售后(5)状态;
+     * 已退款(4)的订单不覆盖, 避免把已全退订单改回售后
+     */
+    public boolean keepOrderStatusApplyRefund(String orderNo) {
+        if (StringUtils.isEmpty(orderNo)) {
+            return false;
+        }
+        LambdaUpdateWrapper<GbOrderInfo> updateWrapper = Wrappers.lambdaUpdate();
+        updateWrapper.eq(GbOrderInfo::getOrderNo, orderNo);
+        // 已退款(4)的订单不覆盖
+        updateWrapper.ne(GbOrderInfo::getStatus, OrderStatusEnum.REFUNDED.getCode());
+        updateWrapper.set(GbOrderInfo::getStatus, OrderStatusEnum.APPLY_REFUND.getCode());
+        updateWrapper.set(GbOrderInfo::getUpdateTime, TimeUtils.getTimeStamp());
+        return mapper.update(updateWrapper) > 0;
+    }
+
+    /**
+     * 售后审核结束(审核拒绝 / 退款失败)后, 把仍停留在售后(5)的订单恢复为正常流转状态:
      * 前提: 订单状态仍为售后(5) 且 该订单已无待审核售后(apply_refund=1)的商品行, 避免打断仍在途的其它售后申请
      * 规则: 按用户确认收货时间(receipt_time)与商品行核销/退款完整度推算申请前状态
      * 1) receipt_time=0(未确认过收货): 恢复待收货(1), 用户可继续核销/确认收货; 已分账核销满7天的由定时任务自动完成
@@ -756,7 +792,7 @@ public class GbOrderInfoService {
     }
 
 
-    // (团长端首页)商品统计汇总: 商品种类总数 + 待核销总件数
+    // (团长端首页)商品统计汇总: 订单商品总件数 + 待核销总件数
     public Map<String, Object> getSummaryGoodsTotal(Long leaderId, Long pointId, String keyword) {
 
         return mapper.getSummaryGoodsTotal(leaderId, pointId, keyword);
@@ -849,24 +885,43 @@ public class GbOrderInfoService {
         return 1;
     }
 
+    /**
+     * 用户申请退款/退货成功后维护商品行的退款占用:
+     * 1) 售后状态置待审核(apply_refund=1)
+     * 2) 按退款类型累加退款数量(refund_num, 退待收货部分)或退货退款数量(refund_goods_num, 退已收货部分)
+     * 注意: 入参 goodsList 中的 refundNum/refundGoodsNum 存放的是"本次申请值", 由调用方在内存中赋值;
+     * 商品维度退款金额不落库, 由 退款数量×商品单价 推算
+     *
+     * @param goodsList     本次申请的商品行(内存值携带本次申请数量)
+     * @param isReturnGoods 1=退款(退待收货部分) 2=退货退款(退已收货部分)
+     */
     public int updateOrderGoodsRefundByOrderNo(List<GbOrderGoodsInfo> goodsList, int isReturnGoods) {
-        if (CollectionUtils.isEmpty(goodsList)) {
+        if (CollectionUtils.isEmpty(goodsList) || (isReturnGoods != 1 && isReturnGoods != 2)) {
             return 0;
         }
+        // 实际更新的商品行数
+        int updated = 0;
         for (GbOrderGoodsInfo item : goodsList) {
+            // 本次申请数量(调用方在内存中赋值), 取绝对值防御负数; 为空或<=0说明该行未真正申请, 跳过避免误置售后状态
+            int applyNum = isReturnGoods == 1
+                    ? (item.getRefundNum() == null ? 0 : Math.abs(item.getRefundNum()))
+                    : (item.getRefundGoodsNum() == null ? 0 : Math.abs(item.getRefundGoodsNum()));
+            if (applyNum <= 0 || item.getId() == null) {
+                log.warn("申请退款维护商品行退款数量跳过: orderGoodsId={}, isReturnGoods={}, applyNum={}", item.getId(), isReturnGoods, applyNum);
+                continue;
+            }
             LambdaUpdateWrapper<GbOrderGoodsInfo> updateGoodsWrapper = Wrappers.lambdaUpdate();
             updateGoodsWrapper.eq(GbOrderGoodsInfo::getId, item.getId());
+            // 售后状态置待审核, 退款数量按本次申请值累加(占坑: 审核同意保留, 审核拒绝时回退)
             updateGoodsWrapper.set(GbOrderGoodsInfo::getApplyRefund, 1);
             if (isReturnGoods == 1) {
-                updateGoodsWrapper.setSql("refund_num = refund_num + {0}", Math.abs(item.getRefundNum()));
+                updateGoodsWrapper.setSql("refund_num = refund_num + {0}", applyNum);
+            } else {
+                updateGoodsWrapper.setSql("refund_goods_num = refund_goods_num + {0}", applyNum);
             }
-            if (isReturnGoods == 2) {
-                updateGoodsWrapper.setSql("refund_goods_num = refund_goods_num + {0}", Math.abs(item.getRefundGoodsNum()));
-            }
-            goodsMapper.update(updateGoodsWrapper);
+            updated += goodsMapper.update(updateGoodsWrapper);
         }
-        //后续需要逻辑再改成具体条数
-        return 1;
+        return updated;
     }
 
     public void updateOrderGoodsApplyStatus(String orderNo, List<Long> orderGoodsIds, int status) {
@@ -881,13 +936,6 @@ public class GbOrderInfoService {
         }
     }
 
-    /**
-     * 累计订单商品的已退款数(refund_num): 仅在审核同意且退款成功后调用
-     * 与申请数量(refund_goods_num)区分: refund_goods_num 提交申请即累加(含待审核/被拒),
-     * 这里累加的是真正退款成功的数量
-     *
-     * @param goodsRefundNumMap key=订单商品id, value=本次退款成功数量
-     */
     /**
      * 审核拒绝时回退商品行本次申请累计的退款/退货退款数量
      * 申请时商品行数量占坑(主表refund_fee金额改为退款回调成功后才累加, 不在申请时占坑),
@@ -951,9 +999,7 @@ public class GbOrderInfoService {
         if (StringUtils.isEmpty(goodsName)) {
             LambdaQueryWrapper<GbOrderInfo> queryWrapper = Wrappers.lambdaQuery();
             queryWrapper.eq(GbOrderInfo::getMemberId, memberId);
-            if (status != null) {
-                queryWrapper.eq(GbOrderInfo::getStatus, status);
-            }
+            appendOrderStatusCondition(queryWrapper, status);
             queryWrapper.orderByDesc(GbOrderInfo::getId);
             queryWrapper.last("limit " + (page - 1) * pageSize + "," + pageSize);
             result = mapper.selectList(queryWrapper);
@@ -977,9 +1023,7 @@ public class GbOrderInfoService {
             LambdaQueryWrapper<GbOrderInfo> queryWrapper = Wrappers.lambdaQuery();
             queryWrapper.eq(GbOrderInfo::getMemberId, memberId);
             queryWrapper.in(GbOrderInfo::getOrderNo, orderNoList);
-            if (status != null) {
-                queryWrapper.eq(GbOrderInfo::getStatus, status);
-            }
+            appendOrderStatusCondition(queryWrapper, status);
             queryWrapper.orderByDesc(GbOrderInfo::getId);
             queryWrapper.last("limit " + (page - 1) * pageSize + "," + pageSize);
             result = mapper.selectList(queryWrapper);
@@ -1133,12 +1177,9 @@ public class GbOrderInfoService {
         // 1. 查询符合条件的订单(分页)
         if (trimKeyword == null || isPhone) {
             // keyword 为空: 查全部; keyword 为手机号: 按手机号模糊匹配
-            LambdaQueryWrapper<GbOrderInfo> queryWrapper = buildLeaderOrderQueryWrapper(leaderId, groupId, status, null);
+            LambdaQueryWrapper<GbOrderInfo> queryWrapper = buildLeaderOrderQueryWrapper(leaderId, groupId, status, null,pointId);
             if (isPhone) {
                 queryWrapper.like(GbOrderInfo::getMobile, trimKeyword);
-            }
-            if (pointId != null && pointId > 0) {
-                queryWrapper.eq(GbOrderInfo::getPointId, pointId);
             }
             queryWrapper.orderByDesc(GbOrderInfo::getId);
             queryWrapper.last("limit " + (page - 1) * pageSize + "," + pageSize);
@@ -1157,10 +1198,7 @@ public class GbOrderInfoService {
             if (CollectionUtils.isEmpty(orderNoList)) {
                 return new ArrayList<>();
             }
-            LambdaQueryWrapper<GbOrderInfo> queryWrapper = buildLeaderOrderQueryWrapper(leaderId, groupId, status, orderNoList);
-            if (pointId != null && pointId > 0) {
-                queryWrapper.eq(GbOrderInfo::getPointId, pointId);
-            }
+            LambdaQueryWrapper<GbOrderInfo> queryWrapper = buildLeaderOrderQueryWrapper(leaderId, groupId, status, orderNoList,pointId);
             queryWrapper.orderByDesc(GbOrderInfo::getId);
             queryWrapper.last("limit " + (page - 1) * pageSize + "," + pageSize);
             result = mapper.selectList(queryWrapper);
@@ -1194,7 +1232,7 @@ public class GbOrderInfoService {
 
     // 构造团长订单查询条件(公共部分)
     private LambdaQueryWrapper<GbOrderInfo> buildLeaderOrderQueryWrapper(Long leaderId, Long groupId,
-                                                                         Integer status, List<String> orderNos) {
+                                                                         Integer status, List<String> orderNos,Long pointId) {
         LambdaQueryWrapper<GbOrderInfo> queryWrapper = Wrappers.lambdaQuery();
         queryWrapper.eq(GbOrderInfo::getLeaderId, leaderId);
         if (!CollectionUtils.isEmpty(orderNos)) {
@@ -1203,20 +1241,39 @@ public class GbOrderInfoService {
         if (groupId != null && groupId > 0) {
             queryWrapper.eq(GbOrderInfo::getGroupId, groupId);
         }
-        if (status != null) {
-            queryWrapper.eq(GbOrderInfo::getStatus, status);
+        if (pointId != null && pointId > 0) {
+            queryWrapper.eq(GbOrderInfo::getPointId, pointId);
         }
+        appendOrderStatusCondition(queryWrapper, status);
         return queryWrapper;
     }
 
-    public List<GbOrderInfo> getLeaderApplyRefundOrderList(Long leaderId, Long groupId, String keyword,
+    // 拼装订单状态查询条件: 查询参数 status=5(售后) 时, 数据库中 status=4(已退款)、5(售后) 的数据都要返回
+    private void appendOrderStatusCondition(LambdaQueryWrapper<GbOrderInfo> queryWrapper, Integer status) {
+
+        if (status == null) {
+            return;
+        }
+        if (status == OrderStatusEnum.APPLY_REFUND.getCode()) {
+            queryWrapper.in(GbOrderInfo::getStatus,
+                    OrderStatusEnum.REFUNDED.getCode(), OrderStatusEnum.APPLY_REFUND.getCode());
+            return;
+        }
+        queryWrapper.eq(GbOrderInfo::getStatus, status);
+    }
+
+    public List<GbOrderInfo> getLeaderApplyRefundOrderList(Long leaderId, Long groupId, Long pointId,String keyword,
                                                            Integer applyStatus, int page, int pageSize) {
         // 1. 查询售后订单(分页)
         LambdaQueryWrapper<GbOrderInfo> queryWrapper = Wrappers.lambdaQuery();
         queryWrapper.eq(GbOrderInfo::getLeaderId, leaderId);
-        queryWrapper.eq(GbOrderInfo::getStatus, OrderStatusEnum.APPLY_REFUND.getCode());
+        queryWrapper.in(GbOrderInfo::getStatus,
+                OrderStatusEnum.REFUNDED.getCode(), OrderStatusEnum.APPLY_REFUND.getCode());
         if (groupId != null && groupId > 0) {
             queryWrapper.eq(GbOrderInfo::getGroupId, groupId);
+        }
+        if (pointId != null && pointId > 0) {
+            queryWrapper.eq(GbOrderInfo::getPointId, pointId);
         }
         // keyword 为纯数字(手机号)时, 按手机号过滤订单
         if (!StringUtils.isEmpty(keyword) && isMobileKeyword(keyword)) {
@@ -1711,8 +1768,8 @@ public class GbOrderInfoService {
             return response;
         }
         // 日期转秒级时间戳: 开始日期取当天00:00:00, 结束日期取当天23:59:59
-        int startTime = TimeUtils.toFormatTimeStamp(startDate);
-        int endTime = TimeUtils.toFormatTimeStamp(endDate);
+        int startTime = TimeUtils.toFormatTimeStamp(startDate+"00:00:00");
+        int endTime = TimeUtils.toFormatTimeStamp(endDate+"23:59:59");
         if (startTime <= 0 || endTime <= 0 || startTime > endTime) {
             log.warn("[团长端-对账单]时间范围不合法, 不执行查询, leaderId:{}, startDate:{}, endDate:{}", leaderId, startDate, endDate);
             return response;

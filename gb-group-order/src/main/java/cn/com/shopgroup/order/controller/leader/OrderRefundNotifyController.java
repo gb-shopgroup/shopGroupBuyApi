@@ -133,9 +133,9 @@ public class OrderRefundNotifyController {
     /**
      * 退款结果业务处理
      * 金额维护口径: 申请与审核阶段都不维护主表refund_fee, 只在退款资金最终成功后按回调实际退款金额累加一次;
-     * 商品行退款以"退款数量"体现(申请占坑, 审核同意保留, 审核拒绝按行回退), 不单独落库商品维度的退款金额。
-     * 回调不再重复累计商品数量, 只做与资金最终结果相关的处理:
-     * 1. 退款成功: 补全订单退款流水号与退款时间、把本次实际退款金额累加到订单refund_fee、分账表置已退款(不再参与分账)、订单主状态兜底同步、交易流水、团长消息
+     * 商品行退款以"退款数量"体现(申请时按行累加, 审核同意保留, 审核拒绝按行回退), 商品维度退款金额可由 退款数量×商品单价 推算, 不单独落库.
+     * 回调不再重复累计商品数量/金额, 只做与资金最终结果相关的处理:
+     * 1. 退款成功: 补全订单退款流水号与退款时间、把本次实际退款金额累加到订单refund_fee、分账表置已退款(不再参与分账)、订单主状态兜底同步(全部退完=已退款4, 否则保持售后5)、交易流水、团长消息
      * 2. 退款失败: 记录失败流水与失败原因、订单不再停留在售后(5)、通知团长人工处理
      * (回调报文只有订单维度的信息, 不含商品明细, 商品行的申请占坑数量无法按行回退, 需团长重新发起或人工核对)
      */
@@ -167,13 +167,9 @@ public class OrderRefundNotifyController {
             }
             // 3. 分账订单表同步为已退款(comm_status=5), 已退款订单不再参与分账
             orderBusinessInfoService.editMiniLeaderOrderBusinessRefundStatus(orderNo);
-            // 4. 订单主状态兜底同步: 订单仍停留在售后(5)时, 商品全部退完置已退款(4), 否则恢复申请前状态
+            // 4. 订单主状态兜底同步: 订单仍停留在售后(5)时, 商品全部退完置已退款(4), 否则只要有未退完的保持售后(5)
             if (orderInfo.getStatus() != null && orderInfo.getStatus().intValue() == OrderStatusEnum.APPLY_REFUND.getCode()) {
-                if (orderInfoService.getOrderGoodsStatus(orderNo) == 0) {
-                    orderInfoService.editMiniLeaderRefundOrder(orderNo);
-                } else {
-                    orderInfoService.restoreOrderStatusAfterRefundReview(orderNo);
-                }
+                orderInfoService.updateOrderStatusAfterRefundAgree(orderNo);
             }
             // 5. 退款成功交易流水
             insertTransaction(orderNo, amount, PaymentStatusEnum.REFUNDED, "退款回调成功,退款单号:" + refundNo);

@@ -76,6 +76,9 @@ public class GroupOrderController {
         // 下单
         Map<String, String> res = orderService.addOrder(memberId, request);
         int success = Integer.parseInt(res.get("success"));
+        //下单成功，删除团购活动的redis统计订单数
+        String groupOrderKey = RedisConstant.RedisOrderTotalKey + request.getGroupId();
+        redisHelper.releaseLock(groupOrderKey);
         String msg = res.get("msg"); // 订单号
         if (success == 1) {
             return JsonResult.success("下单成功", msg);

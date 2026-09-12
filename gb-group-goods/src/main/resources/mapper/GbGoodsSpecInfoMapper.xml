@@ -20,14 +20,14 @@
     </sql>
 
 
-    <!-- 按规格值id列表更新商品id -->
+    <!-- 按规格id列表更新商品id -->
     <update id="updateGoodsIdByIds">
         UPDATE gb_goods_spec_info
         SET goods_id = #{goodsId}
         WHERE leader_id = #{leaderId}
-        AND val_id IN
-        <foreach collection="specValIds" item="valId" open="(" separator="," close=")">
-            #{valId}
+        AND spec_id IN
+        <foreach collection="specInfoIds" item="specId" open="(" separator="," close=")">
+            #{specId}
         </foreach>
     </update>
 

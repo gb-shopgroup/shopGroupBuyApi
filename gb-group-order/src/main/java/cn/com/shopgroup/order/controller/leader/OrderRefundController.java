@@ -90,7 +90,7 @@ public class OrderRefundController {
         return JsonResult.success(total);
     }
 
-    //售后订单审核（同意/不同意）。status: 1=同意, 2=不同意; 每单一行key=订单号, value.refundGoodsMap为本次申请的订单商品行(行内refundNum/refundAmount为本次申请值); 同意=按本次申请金额向易宝发起退款(支持部分退款)、保留申请时占坑的商品数量并把商品售后状态置同意(主表退款金额refund_fee不在此累加, 统一由退款回调成功后按实际退款金额累加; 商品行退款以退款数量体现, 不单独落库金额); 不同意=主表退款金额申请/审核阶段均未累加无需回退(天然回到申请前), 仅按行回退商品退款/退货退款数量并把商品售后状态置不同意; 团长端旧版本未回传refundFlag/金额时后端按该订单最近一笔售后记录兜底
+    //售后订单审核（同意/不同意）。status: 1=同意, 2=不同意; 每单一行key=订单号, value.refundGoodsMap为本次申请的订单商品行(行内refundNum/refundAmount为本次申请值); 同意=按本次申请金额向易宝发起退款(支持部分退款)、保留申请时占坑的商品数量并把商品售后状态置同意, 同时维护订单主状态: 订单商品全部退完=已退款(4), 否则只要有未退完的=售后(5)(主表退款金额refund_fee不在此累加, 统一由退款回调成功后按实际退款金额累加; 商品维度退款金额以退款数量体现, 可由 退款数量×商品单价 推算); 不同意=主表退款金额不变(申请/审核阶段均未累加, 天然回到申请前), 按行回退商品退款/退货退款数量并把商品售后状态置不同意; 团长端旧版本未回传refundFlag/金额时后端按该订单最近一笔售后记录兜底
     @PostMapping("/leader/refund/approve")
     public JsonResult approveRefundOrder(@Validated @RequestBody OrderApproveRequest approveRequest) {
         log.info("团长管理-审核退款订单处理.../order/refund/approve,参数:{}", JSON.toJSONString(approveRequest));
@@ -242,7 +242,7 @@ public class OrderRefundController {
         // 同步分账订单表, 核销之后的订单才能分账, 这样只要不核销订单, 就可以随时退款
         //businessService.updateBusinessOrderCheckStatus(request.getOrderNo());
         // 3. 恢复订单主状态: 拒绝并不产生真实退款, 该订单无其它待审核售后时从售后(5)恢复为申请前状态, 否则订单一直卡在售后
-        orderInfoService.restoreOrderStatusAfterRefundReview(request.getOrderNo());
+       // orderInfoService.restoreOrderStatusAfterRefundReview(request.getOrderNo());
 
         // 添加日志, 消息类型: 1=系统消息2=内部消息3=业务消息
         Byte type = 2;
@@ -321,14 +321,8 @@ public class OrderRefundController {
             refundRecord.setActionReason(reason);
             refundRecord.setAddTime(TimeUtils.getTimeStamp());
             refundRecordService.addRefundRecord(refundRecord);
-            int flag = orderInfoService.getOrderGoodsStatus(orderNo);
-            if (flag == 0) {
-                //改订单商品状态 全部商品都退了为退款
-                orderInfoService.editMiniLeaderRefundOrder(orderNo);
-            } else {
-                // 仅部分商品退款成功: 剩余商品继续正常流转, 订单从售后(5)恢复为申请前状态(该订单无其它待审核售后时)
-                orderInfoService.restoreOrderStatusAfterRefundReview(orderNo);
-            }
+            // 审核同意且退款成功后维护订单主状态: 订单商品全部退完 -> 已退款(4), 否则只要有未退完的 -> 售后(5)
+            orderInfoService.updateOrderStatusAfterRefundAgree(orderNo);
             // 同步分账订单表, 核销之后的订单才能分账, 这样只要不核销订单, 就可以随时退款
             businessService.updateBusinessOrderCheckStatus(request.getOrderNo());
 

@@ -257,7 +257,8 @@ public class GbGoodsSpecInfoServiceImpl implements GbGoodsSpecInfoService {
         if (CollectionUtils.isEmpty(specInfoIds)) {
             return 0;
         }
-        return valueMapper.updateGoodsIdByIds(leaderId, goodsId, specInfoIds);
+        // 注意: 这里操作的是规格表(gb_goods_spec_info), 必须用规格表的 mapper, 否则会更新到规格值表
+        return mapper.updateGoodsIdByIds(leaderId, goodsId, specInfoIds);
     }
 
     @Override

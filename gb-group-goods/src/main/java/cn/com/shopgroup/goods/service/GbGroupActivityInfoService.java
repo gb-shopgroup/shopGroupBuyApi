@@ -1,10 +1,12 @@
 package cn.com.shopgroup.goods.service;
 
+import cn.com.shopgroup.goods.http.response.group.GroupActGoodsResponse;
 import cn.com.shopgroup.goods.model.GbGoodsInfo;
 import cn.com.shopgroup.goods.model.GbGroupActivityGoods;
 import cn.com.shopgroup.goods.model.GbGroupActivityInfo;
 
 import java.util.List;
+import java.util.Map;
 
 public interface GbGroupActivityInfoService {
 
@@ -39,5 +41,15 @@ public interface GbGroupActivityInfoService {
 
     Boolean isGoodsGrouping(Long leaderId, Long goodsId);
 
-    List<GbGroupActivityInfo> getMemberGroupActivityList(Long leaderId, Double longitude, Double latitude, int page, int pageSize);
+    List<GbGroupActivityInfo> getMemberGroupActivityList(Long leaderId, Double longitude, Double latitude,
+                                                         String groupName,Long catId,int page, int pageSize);
+
+    /**
+     * 批量查询多个团购活动的商品列表(价格取团购商品表冗余的团购价, 库存/单位取自商品表), 按团购id分组返回
+     * 一次批量查询完成, 避免团购列表在循环内做 N+1 查询
+     *
+     * @param groupIds 团购id集合
+     * @return key=团购id, value=该团购的商品列表(无商品的团购不会出现在map中)
+     */
+    Map<Long, List<GroupActGoodsResponse>> getGroupGoodsResponseMap(List<Long> groupIds);
 }

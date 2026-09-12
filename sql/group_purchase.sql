@@ -331,7 +331,7 @@ CREATE TABLE `gb_order_commission_info` (
   `comm_remark` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '分账备注,系统自动备注',
   `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '添加时间',
   PRIMARY KEY (`comm_id`),
-  UNIQUE KEY `uk_order_no` (`order_no`)
+  KEY `idx_order_no` (`order_no`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='订单分账/佣金信息表';
 
 -- group_purchase.gb_order_goods_info definition

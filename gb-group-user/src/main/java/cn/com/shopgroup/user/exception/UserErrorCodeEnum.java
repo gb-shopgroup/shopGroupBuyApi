@@ -136,6 +136,12 @@ public enum UserErrorCodeEnum implements IErrorCode {
      * 获取图片尺寸失败
      */
     IMAGE_SIZE_INVALID(300124, "获取图片尺寸失败"),
+
+    STAFF_MUST_BU_MEMBER(300125, "添加的员工必须先注册用户信息"),
+
+    LEADER_INFO_NOT_FIND(300126, "查询不到团长信息"),
+
+    NOT_SUPPORT_DELETE_ACTION(300127, "暂不支持删除操作"),
     ;
 
     /**

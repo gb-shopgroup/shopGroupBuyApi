@@ -355,7 +355,7 @@ public class OrderPaymentController {
         // 团长结算到账方式: 0=支付时延迟到账型, 1=核销时延迟到账型
         // type=0 时延迟15秒再调用微信发货(上传发货信息+标记已调用微信发货), 等微信侧发货状态生效, 同时避免阻塞易宝支付回调请求
         if (type == 0) {
-            log.info("支付-易宝支付回调---3分钟后再调用微信发货......");
+            log.info("支付-易宝支付回调---10分钟后再调用微信发货......");
             String orderNo = orderInfo.getOrderNo();
             wxShipmentExecutor.schedule(() -> {
                 try {
@@ -378,7 +378,7 @@ public class OrderPaymentController {
                 } catch (Exception e) {
                     log.error("[微信发货]延迟调用微信发货异常, orderNo:{}", orderNo, e);
                 }
-            }, 3, TimeUnit.MINUTES);
+            }, 10, TimeUnit.MINUTES);
         }
     }
 

@@ -35,6 +35,7 @@ import cn.com.shopgroup.user.service.GbOrgShopInfoService;
 import com.alibaba.fastjson2.JSON;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
 import org.springframework.validation.annotation.Validated;
@@ -343,7 +344,9 @@ public class MemberOrderController {
         }
     }
 
-    // 用户申请订单退款。refundFlag: 1=退款(退"待收货"部分, 可退量=购买数-收货数-已申请退款数), 2=退货退款(退"已收货"部分, 可退量=收货数-已申请退货退款数); 申请成功后仅对应商品行退款/退货退款数量先占坑累计(可退量会相应扣减), 订单主表refund_fee在申请/审核阶段都不维护, 待团长审核: 同意仅按本次申请金额发起退款(主表金额改由退款回调成功后按实际退款金额累加), 不同意=主表金额天然不变回到申请前, 仅回退商品行数量并把售后状态置不同意; 出参data为本次申请退款总金额(单位:元)
+    // 用户申请订单退款。refundFlag: 1=退款(退"待收货"部分, 可退量=购买数-收货数-已申请退款数), 2=退货退款(退"已收货"部分, 可退量=收货数-已申请退货退款数); 申请成功后: 订单状态置售后(5), 对应商品行退款/退货退款数量先占坑累计(可退量会相应扣减), 商品维度退款金额由 退款数量×商品单价 推算, 不单独落库; 订单主表refund_fee在申请/审核阶段都不维护, 待团长审核: 同意仅按本次申请金额发起退款(主表金额改由退款回调成功后按实际退款金额累加), 不同意=主表金额不变(天然回到申请前), 仅回退商品行本次申请的数量并把售后状态置不同意; 出参data为本次申请退款总金额(单位:元)
+    // 事务保证"订单置售后(5) + 商品行退款数量占坑 + 售后申请记录"三步一致, 避免中途异常导致订单已售后但商品行退款数量未维护(待核销统计虚高)
+    @Transactional(rollbackFor = Exception.class)
     @PostMapping("/group/order/apply/refund")
     public JsonResult orderApplyRefund(@Validated @RequestBody OrderRefundApplyRequest refundApplyRequest) {
         log.info("[用户申请订单退款操作],params->{}", JSON.toJSONString(refundApplyRequest));
@@ -521,7 +524,7 @@ public class MemberOrderController {
             List<OrderRefundRecordResponse> refundRecordResponses = OrderRefundRecordResponse.getOrderRefundRecordResponseList(recordList);
             response.setRefundRecords(refundRecordResponses);
         }
-
+        log.info("售后记录查询返回resp:{}", JSON.toJSONString(response));
         return JsonResult.success(response);
     }
 

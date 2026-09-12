@@ -142,33 +142,36 @@ public interface GbOrderInfoMapper extends BaseMapper<GbOrderInfo> {
     List<Map<String, Object>> getSummaryPointOrderGoodsList(Long leaderId, Long pointId, int startTime, int endTime);
 
 
-    // (团长端首页)商品统计汇总: 商品种类总数(COUNT DISTINCT goods_id), 待核销总件数(verify_time=0), 已支付(pay_time>0), 未退款(refund_time=0)
+    // (团长端首页)商品统计汇总: 订单商品总件数(SUM(goods_num*pack_num)),
+    // 待核销总件数(按商品行计算: goods_num - receipt_num - refund_num - refund_goods_num, 即已退款部分不计入待核销, 支持部分核销),
+    // 已支付(pay_time>0)
     @Select({
-            "SELECT COUNT(DISTINCT g.`goods_id`) AS goods_total,",
-            "       COALESCE(SUM(CASE WHEN o.`verify_time` = 0 THEN g.`goods_num` * g.`pack_num` ELSE 0 END), 0) AS unverify_total",
+            "SELECT COALESCE(SUM(g.`goods_num` * g.`pack_num`), 0) AS goods_total,",
+            "       COALESCE(SUM(GREATEST(g.`goods_num` - IFNULL(g.`receipt_num`, 0) - IFNULL(g.`refund_num`, 0) - IFNULL(g.`refund_goods_num`, 0), 0) * g.`pack_num`), 0) AS unverify_total",
             "FROM `gb_order_goods_info` AS g",
             "JOIN `gb_order_info` AS o ON g.`order_no` = o.`order_no`",
             "WHERE o.`leader_id` = #{leaderId}",
-            "  AND (o.`point_id` = #{pointId} OR #{pointId} <= 0)",
+            "AND (o.`point_id` = #{pointId} OR IFNULL(#{pointId}, 0) <= 0)",
             "  AND o.`pay_time` > 0",
-            "  AND o.`refund_time` = 0",
             "  AND g.`goods_name` LIKE CONCAT('%', IFNULL(#{keyword}, ''), '%')"
     })
     Map<String, Object> getSummaryGoodsTotal(@Param("leaderId") Long leaderId, @Param("pointId") Long pointId,
                                              @Param("keyword") String keyword);
 
 
-    // (团长端首页)商品维度统计分页列表: 每商品总件数/未核销件数, 已支付(pay_time>0), 未退款(refund_time=0), goods_name 关键字搜索, 分页
+    // (团长端首页)商品维度统计分页列表: 每商品总件数(num_total)/已核销件数(receipt_total)/
+    // 待核销件数(unverify_num = goods_num - receipt_num - refund_num - refund_goods_num, 已退款部分不计入待核销, 支持部分核销),
+    // 已支付(pay_time>0), goods_name 关键字搜索, 分页
     @Select({
             "SELECT g.`goods_id`, g.`goods_name`, g.`goods_unit`,",
             "       COALESCE(SUM(g.`goods_num` * g.`pack_num`), 0) AS num_total,",
-            "       COALESCE(SUM(CASE WHEN o.`verify_time` = 0 THEN g.`goods_num` * g.`pack_num` ELSE 0 END), 0) AS unverify_num",
+            "       COALESCE(SUM(IFNULL(g.`receipt_num`, 0) * g.`pack_num`), 0) AS receipt_total,",
+            "       COALESCE(SUM(GREATEST(g.`goods_num` - IFNULL(g.`receipt_num`, 0) - IFNULL(g.`refund_num`, 0) - IFNULL(g.`refund_goods_num`, 0), 0) * g.`pack_num`), 0) AS unverify_num",
             "FROM `gb_order_goods_info` AS g",
             "JOIN `gb_order_info` AS o ON g.`order_no` = o.`order_no`",
             "WHERE o.`leader_id` = #{leaderId}",
-            "  AND (o.`point_id` = #{pointId} OR #{pointId} <= 0)",
+            "AND (o.`point_id` = #{pointId} OR IFNULL(#{pointId}, 0) <= 0)",
             "  AND o.`pay_time` > 0",
-            "  AND o.`refund_time` = 0",
             "  AND g.`goods_name` LIKE CONCAT('%', IFNULL(#{keyword}, ''), '%')",
             "GROUP BY g.`goods_id`, g.`goods_name`, g.`goods_unit`",
             "ORDER BY g.`goods_id` ASC",

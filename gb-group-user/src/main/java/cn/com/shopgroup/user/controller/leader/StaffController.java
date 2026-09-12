@@ -6,8 +6,10 @@ import cn.com.shopgroup.user.exception.UserErrorCodeEnum;
 import cn.com.shopgroup.user.http.request.StaffRequest;
 import cn.com.shopgroup.user.http.response.StaffResponse;
 import cn.com.shopgroup.user.model.GbMemberInfo;
+import cn.com.shopgroup.user.model.GbOrgLeaderInfo;
 import cn.com.shopgroup.user.model.GbOrgStaffInfo;
 import cn.com.shopgroup.user.service.GbMemberInfoService;
+import cn.com.shopgroup.user.service.GbOrgLeaderInfoService;
 import cn.com.shopgroup.user.service.GbOrgStaffInfoService;
 import cn.com.shopgroup.user.utils.RequestParamsUtils;
 import com.alibaba.fastjson2.JSON;
@@ -38,6 +40,9 @@ public class StaffController {
     @Resource
     private GbMemberInfoService memberService;
 
+    @Resource
+    private GbOrgLeaderInfoService leaderInfoService;
+
 
     // 查询当前团长员工列表(不含超级团长)
     @GetMapping("/leader/staff/list")
@@ -66,16 +71,28 @@ public class StaffController {
         log.info("添加员工/leader/staff/add,req:{}", JSON.toJSONString(request));
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
-        if (leaderId == 0) throw new BusinessException(UserErrorCodeEnum.LEADER_NOT_EXIST);
+        if (leaderId == 0) {
+            throw new BusinessException(UserErrorCodeEnum.LEADER_NOT_EXIST);
+        }
+        GbOrgLeaderInfo leaderInfo = leaderInfoService.getLeaderInfo(leaderId);
+        if (ObjectUtils.isEmpty(leaderInfo)) {
+            throw new BusinessException(UserErrorCodeEnum.LEADER_INFO_NOT_FIND);
+        }
 
         // 根据手机号检查员工是否在 member_info 表中
         GbMemberInfo memberInfo = memberService.getMemberInfoByMobile(request.getMobile());
         if (memberInfo == null || memberInfo.getMemberId() == 0) {
-            throw new BusinessException(UserErrorCodeEnum.USER_NOT_EXIST);
+            throw new BusinessException(UserErrorCodeEnum.STAFF_MUST_BU_MEMBER);
         }
+
 
         // 根据openid检查员工是否已经存在
         String openid = memberInfo.getOpenid();
+        //团长openid
+        String leaderOpenid = leaderInfo.getOpenid();
+        if (openid.equals(leaderOpenid)) {
+            throw new BusinessException(UserErrorCodeEnum.OPERATION_NOT_SELF);
+        }
         GbOrgStaffInfo staffInfo = staffInfoService.getMiniStaffInfo(openid);
         if (staffInfo != null && staffInfo.getStaffId() > 0) {
             throw new BusinessException(UserErrorCodeEnum.STAFF_EXISTED);
@@ -162,16 +179,16 @@ public class StaffController {
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) throw new BusinessException(UserErrorCodeEnum.LEADER_NOT_EXIST);
 
-        // 从请求头中获取当前员工id
-        Long sid = RequestParamsUtils.getRequestHeaderStaffId();
-        if (sid == 0) {
-            throw new BusinessException(UserErrorCodeEnum.STAFF_NOT_EXIST);
-        }
-
-        // 不能自己关闭自己
-        if (staffId == sid) {
-            throw new BusinessException(UserErrorCodeEnum.OPERATION_NOT_SELF);
-        }
+//        // 从请求头中获取当前员工id
+//        Long sid = RequestParamsUtils.getRequestHeaderStaffId();
+//        if (sid == 0) {
+//            throw new BusinessException(UserErrorCodeEnum.STAFF_NOT_EXIST);
+//        }
+//
+//        // 不能自己关闭自己
+//        if (staffId == sid) {
+//            throw new BusinessException(UserErrorCodeEnum.OPERATION_NOT_SELF);
+//        }
 
         // 查询旧的用户信息
         GbOrgStaffInfo staffInfo = staffInfoService.getStaffInfo(staffId);
@@ -187,16 +204,17 @@ public class StaffController {
     @PostMapping("/leader/staff/remove")
     public JsonResult removeStaff(@RequestParam("staffId") Long staffId) {
 
+        throw new BusinessException(UserErrorCodeEnum.NOT_SUPPORT_DELETE_ACTION);
         // 从请求头中获取团长id
-        Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
-        if (leaderId == 0) throw new BusinessException(UserErrorCodeEnum.LEADER_NOT_EXIST);
-
-        // 不能自己关闭自己
-        if (staffId == leaderId) {
-            throw new BusinessException(UserErrorCodeEnum.OPERATION_NOT_SELF);
-        }
-        int m = staffInfoService.removeStaff(leaderId, staffId);
-        return JsonResult.success("操作成功");
+//        Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
+//        if (leaderId == 0) throw new BusinessException(UserErrorCodeEnum.LEADER_NOT_EXIST);
+//
+//        // 不能自己关闭自己
+//        if (staffId == leaderId) {
+//            throw new BusinessException(UserErrorCodeEnum.OPERATION_NOT_SELF);
+//        }
+//        int m = staffInfoService.removeStaff(leaderId, staffId);
+//        return JsonResult.success("操作成功");
     }
 
 }

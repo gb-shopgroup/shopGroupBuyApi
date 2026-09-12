@@ -6,6 +6,7 @@ import cn.com.shopgroup.common.exception.BusinessException;
 import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.PhoneGeneratorUtils;
 import cn.com.shopgroup.common.utils.TokenUtils;
+import cn.com.shopgroup.goods.http.response.group.GroupActGoodsResponse;
 import cn.com.shopgroup.goods.http.response.group.GroupActivityResponse;
 import cn.com.shopgroup.goods.http.response.group.GroupCategoryResponse;
 import cn.com.shopgroup.goods.model.GbGroupActivityGoods;
@@ -13,12 +14,13 @@ import cn.com.shopgroup.goods.model.GbGroupActivityInfo;
 import cn.com.shopgroup.goods.model.GbGroupCategoryInfo;
 import cn.com.shopgroup.goods.service.GbGroupActivityInfoService;
 import cn.com.shopgroup.goods.service.GbGroupCategoryInfoService;
+import cn.com.shopgroup.order.exception.OrderErrorCodeEnum;
+import cn.com.shopgroup.order.http.request.MemberGroupActListRequest;
 import cn.com.shopgroup.order.http.request.MemberGroupListRequest;
 import cn.com.shopgroup.order.http.request.MemberGroupViewRequest;
 import cn.com.shopgroup.order.http.response.GroupLogs;
 import cn.com.shopgroup.order.http.response.GroupOrderRecordResponse;
 import cn.com.shopgroup.order.http.response.MemberHomeGroupActResponse;
-import cn.com.shopgroup.order.exception.OrderErrorCodeEnum;
 import cn.com.shopgroup.order.service.GbGroupViewLogService;
 import cn.com.shopgroup.order.service.GbOrderInfoService;
 import cn.com.shopgroup.user.http.response.ShopResponse;
@@ -29,6 +31,7 @@ import io.swagger.annotations.Api;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -43,6 +46,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
@@ -82,10 +86,38 @@ public class MemberGroupController {
         return JsonResult.success(data);
     }
 
-    // 用户首页-查询所有团购活动列表
-    @PostMapping("/group/get/groupActivity/list")
+
+    // 用户查询所有在线的团购活动列表[新用户未绑定团长时leaderId=0]: 仅返回未下线(isClose=0)且当前时间处于开团时间窗内(已开团未结束)的在线活动; 支持团购名称模糊搜索(groupName, 非空时生效)与团购分类过滤(catId, 非空且大于0时生效); leaderId>0按团长过滤(排序值sortOrder升序置顶优先, 同级按活动id倒序, 分页在SQL层完成); leaderId=0时需传经纬度(longitude/latitude, 缺失返回空列表), 仅统计已绑定自提点(pointId>0)的活动并过滤出绑定自提点与定位点球面距离小于20km者, 按活动id倒序(先按名称/分类过滤, 再距离过滤, 最后分页); page默认1, pageSize默认10最大20; 每个团购活动一并返回其商品列表(goods: 团购价取团购商品表冗余价, 库存/单位取自商品表, 批量查询, 无商品的团购返回空数组)
+    @PostMapping("/member/groupActivity/list")
+    public JsonResult getGroupActiveList(@Validated @RequestBody MemberGroupActListRequest request) {
+        log.info("用户首页-查询所有在线的团购活动列表,request:{}", JSON.toJSONString(request));
+        // 从请求获取团长id
+        Long leaderId = request.getLeaderId();
+        Double longitude = request.getLongitude();
+        Double latitude = request.getLatitude();
+        String groupName = request.getGroupName();
+        Long catId = request.getCatId();
+        // 请求参数矫正
+        int page = Optional.ofNullable(request.getPage()).orElse(1);
+        int pageSize = Optional.ofNullable(request.getPageSize())
+                .map(size -> Math.min(size, 20))
+                .orElse(10);
+        List<GbGroupActivityInfo> result = groupActivityInfoService.getMemberGroupActivityList(leaderId, longitude, latitude, groupName, catId, page, pageSize);
+        List<MemberHomeGroupActResponse> data = MemberHomeGroupActResponse.getGroupActResponseList(result);
+        // 填充每个团购活动的商品列表(列表页需要展示团购里的商品)
+        fillGroupGoodsList(data);
+        fillGroupLogList(data);
+        for (MemberHomeGroupActResponse item : data) {
+            item.setOrder(this.getRedisOrderTotal(item.getId(), item.getVirtual()));
+        }
+        log.info("用户首页获取团购活动数据条数：size:{}", data.size());
+        return JsonResult.success(data);
+    }
+
+    // 用户首页-查询所有团购活动列表----旧-废弃
+    //@PostMapping("/group/get/groupActivity/list")
     public JsonResult getGroupActiveList(@RequestBody MemberGroupListRequest request) {
-        log.info("order/group/get/groupActivity/list req:{}", JSON.toJSONString(request));
+        log.info("用户首页-查询所有团购活动列表,order/group/get/groupActivity/list req:{}", JSON.toJSONString(request));
         // 请求参数矫正
         int page = Optional.ofNullable(request.getPage()).orElse(1);
         int pageSize = Optional.ofNullable(request.getPageSize())
@@ -100,11 +132,12 @@ public class MemberGroupController {
         for (MemberHomeGroupActResponse item : data) {
             item.setOrder(this.getRedisOrderTotal(item.getId(), item.getVirtual()));
         }
+        log.info("获取团购活动数据条数：size:{}", data.size());
         return JsonResult.success(data);
     }
 
     /**
-     * 批量填充商品列表的规格信息(包含规格值), 避免循环内 N+1 查询
+     * 填充团购活动的滚动跟团记录(groupLogs, 走Redis缓存)
      */
     private void fillGroupLogList(List<MemberHomeGroupActResponse> data) {
         if (CollectionUtils.isEmpty(data)) {
@@ -115,6 +148,32 @@ public class MemberGroupController {
             if (!CollectionUtils.isEmpty(logList)) {
                 item.setGroupLogs(logList);
             }
+        }
+    }
+
+    /**
+     * 批量填充团购活动的商品列表(团购价取团购商品表冗余价, 库存/单位取自商品表);
+     * 一次批量查询完成, 避免列表循环内 N+1 查询; 没有商品的团购返回空列表
+     */
+    private void fillGroupGoodsList(List<MemberHomeGroupActResponse> data) {
+        if (CollectionUtils.isEmpty(data)) {
+            return;
+        }
+        // 收集本页团购id
+        List<Long> groupIds = new ArrayList<>();
+        for (MemberHomeGroupActResponse item : data) {
+            if (item.getId() != null) {
+                groupIds.add(item.getId());
+            }
+        }
+        if (groupIds.isEmpty()) {
+            return;
+        }
+        // 批量查询商品后按团购id回填
+        Map<Long, List<GroupActGoodsResponse>> goodsMap = groupActivityInfoService.getGroupGoodsResponseMap(groupIds);
+        for (MemberHomeGroupActResponse item : data) {
+            List<GroupActGoodsResponse> goodsList = goodsMap.get(item.getId());
+            item.setGoods(goodsList == null ? new ArrayList<>() : goodsList);
         }
     }
 
@@ -231,7 +290,9 @@ public class MemberGroupController {
     // 晚上时间只生成固定跟团记录（锁定在19:00-20:00生成的订单）。
     @GetMapping("/group/groupActivity/logs")
     public JsonResult groupLogs(@RequestParam("groupId") Long groupId) {
+        log.info("团购记录 /group/groupActivity/logs, groupId:{}", groupId);
         List<GroupLogs> data = getGroupList(groupId);
+        log.info("团购记录 /group/groupActivity/logs 返回:{}", JSON.toJSONString(data));
         return JsonResult.success(data);
     }
 
@@ -448,10 +509,12 @@ public class MemberGroupController {
     @GetMapping("/group/order/records")
     public JsonResult groupOrderRecords(@RequestParam(value = "groupId", required = false) Long groupId,
                                         @RequestParam(value = "limit", required = false) Integer limit) {
+        log.info("真实跟团记录/group/order/records groupId:{}", groupId);
         if (groupId == null || groupId <= 0) {
             throw new BusinessException(OrderErrorCodeEnum.GROUP_ID_REQUIRED);
         }
         List<GroupOrderRecordResponse> data = orderInfoService.getGroupOrderRecordList(groupId, limit);
+        log.info("返回信息/group/order/records:{}", JSON.toJSONString(data));
         return JsonResult.success(data);
     }
 

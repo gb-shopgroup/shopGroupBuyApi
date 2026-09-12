@@ -110,6 +110,7 @@ public class LeaderShopController {
             }
         }
         // 保存店铺信息
+        shopInfo.setLeaderId(leaderId);
         shopInfo.setShopBanner(request.getBanner());
         shopInfo.setShopName(request.getName());
         shopInfo.setShopMobile(request.getMobile());
@@ -247,6 +248,9 @@ public class LeaderShopController {
         String url = domain + "/" + obsKey;
         shopInfo.setShopCodeUrl(url);
         shopInfoService.updateShopInfo(shopInfo);
+        // 删除店铺缓存
+        String key = RedisConstant.RedisShopInfoKey + leaderId;
+        redisHelper.deleteObject(key);
         // 返回访问路径
         return JsonResult.success("二维码生成成功", url);
     }

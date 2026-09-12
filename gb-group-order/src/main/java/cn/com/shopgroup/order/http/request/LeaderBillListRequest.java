@@ -16,11 +16,11 @@ public class LeaderBillListRequest {
     private Integer type;
 
     //开始日期 yyyy-MM-dd, 与结束日期成对传入, 未输入时间则不查询
-    @ApiModelProperty("开始日期 yyyy-MM-dd HH:mm:ss(与结束日期成对传入, 未传入则不查询)")
+    @ApiModelProperty("开始日期 yyyy-MM-dd(与结束日期成对传入, 未传入则不查询)")
     private String startDate;
 
     //结束日期 yyyy-MM-dd, 与开始日期成对传入, 未输入时间则不查询
-    @ApiModelProperty("结束日期 yyyy-MM-dd HH:mm:ss(与开始日期成对传入, 未传入则不查询)")
+    @ApiModelProperty("结束日期 yyyy-MM-dd(与开始日期成对传入, 未传入则不查询)")
     private String endDate;
 
     //页码，默认1

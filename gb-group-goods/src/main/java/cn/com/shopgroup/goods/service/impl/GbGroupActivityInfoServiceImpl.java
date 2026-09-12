@@ -1,11 +1,13 @@
 package cn.com.shopgroup.goods.service.impl;
 
 import cn.com.shopgroup.common.utils.TimeUtils;
+import cn.com.shopgroup.goods.http.response.group.GroupActGoodsResponse;
 import cn.com.shopgroup.goods.mapper.GbGroupActivityGoodsMapper;
 import cn.com.shopgroup.goods.mapper.GbGroupActivityInfoMapper;
 import cn.com.shopgroup.goods.model.GbGoodsInfo;
 import cn.com.shopgroup.goods.model.GbGroupActivityGoods;
 import cn.com.shopgroup.goods.model.GbGroupActivityInfo;
+import cn.com.shopgroup.goods.service.GbGoodsInfoService;
 import cn.com.shopgroup.goods.service.GbGroupActivityInfoService;
 import cn.com.shopgroup.user.model.GbOrgPointInfo;
 import cn.com.shopgroup.user.service.GbOrgMessageInfoService;
@@ -33,6 +35,9 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
 
     @Resource
     private GbGroupActivityGoodsMapper goodsMapper;
+
+    @Resource
+    private GbGoodsInfoService goodsInfoService;
 
     @Resource
     private GbOrgMessageInfoService messageService;
@@ -77,6 +82,48 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
         queryWrapper.orderByAsc(GbGroupActivityGoods::getGoodsId);
         List<GbGroupActivityGoods> results = goodsMapper.selectList(queryWrapper);
         return results == null ? new ArrayList<>() : results;
+    }
+
+
+    @Override
+    public Map<Long, List<GroupActGoodsResponse>> getGroupGoodsResponseMap(List<Long> groupIds) {
+
+        Map<Long, List<GroupActGoodsResponse>> result = new HashMap<>();
+        if (groupIds == null || groupIds.isEmpty()) {
+            return result;
+        }
+        // 1. 批量查询团购商品表(商品名称/主图/团购价/市场价均为冗余字段, 一次查完多个团购)
+        LambdaQueryWrapper<GbGroupActivityGoods> queryWrapper = Wrappers.lambdaQuery();
+        queryWrapper.in(GbGroupActivityGoods::getGroupId, groupIds);
+        queryWrapper.orderByAsc(GbGroupActivityGoods::getGoodsId);
+        List<GbGroupActivityGoods> activityGoodsList = goodsMapper.selectList(queryWrapper);
+        if (activityGoodsList == null || activityGoodsList.isEmpty()) {
+            return result;
+        }
+        // 2. 批量查询商品表, 补充库存/单位
+        Set<Long> goodsIdSet = new HashSet<>();
+        for (GbGroupActivityGoods item : activityGoodsList) {
+            if (item.getGoodsId() != null) {
+                goodsIdSet.add(item.getGoodsId());
+            }
+        }
+        Map<Long, GbGoodsInfo> goodsInfoMap = new HashMap<>();
+        List<GbGoodsInfo> goodsInfoList = goodsInfoService.getGoodsInfoList(new ArrayList<>(goodsIdSet));
+        if (goodsInfoList != null) {
+            for (GbGoodsInfo item : goodsInfoList) {
+                goodsInfoMap.put(item.getGoodsId(), item);
+            }
+        }
+        // 3. 按团购id分组组装返回
+        for (GbGroupActivityGoods item : activityGoodsList) {
+            List<GroupActGoodsResponse> goodsList = result.get(item.getGroupId());
+            if (goodsList == null) {
+                goodsList = new ArrayList<>();
+                result.put(item.getGroupId(), goodsList);
+            }
+            goodsList.add(new GroupActGoodsResponse(item, goodsInfoMap.get(item.getGoodsId())));
+        }
+        return result;
     }
 
 
@@ -330,7 +377,8 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
     }
 
     @Override
-    public List<GbGroupActivityInfo> getMemberGroupActivityList(Long leaderId, Double longitude, Double latitude, int page, int pageSize) {
+    public List<GbGroupActivityInfo> getMemberGroupActivityList(Long leaderId, Double longitude, Double latitude,
+                                                                String groupName, Long catId, int page, int pageSize) {
 
         // 请求参数归一
         if (page < 1) page = 1;
@@ -341,6 +389,8 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
         if (leaderId != null && leaderId > 0) {
             LambdaQueryWrapper<GbGroupActivityInfo> queryWrapper = onlineWrapper();
             queryWrapper.eq(GbGroupActivityInfo::getLeaderId, leaderId);
+            // 团购名称模糊搜索(groupName) + 团购分类过滤(catId)
+            applyNameAndCatFilter(queryWrapper, groupName, catId);
             queryWrapper.orderByAsc(GbGroupActivityInfo::getSortOrder);
             queryWrapper.orderByDesc(GbGroupActivityInfo::getGroupId);
             List<GbGroupActivityInfo> result = mapper.selectList(queryWrapper.last("limit " + (page - 1) * pageSize + "," + pageSize));
@@ -357,6 +407,8 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
         LambdaQueryWrapper<GbGroupActivityInfo> lightWrapper = onlineWrapper();
         lightWrapper.select(GbGroupActivityInfo::getGroupId, GbGroupActivityInfo::getPointId);
         lightWrapper.isNotNull(GbGroupActivityInfo::getPointId).gt(GbGroupActivityInfo::getPointId, 0);
+        // 名称/分类过滤下推到 SQL, 先缩小候选活动集再做距离过滤, 避免全量在线活动都参与球面距离计算
+        applyNameAndCatFilter(lightWrapper, groupName, catId);
         lightWrapper.orderByDesc(GbGroupActivityInfo::getGroupId);
         List<GbGroupActivityInfo> lightList = mapper.selectList(lightWrapper);
         if (lightList == null || lightList.isEmpty()) {
@@ -400,6 +452,17 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
         fullWrapper.orderByDesc(GbGroupActivityInfo::getGroupId);
         List<GbGroupActivityInfo> result = mapper.selectList(fullWrapper);
         return result == null ? new ArrayList<>() : result;
+    }
+
+    // 团购名称模糊搜索 + 团购分类过滤(两个查询分支共用): groupName 非空时按名称模糊匹配, catId 非空且大于0时按分类精确匹配
+    private void applyNameAndCatFilter(LambdaQueryWrapper<GbGroupActivityInfo> queryWrapper, String groupName, Long catId) {
+
+        if (StringUtil.isNotEmpty(groupName)) {
+            queryWrapper.like(GbGroupActivityInfo::getGroupName, groupName);
+        }
+        if (catId != null && catId > 0) {
+            queryWrapper.eq(GbGroupActivityInfo::getCatId, catId);
+        }
     }
 
     // 在线团购活动条件: 未下线且当前时间处于开团时间窗内(已开团未结束); 排序由调用方按业务指定
