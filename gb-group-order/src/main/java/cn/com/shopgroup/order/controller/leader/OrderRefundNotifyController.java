@@ -209,10 +209,11 @@ public class OrderRefundNotifyController {
         //添加退款实际值
         GbOrderGoodsRefundRecord refundRecord = new GbOrderGoodsRefundRecord();
         refundRecord.setOperateId(0L);
-        refundRecord.setOperateName("已退款");
+        refundRecord.setRefundGoodsMsg("已退款"+amount + "元");
+        refundRecord.setOperateName("系统退款成功");
         refundRecord.setIsAgree(1);//同意退款
         refundRecord.setOrderNo(orderNo);
-        refundRecord.setActionReason(amount + "元");
+        refundRecord.setActionReason("退款回调确认");
         refundRecord.setAddTime(TimeUtils.getTimeStamp());
         refundRecordService.addRefundRecord(refundRecord);
     }

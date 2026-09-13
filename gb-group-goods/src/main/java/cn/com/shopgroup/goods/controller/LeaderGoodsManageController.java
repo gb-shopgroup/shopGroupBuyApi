@@ -237,7 +237,9 @@ public class LeaderGoodsManageController {
         data.setSalesPrice(Optional.ofNullable(request.getPrice()).orElse(0D));
         data.setMarketPrice(Optional.ofNullable(request.getPrice2()).orElse(0D));
         data.setIsStock(request.getIsStock());
-        Integer goodsNum = Optional.ofNullable(request.getStockNum()).orElse(9999);
+        Integer goodsNum = Optional.ofNullable(request.getStockNum())
+                .filter(num -> num != 0)
+                .orElse(9999);
         data.setGoodsNum(goodsNum);
         // 限购
         data.setIsLimit(request.getIsLimit());

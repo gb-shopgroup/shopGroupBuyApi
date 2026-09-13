@@ -346,15 +346,15 @@ public class OrderService {
                 skuFlag = skuService.reduceGoodsStock(item.getSkuId(), reduceNum);
             }
             // 任一库存扣减失败(库存不足): 回补该商品已扣部分 + 之前已扣减的商品, 并返回
-            if (!goodsFlag || !skuFlag) {
-                if (goodsFlag) goodsService.increaseGoodsStock(item.getGoodsId(), reduceNum);
-                if (skuFlag && item.getSkuId() != null && item.getSkuId() > 0) {
-                    skuService.increaseGoodsStock(item.getSkuId(), reduceNum);
-                }
-                restoreOrderStock(reducedGoodsList);
-                result.put("msg", item.getGoodsName() + "库存不足");
-                return result;
-            }
+//            if (!goodsFlag || !skuFlag) {
+//                if (goodsFlag) goodsService.increaseGoodsStock(item.getGoodsId(), reduceNum);
+//                if (skuFlag && item.getSkuId() != null && item.getSkuId() > 0) {
+//                    skuService.increaseGoodsStock(item.getSkuId(), reduceNum);
+//                }
+//                restoreOrderStock(reducedGoodsList);
+//                result.put("msg", item.getGoodsName() + "库存不足");
+//                return result;
+//            }
             reducedGoodsList.add(item);
         }
         // 写入数据库

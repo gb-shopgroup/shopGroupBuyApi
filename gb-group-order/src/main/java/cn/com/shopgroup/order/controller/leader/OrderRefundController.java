@@ -134,7 +134,7 @@ public class OrderRefundController {
                 throw new BusinessException(OrderErrorCodeEnum.ORDER_GOODS_NOT_FOUND);
             }
             // 订单商品处理: 仅校验本次审核的申请商品, 数量不能超过对应退款类型的剩余可退数量
-            Map<Long, OrderRefundGoodsRequest> refundGoodsMap = refundInfoRequest.getRefundGoodsMap();
+            /*Map<Long, OrderRefundGoodsRequest> refundGoodsMap = refundInfoRequest.getRefundGoodsMap();
             int isReturnGoods = refundInfoRequest.getRefundFlag() == null ? 0 : refundInfoRequest.getRefundFlag();
             for (GbOrderGoodsInfo goods : goodsList) {
                 Long orderGoodsId = goods.getId();
@@ -171,6 +171,7 @@ public class OrderRefundController {
                     throw new BusinessException(OrderErrorCodeEnum.REFUND_QTY_EXCEEDED);
                 }
             }
+*/
 
             //同意处理
             if (approveStatus == 1) {

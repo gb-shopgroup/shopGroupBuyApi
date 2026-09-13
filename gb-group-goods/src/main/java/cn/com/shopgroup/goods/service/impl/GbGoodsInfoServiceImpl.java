@@ -276,7 +276,6 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
         updateWrapper.setSql("goods_num = goods_num - {0}", num);
         updateWrapper.ge(GbGoodsInfo::getGoodsNum, num);
         updateWrapper.eq(GbGoodsInfo::getGoodsId, goodsId);
-        updateWrapper.eq(GbGoodsInfo::getIsStock, 1);
         int flag = mapper.update(updateWrapper);
         return flag > 0 ? true : false;
     }
