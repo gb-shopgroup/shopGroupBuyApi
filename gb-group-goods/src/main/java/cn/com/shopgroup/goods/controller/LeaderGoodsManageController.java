@@ -103,7 +103,7 @@ public class LeaderGoodsManageController {
     public JsonResult goodsList(@RequestParam("cat") Long catId,
                                 @RequestParam(value = "keyword", required = false) String keyword,
                                 @RequestParam("page") int page, @RequestParam("pageSize") int pageSize) {
-        log.info("goods/leader/goods/list catId:{},keyword:{}",catId,keyword);
+        log.info("goods/leader/goods/list catId:{},keyword:{}", catId, keyword);
         Long leaderId = getLeaderId();
         // 请求参数矫正
         if (page == 0) page = 1;
@@ -183,7 +183,7 @@ public class LeaderGoodsManageController {
         data.setMarketPrice(Optional.ofNullable(request.getMarketPrice()).orElse(0D));
         // 库存: 启用库存时使用提交库存, 否则默认 10000(产品要求)
         data.setIsStock(request.getIsStock());
-        int stockNum = 10000;//先统统设置10000；
+        int stockNum = 9999;//先统统设置9999
 //        if (request.getIsStock() != null && request.getIsStock() == 1
 //                && request.getStockNum() != null && request.getStockNum() > 0) {
 //            stockNum = request.getStockNum();
@@ -237,7 +237,8 @@ public class LeaderGoodsManageController {
         data.setSalesPrice(Optional.ofNullable(request.getPrice()).orElse(0D));
         data.setMarketPrice(Optional.ofNullable(request.getPrice2()).orElse(0D));
         data.setIsStock(request.getIsStock());
-        data.setGoodsNum(request.getStockNum());
+        Integer goodsNum = Optional.ofNullable(request.getStockNum()).orElse(9999);
+        data.setGoodsNum(goodsNum);
         // 限购
         data.setIsLimit(request.getIsLimit());
         data.setLimitNum(request.getLimitNum());

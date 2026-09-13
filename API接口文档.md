@@ -1,6 +1,6 @@
 # ShopGroupBuyApi 接口文档（详细版）
 
-> 自动生成时间：2026-09-13 03:02:00
+> 自动生成时间：2026-09-13 17:40:36
 
 > 生成方式：扫描各模块 `*Controller.java` 源码（`python3 generate_api_doc.py` 可重新生成）
 
@@ -76,7 +76,7 @@
 | 46 | user | GET | `/user/member/isleader` | 是否团长身份 |
 | 47 | order | GET | `/order/orderbusiness/list` | 分页查询订单列表 |
 | 48 | order | GET | `/order/orderbusiness/count` | 查询订单总数 |
-| 49 | order | POST | `/order/group/add` | 用户下单 |
+| 49 | order | POST | `/order/group/add` | 用户下单: 下单前校验商品/SKU库存与限购(限购商品按「当前用户 + 当前团购活动 + 该商品」维度校验, 该团购活动内已购买数量 + 本次购买数量不能超过限购数) |
 | 50 | order | GET | `/order/group/groupActivity/cat` | 团购分类列表（首页） |
 | 51 | order | POST | `/order/member/groupActivity/list` | 用户查询所有在线的团购活动列表[新用户未绑定团长时leaderId=0]: 仅返回未下线(isClose=0)且当前时间处于开团时间窗内(已开团未结束)的在线活动; 支持团购名称模糊搜索(groupName, 非空时生效)与团购分类过滤(catId, 非空且大于0时生效); leaderId>0按团长过滤(排序值sortOrder升序置顶优先, 同级按活动id倒序, 分页在SQL层完成); leaderId=0时需传经纬度(longitude/latitude, 缺失返回空列表), 仅统计已绑定自提点(pointId>0)的活动并过滤出绑定自提点与定位点球面距离小于20km者, 按活动id倒序(先按名称/分类过滤, 再距离过滤, 最后分页); page默认1, pageSize默认10最大20; 每个团购活动一并返回其商品列表(goods: 团购价取团购商品表冗余价, 库存/单位取自商品表, 批量查询, 无商品的团购返回空数组) |
 | 52 | order | GET | `/order/group/groupActivity/info` | 团购详情(团长分享页面)---用户首页：团长更多好货也用 |
@@ -1596,7 +1596,7 @@ data 类型：`Object`（未能静态推断，以接口实际返回为准）
 
 #### 1. POST `/order/group/add`
 
-**功能说明**：用户下单
+**功能说明**：用户下单: 下单前校验商品/SKU库存与限购(限购商品按「当前用户 + 当前团购活动 + 该商品」维度校验, 该团购活动内已购买数量 + 本次购买数量不能超过限购数)
 
 **入参**
 

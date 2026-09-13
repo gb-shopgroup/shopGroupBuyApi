@@ -126,6 +126,10 @@ public class OrderService {
         // 计算订单费用, 构建订单商品数据
         BigDecimal orderPrice = BigDecimal.ZERO;
         List<GbOrderGoodsInfo> orderGoodsInfoList = new ArrayList<>();
+        // 本次下单各商品的基础数量合计(数量×包装数; 同一商品多规格行会累计), 用于限购校验
+        Map<Long, Integer> orderGoodsNumMap = new HashMap<>();
+        // 该用户在当前团购活动内各商品的已购数量缓存, 避免同一商品多行时重复查库
+        Map<Long, Integer> goodsLimitNumMap = new HashMap<>();
         //订单号生成
         String orderNo = createOrderNo(leaderId);
         for (OrderGoodsRequest item : request.getGoods()) {
@@ -193,12 +197,17 @@ public class OrderService {
                 }
             }
 
-            // 商品限购检查
-            if (goodsInfo.getIsLimit() == 1) {
+            // 商品限购检查(仅限购商品): 限购维度为「用户 + 当前团购活动 + 商品」,
+            // 该团购活动内该商品已购买数量 + 本次购买数量(数量×包装数, 同一商品多规格行累计) 不能超过限购数
+            if (goodsInfo.getIsLimit() != null && goodsInfo.getIsLimit().intValue() == 1
+                    && goodsInfo.getLimitNum() != null && goodsInfo.getLimitNum() > 0) {
                 int num = item.getNum() * packNum;
-                int num2 = orderInfoService.getMiniOrderGoodsLimit(memberId, goodsId);
-                if (num + num2 > goodsInfo.getLimitNum()) {
-                    result.put("msg", goodsInfo.getGoodsName() + "限购" + goodsInfo.getLimitNum() + goodsInfo.getGoodsUnit());
+                int buyNum = orderGoodsNumMap.merge(goodsId, num, Integer::sum);
+                int alreadyBuyNum = goodsLimitNumMap.computeIfAbsent(goodsId,
+                        key -> orderInfoService.getGroupOrderGoodsNum(memberId, groupId, goodsId));
+                if (buyNum + alreadyBuyNum > goodsInfo.getLimitNum()) {
+                    result.put("msg", goodsInfo.getGoodsName() + "限购" + goodsInfo.getLimitNum() + goodsInfo.getGoodsUnit()
+                            + ", 本团购活动内您已购买" + alreadyBuyNum + goodsInfo.getGoodsUnit());
                     return result;
                 }
             }

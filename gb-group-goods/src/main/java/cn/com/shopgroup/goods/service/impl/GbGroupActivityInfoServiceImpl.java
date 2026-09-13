@@ -215,12 +215,15 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
             //status 状态：0 全部  1 活动中 2 未开始 3 已结束 \\ 开团时间 start_time / end_time
             if (status == 1) {
                 queryWrapper.le(GbGroupActivityInfo::getStartTime, nowTime).ge(GbGroupActivityInfo::getEndTime, nowTime);
+                queryWrapper.eq(GbGroupActivityInfo::getIsClose, (byte) 0);
             }
             if (status == 2) {
                 queryWrapper.ge(GbGroupActivityInfo::getStartTime, nowTime);
             }
             if (status == 3) {
-                queryWrapper.le(GbGroupActivityInfo::getEndTime, nowTime);
+                queryWrapper.le(GbGroupActivityInfo::getEndTime, nowTime)
+                        .or()
+                        .eq(GbGroupActivityInfo::getIsClose, (byte) 1);
             }
         }
         if (StringUtil.isNotEmpty(activityName)) {

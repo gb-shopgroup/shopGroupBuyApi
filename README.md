@@ -414,7 +414,7 @@ mvn -pl gb-group-task spring-boot:run
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | POST | `/order/group/add` | 用户下单 | Body: **request** (OrderRequest, JSON) |
+| 1 | POST | `/order/group/add` | 用户下单: 下单前校验商品/SKU库存与限购(限购商品按「当前用户 + 当前团购活动 + 该商品」维度校验, 该团购活动内已购买数量 + 本次购买数量不能超过限购数) | Body: **request** (OrderRequest, JSON) |
 
 **MemberGroupController**（`cn.com.shopgroup.order.controller.group`）
 

@@ -266,8 +266,9 @@ public class LeaderGroupManageController {
 
         // 团购介绍
         data.setGroupInfo(request.getInfo());
-        // 虚拟订单数量
-        data.setVirtualOrder(request.getVirtual());
+        // 虚拟订单数量从10开始计算，有10但是虚拟
+        Integer virOrder = Optional.ofNullable(request.getVirtual()).orElse(10);
+        data.setVirtualOrder(virOrder);
         data.setStartTime(request.getStartTime());
         data.setEndTime(request.getEndTime());
         // 是否禁用,0上线1下线
@@ -447,8 +448,9 @@ public class LeaderGroupManageController {
         // 团购介绍
         data.setGroupInfo(request.getInfo());
         // 虚拟订单数量
-        data.setVirtualOrder(request.getVirtual());
-
+        if (request.getVirtual() != null) {
+            data.setVirtualOrder(request.getVirtual());
+        }
         data.setStartTime(request.getStartTime());
         data.setEndTime(request.getEndTime());
         // 团购标签

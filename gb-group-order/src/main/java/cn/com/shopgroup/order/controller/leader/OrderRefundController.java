@@ -167,6 +167,7 @@ public class OrderRefundController {
                     remainRefundNum = 0;
                 }
                 if (temp.getRefundNum() > remainRefundNum) {
+                    log.info("申请退数量大于可退数,remainRefundNum:{},goods:{}",remainRefundNum, JSON.toJSONString(goods));
                     throw new BusinessException(OrderErrorCodeEnum.REFUND_QTY_EXCEEDED);
                 }
             }

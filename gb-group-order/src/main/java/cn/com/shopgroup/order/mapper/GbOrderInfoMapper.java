@@ -249,16 +249,16 @@ public interface GbOrderInfoMapper extends BaseMapper<GbOrderInfo> {
     List<GbOrderGoodsInfo> getUnPayOrderGoodsList(int time, int limit);
 
 
-    // (用户)查询指定时间段内某商品的购买数量, 用于限购判断
+    // (用户)查询某用户在某团购活动中某商品的已购买数量(数量×包装数), 用于下单前的限购校验
     @Select({
-            "SELECT g.`goods_id`, SUM(g.`goods_num` * g.`pack_num`) AS num_total",
+            "SELECT IFNULL(SUM(g.`goods_num` * g.`pack_num`), 0)",
             "FROM `gb_order_goods_info` AS g",
             "JOIN `gb_order_info` AS o ON g.`order_no` = o.`order_no`",
             "WHERE o.`member_id` = #{memberId}",
-            "  AND o.`add_time` BETWEEN #{startTime} AND #{endTime}",
+            "  AND o.`group_id` = #{groupId}",
             "  AND g.`goods_id` = #{goodsId}"
     })
-    List<Map<String, Object>> getOrderGoodsLimit(Long memberId, Long goodsId, int startTime, int endTime);
+    Integer getGroupOrderGoodsNum(Long memberId, Long groupId, Long goodsId);
 
 
     /**

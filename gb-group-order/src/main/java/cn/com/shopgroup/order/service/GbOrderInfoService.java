@@ -336,27 +336,18 @@ public class GbOrderInfoService {
     }
 
 
-    public Integer getMiniOrderGoodsLimit(Long memberId, Long goodsId) {
+    /**
+     * 查询用户在某团购活动内某商品的已购买数量(数量×包装数), 用于下单前的限购校验;
+     * 限购维度为「用户 + 团购活动 + 商品」, 即同一商品在其他团购活动中的购买记录不计入
+     */
+    public Integer getGroupOrderGoodsNum(Long memberId, Long groupId, Long goodsId) {
 
-
-        Integer endTime = TimeUtils.getTimeStamp();
-        Integer startTime = endTime - 90 * 24 * 60 * 60;
-
-
-        List<Map<String, Object>> results = mapper.getOrderGoodsLimit(memberId, goodsId, startTime, endTime);
-
-
-        Integer orderGoodsNum = 0;
-        for (Map<String, Object> item : results) {
-
-            if (item == null || item.get("goods_id") == null) continue;
-            long tempGoodsId = (Long) item.get("goods_id");
-            long tempGoodsNum = ((BigDecimal) item.get("num_total")).longValue();
-            if (tempGoodsId == goodsId) orderGoodsNum = (int) tempGoodsNum;
+        if (memberId == null || memberId <= 0 || groupId == null || groupId <= 0
+                || goodsId == null || goodsId <= 0) {
+            return 0;
         }
-
-
-        return orderGoodsNum;
+        Integer orderGoodsNum = mapper.getGroupOrderGoodsNum(memberId, groupId, goodsId);
+        return orderGoodsNum == null ? 0 : orderGoodsNum;
     }
 
 

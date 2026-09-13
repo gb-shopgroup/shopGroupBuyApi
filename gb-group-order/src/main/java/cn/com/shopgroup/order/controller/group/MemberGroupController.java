@@ -110,7 +110,7 @@ public class MemberGroupController {
         for (MemberHomeGroupActResponse item : data) {
             item.setOrder(this.getRedisOrderTotal(item.getId(), item.getVirtual()));
         }
-        log.info("用户首页获取团购活动数据条数：size:{}", data.size());
+        log.info("用户首页获取团购活动数据条数size:{},data:{}", data.size(), JSON.toJSONString(data));
         return JsonResult.success(data);
     }
 
@@ -281,6 +281,7 @@ public class MemberGroupController {
 
         // 读取缓存数据
         ShopResponse data = redisHelper.getCacheObject(key);
+        log.info("order/group/groupActivity/shop data:{}", JSON.toJSONString(data));
         return JsonResult.success(data);
     }
 

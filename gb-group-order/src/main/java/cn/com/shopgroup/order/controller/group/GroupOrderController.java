@@ -36,7 +36,7 @@ public class GroupOrderController {
     private RedisHelper redisHelper;
 
 
-    // 用户下单
+    // 用户下单: 下单前校验商品/SKU库存与限购(限购商品按「当前用户 + 当前团购活动 + 该商品」维度校验, 该团购活动内已购买数量 + 本次购买数量不能超过限购数)
     @PostMapping("/add")
     public JsonResult order(@RequestBody OrderRequest request) {
         log.info("【订单系统-下单接口:/order/add】request:{}", JSON.toJSON(request));

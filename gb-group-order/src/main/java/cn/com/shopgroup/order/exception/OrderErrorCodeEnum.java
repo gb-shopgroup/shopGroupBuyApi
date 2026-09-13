@@ -145,7 +145,10 @@ public enum OrderErrorCodeEnum implements IErrorCode {
     REFUND_APPLY_FAILED(300343, "申请退款失败"),
 
     /** 店铺信息不可用 */
-    SHOP_INFO_UNAVAILABLE(300344, "店铺信息不可用");
+    SHOP_INFO_UNAVAILABLE(300344, "店铺信息不可用"),
+    //当前订单还有待审核数据，请联系团长处理后再申请
+    ORDER_GOODS_NEED_APPROVE(300345, "当前订单还有待审核数据，请联系团长处理后再申请"),
+    ;
 
     /** 返回给前端的业务状态码 */
     private final int code;

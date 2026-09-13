@@ -388,6 +388,7 @@ public class MemberOrderController {
             throw new BusinessException(OrderErrorCodeEnum.ORDER_REFUNDED_NOT_REFUND);
         }
         List<GbOrderGoodsInfo> goodsList = orderInfoService.getOrderGoodsList(orderNo);
+        log.info("用户申请退款中orderNo:{},goods:{}", orderNo, JSON.toJSONString(goodsList));
         if (CollectionUtils.isEmpty(goodsList)) {
             throw new BusinessException(OrderErrorCodeEnum.ORDER_GOODS_NOT_FOUND);
         }
@@ -407,6 +408,10 @@ public class MemberOrderController {
         // 收集本次申请的商品行(仅这些行会累加退款/退货退款数量, 避免误加未申请的行)
         List<GbOrderGoodsInfo> applyGoodsList = new ArrayList<>();
         for (GbOrderGoodsInfo orderGoods : goodsList) {
+            int applyStatus = orderGoods.getApplyRefund().intValue();
+            if (applyStatus == 1) {
+                throw new BusinessException(OrderErrorCodeEnum.ORDER_GOODS_NEED_APPROVE);
+            }
             Long tempId = orderGoods.getId();
             String tempGoodsName = orderGoods.getGoodsName();
             // 总购买数
@@ -423,7 +428,8 @@ public class MemberOrderController {
                 if (receiptNum - refundedGoodNum > 0) {
                     canRefundNum = receiptNum - refundedGoodNum;
                 }
-            } else if (isReturnGoods == 1) {
+            }
+            if (isReturnGoods == 1) {
                 // 退款: "待收货(尚未收货)"但未申请退款的剩余数量
                 if (goodsNum - receiptNum - refundedNum > 0) {
                     canRefundNum = goodsNum - receiptNum - refundedNum;
