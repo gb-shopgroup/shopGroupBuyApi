@@ -8,6 +8,7 @@ import cn.com.shopgroup.order.mapper.GbOrderGoodsInfoMapper;
 import cn.com.shopgroup.order.mapper.GbOrderInfoMapper;
 import cn.com.shopgroup.order.model.GbOrderGoodsInfo;
 import cn.com.shopgroup.order.model.GbOrderInfo;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import lombok.extern.slf4j.Slf4j;
@@ -140,6 +141,44 @@ public class TaskOrderService {
         updateWrapper.set(GbOrderInfo::getStatus, OrderStatusEnum.CANCELED.getCode());
         updateWrapper.set(GbOrderInfo::getUpdateTime, updateTime);
         return mapper.update(null, updateWrapper);
+    }
+
+    /**
+     * (Redis延迟队列驱动)取消超时未支付订单并恢复库存:
+     * 与 cancelTimeoutUnpaidOrderAndReturnStock 的取消/回补逻辑一致, 区别是订单号来源为Redis延迟队列(下单时入队, 15分钟到期),
+     * 无需全表扫描待支付订单; 抢占式取消(status 0->6 更新成功)成功后才回补库存, 已支付/已取消的订单不命中, 天然幂等
+     *
+     * @param orderNo 订单号
+     * @return 是否实际取消了该订单(未支付且被本次成功置为已取消返回true)
+     */
+    public boolean cancelUnpaidOrderByOrderNoAndReturnStock(String orderNo) {
+
+        // 抢占式取消: 仅当订单仍为待支付且未支付时(status 0->6 更新成功)才继续回补库存
+        int now = TimeUtils.getTimeStamp();
+        if (cancelUnpaidOrder(orderNo, now) <= 0) {
+            // 已支付/已取消/已处理过, 直接跳过
+            log.info("延迟队列取消订单跳过(订单已支付或已处理): orderNo={}", orderNo);
+            return false;
+        }
+
+        // 查询订单商品行, 回补商品总库存 + SKU库存
+        LambdaQueryWrapper<GbOrderGoodsInfo> queryWrapper = Wrappers.lambdaQuery();
+        queryWrapper.eq(GbOrderGoodsInfo::getOrderNo, orderNo);
+        List<GbOrderGoodsInfo> goodsList = goodsMapper.selectList(queryWrapper);
+        if (goodsList != null) {
+            for (GbOrderGoodsInfo item : goodsList) {
+                int packNum = item.getPackNum() == null || item.getPackNum() == 0 ? 1 : item.getPackNum();
+                int stockNum = item.getGoodsNum() * packNum;
+                goodsService.increaseGoodsStock(item.getGoodsId(), stockNum);
+                // 回补SKU库存(下单时按skuId同步扣减)
+                if (item.getSkuId() != null && item.getSkuId() > 0) {
+                    skuService.increaseGoodsStock(item.getSkuId(), stockNum);
+                }
+                log.info("延迟队列取消订单并恢复库存: orderNo={}, goodsId={}, skuId={}, stockNum={}", orderNo, item.getGoodsId(), item.getSkuId(), stockNum);
+            }
+        }
+        log.info("延迟队列取消超时未支付订单成功: orderNo={}", orderNo);
+        return true;
     }
 
 }

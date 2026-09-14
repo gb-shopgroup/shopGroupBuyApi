@@ -220,6 +220,7 @@ public class GbOrderInfoService {
             queryWrapper.eq(GbOrderInfo::getMemberId, memberId);
         }
         queryWrapper.eq(GbOrderInfo::getOrderNo, orderNo);
+        queryWrapper.notIn(GbOrderInfo::getStatus, 0, 4, 6);
         GbOrderInfo data = mapper.selectOne(queryWrapper);
         if (ObjectUtils.isEmpty(data)) {
             return null;
@@ -1168,7 +1169,7 @@ public class GbOrderInfoService {
         // 1. 查询符合条件的订单(分页)
         if (trimKeyword == null || isPhone) {
             // keyword 为空: 查全部; keyword 为手机号: 按手机号模糊匹配
-            LambdaQueryWrapper<GbOrderInfo> queryWrapper = buildLeaderOrderQueryWrapper(leaderId, groupId, status, null,pointId);
+            LambdaQueryWrapper<GbOrderInfo> queryWrapper = buildLeaderOrderQueryWrapper(leaderId, groupId, status, null, pointId);
             if (isPhone) {
                 queryWrapper.like(GbOrderInfo::getMobile, trimKeyword);
             }
@@ -1189,7 +1190,7 @@ public class GbOrderInfoService {
             if (CollectionUtils.isEmpty(orderNoList)) {
                 return new ArrayList<>();
             }
-            LambdaQueryWrapper<GbOrderInfo> queryWrapper = buildLeaderOrderQueryWrapper(leaderId, groupId, status, orderNoList,pointId);
+            LambdaQueryWrapper<GbOrderInfo> queryWrapper = buildLeaderOrderQueryWrapper(leaderId, groupId, status, orderNoList, pointId);
             queryWrapper.orderByDesc(GbOrderInfo::getId);
             queryWrapper.last("limit " + (page - 1) * pageSize + "," + pageSize);
             result = mapper.selectList(queryWrapper);
@@ -1223,7 +1224,7 @@ public class GbOrderInfoService {
 
     // 构造团长订单查询条件(公共部分)
     private LambdaQueryWrapper<GbOrderInfo> buildLeaderOrderQueryWrapper(Long leaderId, Long groupId,
-                                                                         Integer status, List<String> orderNos,Long pointId) {
+                                                                         Integer status, List<String> orderNos, Long pointId) {
         LambdaQueryWrapper<GbOrderInfo> queryWrapper = Wrappers.lambdaQuery();
         queryWrapper.eq(GbOrderInfo::getLeaderId, leaderId);
         if (!CollectionUtils.isEmpty(orderNos)) {
@@ -1253,7 +1254,7 @@ public class GbOrderInfoService {
         queryWrapper.eq(GbOrderInfo::getStatus, status);
     }
 
-    public List<GbOrderInfo> getLeaderApplyRefundOrderList(Long leaderId, Long groupId, Long pointId,String keyword,
+    public List<GbOrderInfo> getLeaderApplyRefundOrderList(Long leaderId, Long groupId, Long pointId, String keyword,
                                                            Integer applyStatus, int page, int pageSize) {
         // 1. 查询售后订单(分页)
         LambdaQueryWrapper<GbOrderInfo> queryWrapper = Wrappers.lambdaQuery();
@@ -1759,8 +1760,8 @@ public class GbOrderInfoService {
             return response;
         }
         // 日期转秒级时间戳: 开始日期取当天00:00:00, 结束日期取当天23:59:59
-        int startTime = TimeUtils.toFormatTimeStamp(startDate+"00:00:00");
-        int endTime = TimeUtils.toFormatTimeStamp(endDate+"23:59:59");
+        int startTime = TimeUtils.toFormatTimeStamp(startDate + "00:00:00");
+        int endTime = TimeUtils.toFormatTimeStamp(endDate + "23:59:59");
         if (startTime <= 0 || endTime <= 0 || startTime > endTime) {
             log.warn("[团长端-对账单]时间范围不合法, 不执行查询, leaderId:{}, startDate:{}, endDate:{}", leaderId, startDate, endDate);
             return response;

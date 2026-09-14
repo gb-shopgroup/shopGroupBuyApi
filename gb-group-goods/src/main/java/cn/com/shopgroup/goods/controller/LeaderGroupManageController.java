@@ -29,8 +29,11 @@ import cn.com.shopgroup.goods.service.GbGoodsInfoService;
 import cn.com.shopgroup.goods.service.GbGroupActivityInfoService;
 import cn.com.shopgroup.goods.service.GbGroupCategoryInfoService;
 import cn.com.shopgroup.goods.service.GbGroupTagService;
+import cn.com.shopgroup.user.model.GbOrgBusinessInfo;
+import cn.com.shopgroup.user.model.GbOrgPointInfo;
 import cn.com.shopgroup.user.model.GbOrgShopInfo;
 import cn.com.shopgroup.user.model.GbOrgStaffInfo;
+import cn.com.shopgroup.user.service.GbOrgBusinessInfoService;
 import cn.com.shopgroup.user.service.GbOrgPointInfoService;
 import cn.com.shopgroup.user.service.GbOrgShopInfoService;
 import cn.com.shopgroup.user.service.GbOrgStaffInfoService;
@@ -57,9 +60,11 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 //团长端-团购活动管理
@@ -95,6 +100,8 @@ public class LeaderGroupManageController {
     @Autowired
     private ResourceLoader resourceLoader;
 
+    @javax.annotation.Resource
+    private GbOrgBusinessInfoService businessService;
     @javax.annotation.Resource
     private GbOrgPointInfoService pointInfoService;
 
@@ -177,6 +184,15 @@ public class LeaderGroupManageController {
         if (leaderId == 0) {
             throw new BusinessException(GoodsErrorCodeEnum.LEADER_NOT_EXIST);
         }
+        List<GbOrgBusinessInfo> businessList = businessService.getMiniBusinessList(leaderId);
+        if (CollectionUtils.isEmpty(businessList)) {
+            throw new BusinessException(GoodsErrorCodeEnum.ADD_GROUP_BUSINESS_NOT_EXIST);
+        }
+        //添加团购活动前必须先添加团长自提点信息
+        List<GbOrgPointInfo> pointList = pointInfoService.getMiniPointList(leaderId);
+        if (CollectionUtils.isEmpty(pointList)) {
+            throw new BusinessException(GoodsErrorCodeEnum.PICKUP_POINT_REQUIRED);
+        }
         // 从请求头中获取员工id
         Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
         log.info("添加团购活动时，员工id:{}", staffId);
@@ -194,10 +210,10 @@ public class LeaderGroupManageController {
             // 添加人员姓名
             data.setStaffName(staffInfo.getStaffName());
         }
-        Long pointId = Optional.ofNullable(request.getPointId()).orElse(0L);
-        if (pointId.intValue() == 0) {
-            throw new BusinessException(GoodsErrorCodeEnum.PICKUP_POINT_REQUIRED);
-        }
+//        Long pointId = Optional.ofNullable(request.getPointId()).orElse(0L);
+//        if (pointId.intValue() == 0) {
+//            throw new BusinessException(GoodsErrorCodeEnum.PICKUP_POINT_REQUIRED);
+//        }
         // 团购商品信息兜底: 价格/名称/图片/类型未传时, 取商品表数据(一次批量查询, 避免循环内 N+1)
         fillGroupActGoodsInfo(request.getGoods());
         // 团购id,主键自增
@@ -210,8 +226,8 @@ public class LeaderGroupManageController {
         data.setIsolationId(0);
         // 商品提货方式,1自提2邮递
         data.setPickupStyle(request.getPickup());
-        // 自提点id,0未选择
-        data.setPointId(request.getPointId());
+//        // 自提点id,0未选择
+//        data.setPointId(request.getPointId());
         // 团购名称
         data.setGroupName(request.getName());
 
@@ -375,6 +391,25 @@ public class LeaderGroupManageController {
         int endTime = groupInfo.getEndTime().intValue();
         if (startTime < nowTime && nowTime < endTime) {
             throw new BusinessException(GoodsErrorCodeEnum.GROUP_ONGOING);
+        }
+
+        // 编辑校验: 原团购中的商品不允许删除, 提交的商品必须包含原有全部商品(只允许新增商品)
+        List<GbGroupActivityGoods> originGoodsList = activityInfoService.getGroupActivityGoodsList(request.getId());
+        Set<Long> submitGoodsIds = new HashSet<>();
+        if (!CollectionUtils.isEmpty(request.getGoods())) {
+            for (GroupActGoodsRequest item : request.getGoods()) {
+                submitGoodsIds.add(item.getGid());
+            }
+        }
+        List<String> missingGoodsNames = new ArrayList<>();
+        for (GbGroupActivityGoods originGoods : originGoodsList) {
+            if (!submitGoodsIds.contains(originGoods.getGoodsId())) {
+                missingGoodsNames.add(originGoods.getGoodsName());
+            }
+        }
+        if (!missingGoodsNames.isEmpty()) {
+            throw new BusinessException(GoodsErrorCodeEnum.GROUP_GOODS_MISSING.getCode(),
+                    GoodsErrorCodeEnum.GROUP_GOODS_MISSING.getMessage() + ": " + String.join("、", missingGoodsNames));
         }
 
         // 团购商品信息兜底: 价格/名称/图片/类型未传时, 取商品表数据(一次批量查询, 避免循环内 N+1)

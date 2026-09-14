@@ -71,4 +71,8 @@ public class RedisConstant {
     public final static String RedisMemberTokenKey = "MemberToken:";
 
 
+    // 订单支付超时延迟队列(ZSet结构, member=订单号, score=订单超时可取消的时间戳=下单时间+15分钟):
+    // 下单时入队, 延迟15分钟仍未支付(pay_time=0且status=0)的订单由定时任务自动取消并回补库存
+    public final static String RedisOrderPayDelayQueueKey = "OrderPayDelayQueue";
+
 }

@@ -34,4 +34,7 @@ public interface GbOrgPointInfoService {
 
     // 按自提点id批量查询自提点信息
     List<GbOrgPointInfo> getPointListByIds(Collection<Long> pointIds);
+
+    // 按团长id集合批量查询其未禁用的全部自提点
+    List<GbOrgPointInfo> getPointListByLeaderIds(Collection<Long> leaderIds);
 }

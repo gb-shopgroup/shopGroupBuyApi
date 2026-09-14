@@ -177,4 +177,17 @@ public class GbOrgPointInfoServiceImpl implements GbOrgPointInfoService {
         List<GbOrgPointInfo> result = orgPointInfoMapper.selectList(queryWrapper);
         return result == null ? new ArrayList<>() : result;
     }
+
+    @Override
+    public List<GbOrgPointInfo> getPointListByLeaderIds(Collection<Long> leaderIds) {
+        // 空集合直接返回, 避免生成非法 IN ()
+        if (leaderIds == null || leaderIds.isEmpty()) {
+            return new ArrayList<>();
+        }
+        LambdaQueryWrapper<GbOrgPointInfo> queryWrapper = Wrappers.lambdaQuery();
+        queryWrapper.in(GbOrgPointInfo::getLeaderId, leaderIds);
+        queryWrapper.eq(GbOrgPointInfo::getIsClose, (byte) 0);
+        List<GbOrgPointInfo> result = orgPointInfoMapper.selectList(queryWrapper);
+        return result == null ? new ArrayList<>() : result;
+    }
 }

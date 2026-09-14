@@ -378,11 +378,14 @@ public class MemberOrderController {
         }
 
         int status = orderInfo.getStatus().intValue();
-        // 支付状态, 未支付不能收货
+        // 支付状态, 未支付不能申请团款
         if (status == OrderStatusEnum.UNPAID.getCode()) {
             throw new BusinessException(OrderErrorCodeEnum.ORDER_UNPAID_NOT_REFUND);
         }
-
+        // 已经取消状态, 未支付不能收货
+        if (status == OrderStatusEnum.CANCELED.getCode()) {
+            throw new BusinessException(OrderErrorCodeEnum.ORDER_CANCELED_NOT_REFUND);
+        }
         // 退货状态, 申请退货不能收货
         if (status == OrderStatusEnum.REFUNDED.getCode()) {
             throw new BusinessException(OrderErrorCodeEnum.ORDER_REFUNDED_NOT_REFUND);

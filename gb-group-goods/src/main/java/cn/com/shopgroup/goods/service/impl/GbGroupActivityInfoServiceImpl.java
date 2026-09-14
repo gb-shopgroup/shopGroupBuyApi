@@ -221,9 +221,11 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
                 queryWrapper.ge(GbGroupActivityInfo::getStartTime, nowTime);
             }
             if (status == 3) {
-                queryWrapper.le(GbGroupActivityInfo::getEndTime, nowTime)
+                // 已结束: 结束时间已过 或 已被下线关闭; 用 nested 加括号,
+                // 否则 OR 会脱离 leader_id 条件(AND 优先级高于 OR), 查出其他团长的数据
+                queryWrapper.nested(w -> w.le(GbGroupActivityInfo::getEndTime, nowTime)
                         .or()
-                        .eq(GbGroupActivityInfo::getIsClose, (byte) 1);
+                        .eq(GbGroupActivityInfo::getIsClose, (byte) 1));
             }
         }
         if (StringUtil.isNotEmpty(activityName)) {
@@ -255,7 +257,10 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
             queryWrapper.ge(GbGroupActivityInfo::getStartTime, nowTime);
         }
         if (status == 3) {
-            queryWrapper.le(GbGroupActivityInfo::getEndTime, nowTime);
+            // 与 getMiniLeaderGroupList 的 status==3 条件保持一致(已结束 或 已下线), nested 加括号避免 OR 脱离 leader_id 条件
+            queryWrapper.nested(w -> w.le(GbGroupActivityInfo::getEndTime, nowTime)
+                    .or()
+                    .eq(GbGroupActivityInfo::getIsClose, (byte) 1));
         }
         if (StringUtil.isNotEmpty(activityName)) {
             queryWrapper.like(GbGroupActivityInfo::getGroupName, activityName);
@@ -400,16 +405,15 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
             return result == null ? new ArrayList<>() : result;
         }
 
-        // 2. 未绑定团长(新用户, leaderId=0): 按定位经纬度过滤出离自提点 20km 内的在线活动
+        // 2. 未绑定团长(新用户, leaderId=0): 按定位经纬度过滤出团长自提点在自提范围内的在线活动
         //    距离计算需要经纬度, 缺失时无法定位, 直接返回空列表
         if (longitude == null || latitude == null) {
             return new ArrayList<>();
         }
-        // 2.1 第一阶段: 窄表扫描仅取 groupId/pointId 两列, 距离过滤与分页定位在此进行,
-        //     避免把全量在线活动的大字段(图片/详情等)加载进内存; 未选自提点的活动无法计算距离, SQL 端直接排除
+        // 2.1 第一阶段: 窄表扫描仅取 groupId/leaderId 两列, 距离过滤与分页定位在此进行,
+        //     避免把全量在线活动的大字段(图片/详情等)加载进内存
         LambdaQueryWrapper<GbGroupActivityInfo> lightWrapper = onlineWrapper();
-        lightWrapper.select(GbGroupActivityInfo::getGroupId, GbGroupActivityInfo::getPointId);
-        lightWrapper.isNotNull(GbGroupActivityInfo::getPointId).gt(GbGroupActivityInfo::getPointId, 0);
+        lightWrapper.select(GbGroupActivityInfo::getGroupId, GbGroupActivityInfo::getLeaderId);
         // 名称/分类过滤下推到 SQL, 先缩小候选活动集再做距离过滤, 避免全量在线活动都参与球面距离计算
         applyNameAndCatFilter(lightWrapper, groupName, catId);
         lightWrapper.orderByDesc(GbGroupActivityInfo::getGroupId);
@@ -417,29 +421,37 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
         if (lightList == null || lightList.isEmpty()) {
             return new ArrayList<>();
         }
-        // 收集绑定的自提点id, 批量查询自提点坐标
-        Set<Long> pointIdSet = new HashSet<>();
+        // 收集候选活动涉及的团长id, 批量查询各团长的全部未禁用自提点
+        Set<Long> leaderIdSet = new HashSet<>();
         for (GbGroupActivityInfo item : lightList) {
-            pointIdSet.add(item.getPointId());
+            if (item.getLeaderId() != null && item.getLeaderId() > 0) {
+                leaderIdSet.add(item.getLeaderId());
+            }
         }
-        List<GbOrgPointInfo> pointList = pointService.getPointListByIds(pointIdSet);
-        Map<Long, GbOrgPointInfo> pointMap = new HashMap<>();
+        List<GbOrgPointInfo> pointList = pointService.getPointListByLeaderIds(leaderIdSet);
+        Map<Long, List<GbOrgPointInfo>> leaderPointMap = new HashMap<>();
         if (pointList != null) {
             for (GbOrgPointInfo point : pointList) {
-                pointMap.put(point.getPointId(), point);
+                List<GbOrgPointInfo> tempList = leaderPointMap.computeIfAbsent(point.getLeaderId(), k -> new ArrayList<>());
+                tempList.add(point);
             }
         }
-        // 过滤出距离 20km 内的活动id(lightList 按活动id倒序, 遍历顺序即最终展示顺序)
+        // 过滤出团长可见的活动id: 团长任一自提点到用户的距离小于等于该自提点设置的自提范围, 即视为可见,
+        // 该团长下的所有团购活动均展示(lightList 按活动id倒序, 遍历顺序即最终展示顺序)
         List<Long> nearIds = new ArrayList<>();
+        // 团长可见性缓存(同一团长多活动只计算一次)
+        Map<Long, Boolean> leaderVisibleMap = new HashMap<>();
         for (GbGroupActivityInfo item : lightList) {
-            GbOrgPointInfo point = pointMap.get(item.getPointId());
-            if (point == null || point.getLongitude() == null || point.getLatitude() == null) {
+            Long itemLeaderId = item.getLeaderId();
+            if (itemLeaderId == null || itemLeaderId <= 0) {
                 continue;
             }
-            //自提点设置的自提范围,单位：公里
-            double allowScope = point.getPointScope();
-            double distance = distanceKm(longitude, latitude, point.getLongitude(), point.getLatitude());
-            if (distance < allowScope) {
+            Boolean visible = leaderVisibleMap.get(itemLeaderId);
+            if (visible == null) {
+                visible = isLeaderVisible(longitude, latitude, leaderPointMap.get(itemLeaderId));
+                leaderVisibleMap.put(itemLeaderId, visible);
+            }
+            if (visible) {
                 nearIds.add(item.getGroupId());
             }
         }
@@ -455,6 +467,28 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
         fullWrapper.orderByDesc(GbGroupActivityInfo::getGroupId);
         List<GbGroupActivityInfo> result = mapper.selectList(fullWrapper);
         return result == null ? new ArrayList<>() : result;
+    }
+
+    /**
+     * 团长对新用户是否可见: 遍历团长的全部自提点,
+     * 只要有任意一个自提点到用户的距离小于等于该自提点设置的自提范围(point_scope), 即可见
+     */
+    private boolean isLeaderVisible(Double longitude, Double latitude, List<GbOrgPointInfo> pointList) {
+        if (pointList == null || pointList.isEmpty()) {
+            return false;
+        }
+        for (GbOrgPointInfo point : pointList) {
+            if (point.getLongitude() == null || point.getLatitude() == null) {
+                continue;
+            }
+            // 自提点设置的自提范围,单位：公里(未设置时视为0, 即不以该点展示)
+            double allowScope = point.getPointScope() == null ? 0D : point.getPointScope();
+            double distance = distanceKm(longitude, latitude, point.getLongitude(), point.getLatitude());
+            if (distance <= allowScope) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // 团购名称模糊搜索 + 团购分类过滤(两个查询分支共用): groupName 非空时按名称模糊匹配, catId 非空且大于0时按分类精确匹配

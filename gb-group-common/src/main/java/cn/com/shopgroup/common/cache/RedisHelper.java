@@ -7,6 +7,7 @@ import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -235,6 +236,34 @@ public class RedisHelper {
 
         // 分值最小的id
         return Integer.valueOf(minMerchant.iterator().next().toString());
+    }
+
+
+    /***********************************************************************/
+
+
+    // 添加延迟队列成员(ZSet, score=到期时间戳), 用于延迟消息队列
+    public boolean addDelayQueueItem(String zSetKey, Object member, double score) {
+        Boolean flag = redisTemplate.opsForZSet().add(zSetKey, member, score);
+        return flag != null && flag;
+    }
+
+    // 取出并移除到期的延迟队列成员(score <= maxScore, 最多count个):
+    // 对每个成员先remove成功(CAS)才算取出成功, 多实例并发消费时同一成员只会被一个实例取到
+    @SuppressWarnings("unchecked")
+    public List<Object> popDelayQueueItems(String zSetKey, double maxScore, int count) {
+        Set<Object> members = redisTemplate.opsForZSet().rangeByScore(zSetKey, 0, maxScore, 0, count - 1);
+        if (members == null || members.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<Object> result = new ArrayList<>();
+        for (Object member : members) {
+            Long removed = redisTemplate.opsForZSet().remove(zSetKey, member);
+            if (removed != null && removed > 0) {
+                result.add(member);
+            }
+        }
+        return result;
     }
 
 

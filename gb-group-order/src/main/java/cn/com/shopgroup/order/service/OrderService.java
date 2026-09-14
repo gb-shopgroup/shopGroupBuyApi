@@ -82,6 +82,11 @@ public class OrderService {
      */
     private static final long LOCK_EXPIRE = 10;
 
+    /**
+     * 订单支付超时时间（秒, 15分钟）: 下单后超过该时间未支付, 延迟队列到期自动取消订单并回补库存
+     */
+    private static final int ORDER_PAY_TIMEOUT_SECONDS = 15 * 60;
+
 
     // 小程序下单
     public Map<String, String> addOrder(Long memberId, OrderRequest request) {
@@ -365,6 +370,9 @@ public class OrderService {
             result.put("msg", "下单失败");
             return result;
         }
+        // 订单号放入Redis延迟队列(ZSet, score=下单时间+15分钟), 到期仍未支付的订单由定时任务自动取消并回补库存
+        redisHelper.addDelayQueueItem(RedisConstant.RedisOrderPayDelayQueueKey, orderNo,
+                (double) (TimeUtils.getTimeStamp() + ORDER_PAY_TIMEOUT_SECONDS));
         // 返回订单Id
         result.put("success", "1");
         result.put("msg", orderNo);
