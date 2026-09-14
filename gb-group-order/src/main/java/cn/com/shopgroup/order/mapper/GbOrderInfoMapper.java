@@ -143,11 +143,11 @@ public interface GbOrderInfoMapper extends BaseMapper<GbOrderInfo> {
 
 
     // (团长端首页)商品统计汇总: 订单商品总件数(SUM(goods_num*pack_num)),
-    // 待核销总件数(按商品行计算: goods_num - receipt_num - refund_num - refund_goods_num, 即已退款部分不计入待核销, 支持部分核销),
+    // 待核销总件数(按商品行计算: goods_num - receipt_num - refund_num, 即已退款部分不计入待核销, 支持部分核销),
     // 已支付(pay_time>0)
     @Select({
             "SELECT COALESCE(SUM(g.`goods_num` * g.`pack_num`), 0) AS goods_total,",
-            "       COALESCE(SUM(GREATEST(g.`goods_num` - IFNULL(g.`receipt_num`, 0) - IFNULL(g.`refund_num`, 0) - IFNULL(g.`refund_goods_num`, 0), 0) * g.`pack_num`), 0) AS unverify_total",
+            "       COALESCE(SUM(GREATEST(g.`goods_num` - IFNULL(g.`receipt_num`, 0) - IFNULL(g.`refund_num`, 0) , 0) * g.`pack_num`), 0) AS unverify_total",
             "FROM `gb_order_goods_info` AS g",
             "JOIN `gb_order_info` AS o ON g.`order_no` = o.`order_no`",
             "WHERE o.`leader_id` = #{leaderId}",
@@ -160,13 +160,13 @@ public interface GbOrderInfoMapper extends BaseMapper<GbOrderInfo> {
 
 
     // (团长端首页)商品维度统计分页列表: 每商品总件数(num_total)/已核销件数(receipt_total)/
-    // 待核销件数(unverify_num = goods_num - receipt_num - refund_num - refund_goods_num, 已退款部分不计入待核销, 支持部分核销),
+    // 待核销件数(unverify_num = goods_num - receipt_num - refund_num, 已退款部分不计入待核销, 支持部分核销),
     // 已支付(pay_time>0), goods_name 关键字搜索, 分页
     @Select({
             "SELECT g.`goods_id`, g.`goods_name`, g.`goods_unit`,",
             "       COALESCE(SUM(g.`goods_num` * g.`pack_num`), 0) AS num_total,",
             "       COALESCE(SUM(IFNULL(g.`receipt_num`, 0) * g.`pack_num`), 0) AS receipt_total,",
-            "       COALESCE(SUM(GREATEST(g.`goods_num` - IFNULL(g.`receipt_num`, 0) - IFNULL(g.`refund_num`, 0) - IFNULL(g.`refund_goods_num`, 0), 0) * g.`pack_num`), 0) AS unverify_num",
+            "       COALESCE(SUM(GREATEST(g.`goods_num` - IFNULL(g.`receipt_num`, 0) - IFNULL(g.`refund_num`, 0), 0) * g.`pack_num`), 0) AS unverify_num",
             "FROM `gb_order_goods_info` AS g",
             "JOIN `gb_order_info` AS o ON g.`order_no` = o.`order_no`",
             "WHERE o.`leader_id` = #{leaderId}",
@@ -242,7 +242,6 @@ public interface GbOrderInfoMapper extends BaseMapper<GbOrderInfo> {
             "WHERE o.`pay_time` = 0",
             "  AND o.`status` = 0",
             "  AND o.`add_time` < #{time}",
-            "  AND i.`is_stock` = 1",
             "ORDER BY g.`id` ASC, g.`goods_id` ASC",
             "LIMIT 0, #{limit}"
     })
@@ -324,7 +323,7 @@ public interface GbOrderInfoMapper extends BaseMapper<GbOrderInfo> {
      * 团长端-统计团员数量
      */
     Integer getLeaderMemberSummaryCount(@Param("leaderId") Long leaderId,
-                                          @Param("keyword") String keyword);
+                                        @Param("keyword") String keyword);
 
     /**
      * 团长端-查询某个团员在团长下的有效订单列表
