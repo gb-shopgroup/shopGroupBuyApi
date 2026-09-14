@@ -1678,7 +1678,7 @@ public class GbOrderInfoService {
 
 
         LambdaQueryWrapper<GbOrderInfo> queryWrapper = Wrappers.lambdaQuery();
-        queryWrapper.eq(GbOrderInfo::getStatus, 5);
+        queryWrapper.in(GbOrderInfo::getStatus, Arrays.asList(4,5));
         queryWrapper.eq(GbOrderInfo::getOrderNo, orderNo);
         GbOrderInfo data = mapper.selectOne(queryWrapper);
         if (ObjectUtils.isEmpty(data)) {
