@@ -220,7 +220,6 @@ public class GbOrderInfoService {
             queryWrapper.eq(GbOrderInfo::getMemberId, memberId);
         }
         queryWrapper.eq(GbOrderInfo::getOrderNo, orderNo);
-        queryWrapper.notIn(GbOrderInfo::getStatus, 0, 4, 6);
         GbOrderInfo data = mapper.selectOne(queryWrapper);
         if (ObjectUtils.isEmpty(data)) {
             return null;
