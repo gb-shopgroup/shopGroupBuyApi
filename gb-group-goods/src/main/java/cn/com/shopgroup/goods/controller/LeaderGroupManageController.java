@@ -30,10 +30,12 @@ import cn.com.shopgroup.goods.service.GbGroupActivityInfoService;
 import cn.com.shopgroup.goods.service.GbGroupCategoryInfoService;
 import cn.com.shopgroup.goods.service.GbGroupTagService;
 import cn.com.shopgroup.user.model.GbOrgBusinessInfo;
+import cn.com.shopgroup.user.model.GbOrgLeaderInfo;
 import cn.com.shopgroup.user.model.GbOrgPointInfo;
 import cn.com.shopgroup.user.model.GbOrgShopInfo;
 import cn.com.shopgroup.user.model.GbOrgStaffInfo;
 import cn.com.shopgroup.user.service.GbOrgBusinessInfoService;
+import cn.com.shopgroup.user.service.GbOrgLeaderInfoService;
 import cn.com.shopgroup.user.service.GbOrgPointInfoService;
 import cn.com.shopgroup.user.service.GbOrgShopInfoService;
 import cn.com.shopgroup.user.service.GbOrgStaffInfoService;
@@ -102,8 +104,12 @@ public class LeaderGroupManageController {
 
     @javax.annotation.Resource
     private GbOrgBusinessInfoService businessService;
+
     @javax.annotation.Resource
     private GbOrgPointInfoService pointInfoService;
+
+    @javax.annotation.Resource
+    private GbOrgLeaderInfoService leaderInfoService;
 
     @Autowired
     private WxMiniAccessTokenHelper helper;
@@ -184,6 +190,10 @@ public class LeaderGroupManageController {
         if (leaderId == 0) {
             throw new BusinessException(GoodsErrorCodeEnum.LEADER_NOT_EXIST);
         }
+        GbOrgLeaderInfo leaderInfo = leaderInfoService.getLeaderInfo(leaderId);
+        if (ObjectUtils.isEmpty(leaderInfo)) {
+            throw new BusinessException(GoodsErrorCodeEnum.LEADER_NOT_EXIST);
+        }
         List<GbOrgBusinessInfo> businessList = businessService.getMiniBusinessList(leaderId);
         if (CollectionUtils.isEmpty(businessList)) {
             throw new BusinessException(GoodsErrorCodeEnum.ADD_GROUP_BUSINESS_NOT_EXIST);
@@ -199,17 +209,21 @@ public class LeaderGroupManageController {
         GbOrgStaffInfo staffInfo = new GbOrgStaffInfo();
         // 重构数据
         GbGroupActivityInfo data = new GbGroupActivityInfo();
+        Long opId = leaderId;
+        String opName = Optional.ofNullable(leaderInfo.getLeaderName()).orElse("团长");
         if (staffId != 0) {
             staffInfo = staffService.getStaffInfo(staffId);
             log.info("添加团购活动时，stfInfo:{}", JSON.toJSONString(staffInfo));
             if (ObjectUtils.isEmpty(staffInfo)) {
                 throw new BusinessException(GoodsErrorCodeEnum.STAFF_NOT_EXIST);
             }
-            // 添加人员id
-            data.setStaffId(staffId);
-            // 添加人员姓名
-            data.setStaffName(staffInfo.getStaffName());
+            opId = staffId;
+            opName = staffInfo.getStaffName();
         }
+        // 添加人员id
+        data.setStaffId(opId);
+        // 添加人员姓名
+        data.setStaffName(opName);
 //        Long pointId = Optional.ofNullable(request.getPointId()).orElse(0L);
 //        if (pointId.intValue() == 0) {
 //            throw new BusinessException(GoodsErrorCodeEnum.PICKUP_POINT_REQUIRED);
@@ -366,6 +380,10 @@ public class LeaderGroupManageController {
             throw new BusinessException(GoodsErrorCodeEnum.LEADER_NOT_EXIST);
         }
 
+        GbOrgLeaderInfo leaderInfo = leaderInfoService.getLeaderInfo(leaderId);
+        if (ObjectUtils.isEmpty(leaderInfo)) {
+            throw new BusinessException(GoodsErrorCodeEnum.LEADER_NOT_EXIST);
+        }
         // 从请求头中获取员工id
         Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
         log.info("编辑团购活动时，员工id:{}", staffId);
@@ -381,17 +399,33 @@ public class LeaderGroupManageController {
             // 修改人员姓名
             data.setStaffName(staffInfo.getStaffName());
         }
+        Long uptateId = leaderId;
+        String updateName = Optional.ofNullable(leaderInfo.getLeaderName()).orElse("团长");
+        if (staffId != 0) {
+            staffInfo = staffService.getStaffInfo(staffId);
+            log.info("添加团购活动时，stfInfo:{}", JSON.toJSONString(staffInfo));
+            if (ObjectUtils.isEmpty(staffInfo)) {
+                throw new BusinessException(GoodsErrorCodeEnum.STAFF_NOT_EXIST);
+            }
+            uptateId = staffId;
+            updateName = staffInfo.getStaffName();
+        }
+        // 添加人员id
+        data.setStaffId(uptateId);
+        // 添加人员姓名
+        data.setStaffName(updateName);
+
         // 团购进行中, 不允许修改
         GbGroupActivityInfo groupInfo = activityInfoService.getGroupInfo(request.getId());
         if (ObjectUtils.isEmpty(groupInfo)) {
             throw new BusinessException(GoodsErrorCodeEnum.GROUP_NOT_EXIST);
         }
-        int nowTime = TimeUtils.getTimeStamp();
-        int startTime = groupInfo.getStartTime().intValue();
-        int endTime = groupInfo.getEndTime().intValue();
-        if (startTime < nowTime && nowTime < endTime) {
-            throw new BusinessException(GoodsErrorCodeEnum.GROUP_ONGOING);
-        }
+//        int nowTime = TimeUtils.getTimeStamp();
+//        int startTime = groupInfo.getStartTime().intValue();
+//        int endTime = groupInfo.getEndTime().intValue();
+//        if (startTime < nowTime && nowTime < endTime) {
+//            throw new BusinessException(GoodsErrorCodeEnum.GROUP_ONGOING);
+//        }
 
         // 编辑校验: 原团购中的商品不允许删除, 提交的商品必须包含原有全部商品(只允许新增商品)
         List<GbGroupActivityGoods> originGoodsList = activityInfoService.getGroupActivityGoodsList(request.getId());
