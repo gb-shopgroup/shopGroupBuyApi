@@ -56,6 +56,8 @@ public class GroupActResponse {
 
     // 团购商品列表
     private List<GroupActGoodsResponse> goods;
+    //团长团购活动订单汇总数据
+    private LeaderGroupSummaryResponse groupSummaryResponse;
 
     public GroupActResponse() {
 

@@ -20,6 +20,7 @@ import cn.com.shopgroup.goods.http.request.leader.LeaderGroupListRequest;
 import cn.com.shopgroup.goods.http.response.group.GroupActGoodsResponse;
 import cn.com.shopgroup.goods.http.response.leader.GroupActResponse;
 import cn.com.shopgroup.goods.http.response.leader.GroupCatResponse;
+import cn.com.shopgroup.goods.http.response.leader.LeaderGroupSummaryResponse;
 import cn.com.shopgroup.goods.model.GbGoodsInfo;
 import cn.com.shopgroup.goods.model.GbGroupActivityGoods;
 import cn.com.shopgroup.goods.model.GbGroupActivityInfo;
@@ -29,6 +30,7 @@ import cn.com.shopgroup.goods.service.GbGoodsInfoService;
 import cn.com.shopgroup.goods.service.GbGroupActivityInfoService;
 import cn.com.shopgroup.goods.service.GbGroupCategoryInfoService;
 import cn.com.shopgroup.goods.service.GbGroupTagService;
+import cn.com.shopgroup.goods.service.LeaderGroupSummaryService;
 import cn.com.shopgroup.user.model.GbOrgBusinessInfo;
 import cn.com.shopgroup.user.model.GbOrgLeaderInfo;
 import cn.com.shopgroup.user.model.GbOrgPointInfo;
@@ -114,8 +116,16 @@ public class LeaderGroupManageController {
     @Autowired
     private WxMiniAccessTokenHelper helper;
 
+    @Autowired
+    private LeaderGroupSummaryService leaderGroupSummaryService;
 
-    // 团长端-查询所有团购活动列表
+
+    /**
+     * 团长端-查询所有团购活动列表
+     *
+     * <p>返回每个团购活动的订单汇总数据 {@code groupSummaryResponse}（实际收入、退款金额、跟团人数）,
+     * 由 LeaderGroupSummaryService 批量聚合 gb_order_info 得出; 已取消订单不计入。
+     */
     @PostMapping("/get/groupActivity/list")
     public JsonResult getGroupActiveList(@Validated @RequestBody LeaderGroupListRequest request) {
         log.info("团长端-查询所有团购活动列表,request:{}", JSON.toJSONString(request));
@@ -136,7 +146,45 @@ public class LeaderGroupManageController {
         // 查询列表(1、团长团查询 2 用户端查询)
         List<GbGroupActivityInfo> result = activityInfoService.getMiniLeaderGroupList(1, leaderId, request.getCatId(), activityName, status, page, pageSize);
         List<GroupActResponse> data = GroupActResponse.getGroupResponseList(result);
+        // 填充每个团购活动的订单汇总数据(收入/退款/跟团人数), 一次批量查询避免 N+1
+        fillGroupSummary(data);
+        log.info("团长端-查询所有团购活动列表返回data:{}", JSON.toJSONString(data));
         return JsonResult.success(data);
+    }
+
+    /**
+     * 为团购活动列表填充订单汇总(groupSummaryResponse)
+     * 团购无订单时, 设置为默认值(0元/0元/0人)
+     */
+    private void fillGroupSummary(List<GroupActResponse> data) {
+
+        if (CollectionUtils.isEmpty(data)) {
+            return;
+        }
+        // 收集 groupId
+        List<Long> groupIds = new ArrayList<>(data.size());
+        for (GroupActResponse item : data) {
+            if (item.getId() != null) {
+                groupIds.add(item.getId());
+            }
+        }
+        if (groupIds.isEmpty()) {
+            return;
+        }
+        Map<Long, LeaderGroupSummaryResponse> summaryMap =
+                leaderGroupSummaryService.getSummaryByGroupIds(groupIds);
+        // 回填到响应对象
+        for (GroupActResponse item : data) {
+            LeaderGroupSummaryResponse summary = summaryMap.get(item.getId());
+            if (summary == null) {
+                // 无订单的团购, 用默认值填充, 避免前端 null 处理
+                summary = new LeaderGroupSummaryResponse();
+                summary.setTotalFee(0.00);
+                summary.setRefundFee(0.00);
+                summary.setOrderNum(0);
+            }
+            item.setGroupSummaryResponse(summary);
+        }
     }
 
     // 查询所有团购活动总数(筛选条件与列表接口一致, 保证分页总页数正确)

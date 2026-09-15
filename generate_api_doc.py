@@ -9,6 +9,7 @@
 import os
 import re
 import glob
+import subprocess
 from datetime import datetime
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -564,22 +565,49 @@ def parse_file(path):
             desc = ao[-1]
         else:
             lines = head.splitlines()
+            # 收集 Javadoc 中的非 @param/@return 说明行, 按出现顺序拼接
+            # 规则: 从下往上扫描, 第一个非空/非 */ / 非 @param 的内容行作为起点,
+            # 继续向上拼接所有非空说明行, 直到遇到 /** / 空 Javadoc 行 或 第一个非 * 行
+            javadoc_lines = []
+            in_javadoc = False
             for line in reversed(lines):
                 s = line.strip()
+                if s == "*/":
+                    in_javadoc = True
+                    continue
+                if not in_javadoc:
+                    # 尚未进入 Javadoc 段, 跳过
+                    continue
                 if s.startswith("//"):
+                    # 单行注释优先级最高(覆盖 Javadoc)
                     desc = s.lstrip("/").strip()
+                    javadoc_lines = []
                     break
-                if s.startswith("*"):
-                    # Javadoc 注释：跳过收尾行与 @param/@return 行，取最近一条说明行
-                    if s == "*/":
-                        continue
-                    content = s.lstrip("*").strip()
-                    if content and not content.startswith("@"):
-                        desc = content
-                        break
-                    continue  # @param/@return 行或空行，继续向上查找
-                if s and not s.startswith("@"):
+                if not s.startswith("*"):
+                    # 离开 Javadoc 段(遇到了普通代码或注解)
                     break
+                # 在 Javadoc 内, s 以 "*" 开头
+                content = s.lstrip("*").strip()
+                if not content:
+                    # Javadoc 内空行 -> 段落分隔符
+                    if javadoc_lines and javadoc_lines[-1] != "<BR>":
+                        javadoc_lines.append("<BR>")
+                    continue
+                if content.startswith("@"):
+                    # @param/@return 等跳过, 不影响主说明
+                    continue
+                if content == "/**":
+                    # 已是 /** 行, 停止
+                    break
+                # 清理 Javadoc 内嵌标签: <p> / </p> / <br> 等
+                content = re.sub(r"</?p\s*/?>", "", content, flags=re.I)
+                content = re.sub(r"<br\s*/?>", "", content, flags=re.I)
+                content = re.sub(r"\{@code\s+([^}]+)\}", r"`\1`", content)
+                # 收集说明行（拼接顺序: 由近及远 -> 反转后为自然顺序）
+                javadoc_lines.append(content)
+            if not desc and javadoc_lines:
+                # 反转得到自然顺序, 多段以 <br> 在 markdown 中渲染为换行
+                desc = " ".join(reversed(javadoc_lines)).replace(" <BR> ", "<br>").replace("<BR> ", "<br>")
 
         # 返回 data 类型推断（仅针对 JsonResult 统一返回体）
         is_json_result = ret_raw == "JsonResult" or ret_raw.startswith("JsonResult<")
@@ -755,6 +783,75 @@ def render_interface(idx, itf):
 # ============================================================
 # README.md 接口清单同步
 # ============================================================
+def collect_recent_changes(limit=15, since_days=14):
+    """从 git log 提取近期接口/字段变更, 用于文档头部「近期变更」章节
+    - 关注 *Controller.java / http/request/ / http/response/ 路径下的提交
+    - 合并同一天、同一 commit 的多文件改动, 按日期降序
+    - 没有 git 或无匹配时返回空列表"""
+    try:
+        # 仅查 Controller 与 http/request|http/response 路径下的近期提交
+        cmd = [
+            "git", "-C", ROOT, "log",
+            f"--since={since_days}.days",
+            "--pretty=format:%h|%ad|%s",
+            "--date=short",
+            "--name-only",
+            "--",
+            "*/src/main/java/**/*Controller.java",
+            "*/src/main/java/**/http/request/**",
+            "*/src/main/java/**/http/response/**",
+        ]
+        out = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode("utf-8", errors="ignore")
+    except Exception:
+        return []
+    if not out.strip():
+        return []
+    commits = []
+    current = None
+    for line in out.splitlines():
+        if "|" in line and len(line.split("|", 2)) == 3 and re.match(r"^[0-9a-f]{7,}\|\d{4}-\d{2}-\d{2}\|", line):
+            if current:
+                commits.append(current)
+            h, d, s = line.split("|", 2)
+            current = {"hash": h, "date": d, "subject": s.strip(), "files": []}
+        elif line.strip() and current:
+            # 仅保留 Controller/http 下的相关文件
+            if ("/http/request/" in line or "/http/response/" in line or line.endswith("Controller.java")) \
+                    and "src/main/java" in line:
+                # 文件名转中文类型提示
+                short = line.rsplit("/", 1)[-1]
+                current["files"].append(short)
+    if current:
+        commits.append(current)
+    # 去重 (按 hash), 限制条数
+    seen, result = set(), []
+    for c in commits:
+        if c["hash"] in seen:
+            continue
+        seen.add(c["hash"])
+        result.append(c)
+        if len(result) >= limit:
+            break
+    return result
+
+
+def render_recent_changes(changes):
+    """渲染近期变更 Markdown 段落"""
+    if not changes:
+        return ""
+    parts = ["## 近期变更\n"]
+    parts.append("> 以下为最近 %d 条与接口定义相关的提交（来源 `git log`, 由 `generate_api_doc.py` 自动生成）；\n"
+                 "> 完整变更请查阅 git 提交记录。\n" % len(changes))
+    parts.append("| 日期 | 提交 | 摘要 | 涉及文件 |")
+    parts.append("| --- | --- | --- | --- |")
+    for c in changes:
+        files = ", ".join(sorted(set(c["files"]))[:5])
+        if len(set(c["files"])) > 5:
+            files += " 等"
+        subj = c["subject"].replace("|", "\\|")
+        parts.append("| %s | `%s` | %s | %s |" % (c["date"], c["hash"], subj, files or "—"))
+    parts.append("")
+    return "\n".join(parts)
 def render_readme_params(itf):
     """生成 README 表格中的参数列（紧凑格式）"""
     bits = []
@@ -822,6 +919,9 @@ def main():
     lines.append("> 参数约定：Query/Header 参数「必填」默认「是」（`@RequestParam` 默认必填，标注 `required=false` 则为「否」）；Body 请求对象各字段的「必填」取自字段校验注解（`@NotNull` 等），未注解时以实际逻辑为准\n")
     lines.append("> 分页约定：列表类接口一般通过 `page`（页码，从 1 开始）/ `pageSize`（每页条数）分页，配套 `count` 接口获取总数\n")
     lines.append("> 统一出参：所有接口返回 `JsonResult`（`code` 状态码 / `msg` 提示信息 / `data` 业务数据），`data` 字段说明见各接口；嵌套对象字段以 `→` 前缀递进展开\n")
+
+    # 近期变更（从 git log 自动提取, 仅做接口变更追踪参考, 不替代人工 commit message）
+    lines.append(render_recent_changes(collect_recent_changes()))
 
     order = 0
     idx_global = 0
