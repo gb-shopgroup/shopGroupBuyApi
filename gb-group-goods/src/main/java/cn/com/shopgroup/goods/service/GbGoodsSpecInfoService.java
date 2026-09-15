@@ -1,7 +1,6 @@
 package cn.com.shopgroup.goods.service;
 
 import cn.com.shopgroup.goods.model.GbGoodsSpecInfo;
-import cn.com.shopgroup.goods.model.GbGoodsSpecValue;
 
 import java.util.List;
 import java.util.Map;
