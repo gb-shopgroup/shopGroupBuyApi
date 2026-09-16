@@ -1,6 +1,7 @@
 package cn.com.shopgroup.goods.service.impl;
 
 import cn.com.shopgroup.common.utils.MoneyUtil;
+import cn.com.shopgroup.goods.http.response.leader.LeaderGroupGenTuanResponse;
 import cn.com.shopgroup.goods.http.response.leader.LeaderGroupSummaryResponse;
 import cn.com.shopgroup.goods.service.LeaderGroupSummaryService;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -94,6 +95,40 @@ public class LeaderGroupSummaryServiceImpl implements LeaderGroupSummaryService 
             summary.setOrderNum(orderNum);
 
             result.put(groupId, summary);
+        }
+        return result;
+    }
+
+    /**
+     * 查询单个团购活动的跟团统计(团员人数及其下单数)
+     *
+     * 统计口径(与用户端跟团人数一致): 已支付(pay_time>0)、未取消(status!=6)的有效订单; 团员人数按 member_id 去重, 下单数为有效订单条数
+     */
+    @Override
+    public LeaderGroupGenTuanResponse getGenTuanByGroupId(Long groupId) {
+
+        LeaderGroupGenTuanResponse result = new LeaderGroupGenTuanResponse();
+        result.setMemberNum(0);
+        result.setOrderNum(0);
+        if (groupId == null || groupId <= 0) {
+            return result;
+        }
+
+        // 一次查询同时得出: 去重团员人数 + 有效订单数(下单数)
+        String sql = "SELECT COUNT(DISTINCT member_id) AS member_num, " +
+                "       COUNT(*) AS order_num " +
+                "FROM gb_order_info " +
+                "WHERE group_id = ? " +
+                "  AND pay_time > 0 " +
+                "  AND status <> ? " +
+                //"  AND refund_time = 0 " +
+                "  AND member_id > 0";
+
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, groupId, ORDER_STATUS_CANCELED);
+        if (rows != null && !rows.isEmpty()) {
+            Map<String, Object> row = rows.get(0);
+            result.setMemberNum((int) toLong(row.get("member_num")));
+            result.setOrderNum((int) toLong(row.get("order_num")));
         }
         return result;
     }

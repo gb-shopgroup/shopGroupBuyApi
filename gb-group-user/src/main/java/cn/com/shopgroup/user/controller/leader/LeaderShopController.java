@@ -69,7 +69,7 @@ public class LeaderShopController {
         return handleGetShop(leaderId);
     }
 
-    private JsonResult handleGetShop(Long leaderId) {
+    public JsonResult handleGetShop(Long leaderId) {
         String redisKey = RedisConstant.RedisShopInfoKey + leaderId;
         if (redisHelper.hasKey(redisKey) == false) {
             // 查询数据库 ---获取店铺信息

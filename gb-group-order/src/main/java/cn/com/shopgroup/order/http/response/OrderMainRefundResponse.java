@@ -1,5 +1,6 @@
 package cn.com.shopgroup.order.http.response;
 
+import cn.com.shopgroup.common.utils.MoneyUtil;
 import cn.com.shopgroup.order.model.GbOrderGoodsInfo;
 import cn.com.shopgroup.order.model.GbOrderInfo;
 import lombok.Data;
@@ -14,8 +15,8 @@ public class OrderMainRefundResponse {
     private String orderNo;
     //订单金额
     private Double orderPrice;
-    // 退款金额,单位：分
-    private Integer refundFee;
+    // 退款金额（元）
+    private Double refundFee;
     // 团长信息id
     private Long leaderId;
     // 团购信息
@@ -45,6 +46,8 @@ public class OrderMainRefundResponse {
         // 订单信息
         this.orderNo = data.getOrderNo();
         this.orderPrice = data.getOrderPrice();
+        // 退款金额: 分 -> 元
+        this.refundFee = MoneyUtil.centToYuan(data.getRefundFee());
 
         // 团长信息和店铺名称
         this.leaderId = data.getLeaderId();

@@ -118,6 +118,12 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
     }
 
     @Override
+    public Integer countGroupMemberNum(Long groupId) {
+        Integer count = mapper.countGroupMemberNum(groupId);
+        return count == null ? 0 : count;
+    }
+
+    @Override
     public Long addMiniOrder(GbOrderInfo orderInfo, List<GbOrderGoodsInfo> goodsInfoList) {
 
         return transactionTemplate.execute(new TransactionCallback<Long>() {
@@ -1548,7 +1554,7 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
                     avatar,
                     TimeUtils.getRelativeTime(latestTime),
                     lastActionDesc,
-                    fenToYuan(totalPayFee),
+                    MoneyUtil.centToYuan(totalPayFee),
                     orderCount == null ? 0 : orderCount,
                     viewCount
             ));
@@ -1568,7 +1574,7 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
         // 查看记录(埋点)最近50条
         List<GbGroupViewLog> views = viewLogService.getRecentViewList(leaderId, memberId);
         if (CollectionUtils.isEmpty(orders) && CollectionUtils.isEmpty(views)) {
-            return new LeaderMemberDetailResponse(memberId, "", "", "", "0.00", "0.00", 0, 0, new ArrayList<>());
+            return new LeaderMemberDetailResponse(memberId, "", "", "", 0.00, 0.00, 0, 0, new ArrayList<>());
         }
 
         int orderCount = CollectionUtils.isEmpty(orders) ? 0 : orders.size();
@@ -1627,8 +1633,8 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
                 hideMobile(mobile),
                 nickname,
                 avatar,
-                fenToYuan(totalPayFee),
-                fenToYuan(totalRefundFee),
+                MoneyUtil.centToYuan(totalPayFee),
+                MoneyUtil.centToYuan(totalRefundFee),
                 orderCount,
                 viewCount,
                 dynamicList
@@ -1903,13 +1909,6 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
         } catch (NumberFormatException e) {
             return 0.00;
         }
-    }
-
-    private String fenToYuan(Integer fen) {
-        if (fen == null) {
-            return "0.00";
-        }
-        return BigDecimal.valueOf(fen).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP).toString();
     }
 
     private Long toLong(Object obj) {

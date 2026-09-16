@@ -1,5 +1,6 @@
 package cn.com.shopgroup.goods.service;
 
+import cn.com.shopgroup.goods.http.response.leader.LeaderGroupGenTuanResponse;
 import cn.com.shopgroup.goods.http.response.leader.LeaderGroupSummaryResponse;
 import java.util.Collection;
 import java.util.Map;
@@ -24,5 +25,16 @@ public interface LeaderGroupSummaryService {
      * @return key=groupId, value=汇总数据(无订单的团购不在返回结果中, 调用方按需判空)
      */
     Map<Long, LeaderGroupSummaryResponse> getSummaryByGroupIds(Collection<Long> groupIds);
+
+    /**
+     * 查询单个团购活动的跟团统计(团员人数及其下单数)
+     *
+     * 统计口径(与用户端跟团人数一致): 已支付(pay_time>0)、未取消(status!=6)、
+     * 未退款(refund_time=0)的有效订单; 团员人数按 member_id 去重, 下单数为有效订单条数
+     *
+     * @param groupId 团购id
+     * @return 跟团统计(团购无有效订单时人数/单数均为0, 不返回null)
+     */
+    LeaderGroupGenTuanResponse getGenTuanByGroupId(Long groupId);
 
 }

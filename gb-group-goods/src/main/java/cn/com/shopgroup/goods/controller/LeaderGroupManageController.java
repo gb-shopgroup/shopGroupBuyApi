@@ -383,6 +383,7 @@ public class LeaderGroupManageController {
     }
 
     // 查询团购信息, 还要查询商品列表(价格以团购商品表冗余的团购价为准)
+    // 返回跟团统计genTuanResponse(团员人数memberNum及其下单数orderNum, 已支付、未取消、未退款的有效订单口径)
     @GetMapping("/get/groupActivity/info")
     public JsonResult getGroupActivity(@RequestParam("groupId") Long groupId) {
         log.info("goods/get/groupActivity/info groupId:{}", groupId);
@@ -415,6 +416,8 @@ public class LeaderGroupManageController {
             goodsResponses.add(new GroupActGoodsResponse(item, goodsMap.get(item.getGoodsId())));
         }
         response.setGoods(goodsResponses);
+        // 跟团统计: 团员人数及其下单数
+        response.setGenTuanResponse(leaderGroupSummaryService.getGenTuanByGroupId(groupId));
         return JsonResult.success(response);
     }
 

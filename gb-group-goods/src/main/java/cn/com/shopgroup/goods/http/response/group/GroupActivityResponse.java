@@ -21,7 +21,7 @@ public class GroupActivityResponse {
 
     private Long lid;        // 团长id
     private Byte pickup;     // 商品提货方式：1自提2邮递
-    private Integer num;       // 订单数量
+    private Integer num;       // 订单数量（实际支付订单数 + 虚拟订单数）
     private Integer num2;      // 虚拟数量
 
     private Byte isClose;   // 是否关闭

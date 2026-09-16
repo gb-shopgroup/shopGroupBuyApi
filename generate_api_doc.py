@@ -134,6 +134,166 @@ SPLIT_HINT = {
 }
 
 
+# ============================================================
+# 功能说明自动推断：源码无方法注释时, 依据路径段 + HTTP 方法 + 出入参推断中文说明
+# （文档中该说明以斜体呈现, 与源码注释区分）
+# ============================================================
+PATH_HINTS = {
+    "group": "团购", "groupactivity": "团购活动", "activity": "活动", "goods": "商品",
+    "product": "商品", "order": "订单", "leader": "团长", "member": "会员",
+    "mymember": "我的团员", "staff": "员工", "shop": "店铺", "store": "店铺",
+    "cat": "分类", "category": "分类", "point": "自提点", "address": "地址",
+    "message": "消息", "msg": "消息", "article": "文章", "black": "黑名单",
+    "bill": "对账单", "business": "收款账户", "account": "账户", "refund": "退款",
+    "reason": "原因", "receipt": "提货", "verify": "核销", "wx": "微信", "wechat": "微信",
+    "image": "图片", "file": "文件", "avatar": "头像", "banner": "轮播图", "tag": "标签",
+    "report": "报表", "focus": "关注", "phone": "手机号", "openid": "openid",
+    "isleader": "是否为团长", "records": "记录", "recodes": "记录", "logs": "日志",
+    "home": "首页", "show": "展示", "config": "配置", "setting": "设置",
+    "errcode": "二维码", "ercode": "二维码", "qrcode": "二维码", "access": "资源",
+    "shipping": "发货", "notallreceipt": "未全部提货", "applyrefund": "退款申请",
+    "status": "状态", "price": "价格", "stock": "库存", "count": "数量",
+    "total": "汇总", "test": "测试", "user": "用户", "payment": "支付", "pay": "支付",
+    "balance": "余额", "cash": "提现", "commission": "佣金", "divide": "分账",
+    "settle": "结算", "statistics": "统计", "report": "报表",
+    "mobile": "手机号", "unread": "未读", "orderbusiness": "订单收款账户",
+    "orders": "订单", "online": "上架", "img": "图片", "skuspec": "SKU规格",
+    "sku": "SKU", "spec": "规格", "kaptcha": "验证码", "poster": "海报",
+    "share": "分享", "tagname": "标签名", "nickname": "昵称", "trueName": "收货人",
+}
+
+ACTION_VERB = {
+    "apply": "申请", "confirm": "确认", "cancel": "取消", "make": "生成", "send": "发送",
+    "view": "查看", "get": "查询", "add": "新增", "save": "保存", "edit": "修改",
+    "update": "修改", "remove": "删除", "delete": "删除", "close": "启用/关闭",
+    "open": "开启", "read": "标记已读", "upload": "上传", "login": "登录",
+    "logout": "退出登录", "reg": "注册", "bind": "绑定", "unbind": "解绑",
+    "reset": "重置", "set": "设置", "copy": "复制", "sync": "同步", "import": "导入",
+    "export": "导出", "audit": "审核", "check": "校验", "notify": "回调",
+    "callback": "回调", "verify": "核销", "receipt": "提货", "refund": "退款",
+    "pay": "支付", "prepay": "预支付", "settle": "结算", "divide": "分账",
+    "withdraw": "提现", "freeze": "冻结", "unfreeze": "解冻", "summary": "汇总",
+    "top": "置顶", "batch": "批量处理", "generate": "生成", "create": "创建",
+    "modify": "修改", "clear": "清空", "show": "展示", "payment": "支付",
+    "scan": "扫码核销", "writeoff": "核销", "partwriteoff": "部分核销",
+    "write": "核销", "part": "部分核销",
+    "approve": "审核", "submit": "提交", "backstock": "回库",
+    "query": "查询", "select": "查询", "search": "搜索", "stat": "统计",
+}
+
+# 客体型动作: 直接跟宾语主体（新增/修改/删除...）
+OBJ_VERBS = {"新增", "保存", "修改", "删除", "创建", "启用/关闭", "导入", "导出",
+             "批量处理", "设置", "绑定", "解绑"}
+
+# 查询型动作模板: 路径末段 -> (动词, 结果后缀)
+ACTION_TPL = {
+    "list": ("查询", "列表"), "count": ("查询", "总数"),
+    "info": ("查询", "详情"), "detail": ("查询", "详情"),
+    "logs": ("查询", "日志"), "logs2": ("查询", "日志"),
+    "records": ("查询", "记录"), "recodes": ("查询", "记录"),
+    "all": ("查询", "全部"), "page": ("查询", "分页列表"),
+}
+
+
+def _camel_words(s):
+    """驼峰串 -> 词列表（如 applyRefund -> [apply, Refund]）"""
+    return re.findall(r"[A-Z]?[a-z0-9]+|[A-Z]+(?![a-z])", s) or [s]
+
+
+def _cn_segment(seg, skip_verbs=False):
+    """路径段 -> 中文（整段优先命中词典, 否则按驼峰拆分逐词映射）"""
+    if not seg:
+        return ""
+    if seg.lower() in PATH_HINTS:
+        return PATH_HINTS[seg.lower()]
+    out = []
+    for w in _camel_words(seg):
+        lw = w.lower()
+        if lw in PATH_HINTS:
+            out.append(PATH_HINTS[lw])
+        elif skip_verbs and lw in ACTION_VERB:
+            continue  # 主体名中不保留动词段
+        else:
+            out.append(w)
+    return "".join(out)
+
+
+def subject_cn(segs):
+    """路径段列表 -> 主体中文名"""
+    return _dedup_head("".join(_cn_segment(s, skip_verbs=True) for s in segs))
+
+
+def _dedup_head(txt):
+    """去除结果开头的相邻重复片段（如 支付支付订单 -> 支付订单）"""
+    for _ in range(2):
+        m = re.match(r"^(..+?)\1", txt)
+        if not m:
+            break
+        txt = m.group(1) + txt[2 * len(m.group(1)):]
+    return txt
+
+
+def infer_desc(method, path, params, data_types):
+    """依据路径与出入参推断接口功能说明（源码无注释时使用）
+    例: POST /order/leader/myMember/list -> 查询团长我的团员列表"""
+    segs = [s for s in path.strip("/").split("/") if s and not s.startswith("{")]
+    if segs and segs[0].lower() in ("user", "order", "goods", "admin", "task"):
+        segs = segs[1:]
+    if not segs:
+        return ""
+    # 上传 / 静态资源访问
+    if any(s.lower() == "upload" for s in segs):
+        idx = [i for i, s in enumerate(segs) if s.lower() == "upload"][0]
+        res = subject_cn(segs[idx + 1:]) or subject_cn(segs[:idx])
+        return "上传%s文件" % (res or "")
+    if segs[-1].lower() == "access":
+        return "访问%s（静态资源）" % (subject_cn(segs[:-1]) or "文件")
+
+    head, last = segs[:-1], segs[-1]
+    verb, suffix = "", ""
+    if last.lower() in ACTION_TPL:
+        verb, suffix = ACTION_TPL[last.lower()]
+    else:
+        m = re.match(r"^(.*?)(List|Count|Info|Detail)$", last)
+        if m and m.group(1):
+            verb, suffix = "查询", {"List": "列表", "Count": "总数",
+                                    "Info": "详情", "Detail": "详情"}[m.group(2)]
+            head = head + [m.group(1)]
+        else:
+            words = _camel_words(last)
+            if words and words[0].lower() in ACTION_VERB:
+                verb = ACTION_VERB[words[0].lower()]
+                rest = "".join(words[1:])
+                if rest:
+                    # 剩余词能汉化则作为动作后缀, 否则丢弃（避免说明中出现英文残留）
+                    sfx = _cn_segment(rest)
+                    suffix = sfx if (sfx and sfx != rest) else ""
+            else:
+                verb = "查询" if method == "GET" else "提交"
+                head = head + [last]
+    # 动作与后缀语义重复时丢弃后缀（如 扫码核销 + 二维码）
+    if suffix == "二维码" and "扫码" in verb:
+        suffix = ""
+
+    subject = subject_cn(head)
+    if verb == "查询":
+        return _dedup_head("查询" + ((subject + suffix) if subject else (suffix or "数据")))
+    act = verb + suffix
+    if not subject:
+        return _dedup_head(act)
+    # 客体型动作(新增/修改/删除...)直接接主体; 操作型动作(退款/发货/核销...)主体放入括号
+    if verb in OBJ_VERBS:
+        return _dedup_head(act + subject)
+    return _dedup_head("%s（%s）" % (act, subject))
+
+
+def slugify(text):
+    """Markdown 标题文本 -> 锚点（GitHub / IDE 预览通用规则）"""
+    t = re.sub(r"[`*]", "", text.strip().lower())
+    t = re.sub(r"[^\w\u4e00-\u9fff\s-]", "", t)
+    return re.sub(r"\s+", "-", t.strip())
+
+
 def camel_split(name):
     """驼峰/下划线参数名 -> 中文语义片段"""
     words = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", name)
@@ -397,10 +557,10 @@ def extract_body(body, start_pos):
 
 def infer_return_data(method_body, param_types):
     """推断方法返回 data 的类型: 解析局部变量声明 + JsonResult.success(...) 参数
-    返回 (data_type 或 None, 说明文本)"""
+    返回 (data_type 列表, 未能推断时的源码表达式提示列表)"""
     # 局部变量声明: 类型 变量 = ...   (排除 for/if 等控制结构, 匹配赋值)
     local = {}
-    for m in re.finditer(r"\b(?:final\s+)?([A-Z][\w<>\[\],\s.]+?)\s+(\w+)\s*=", method_body):
+    for m in re.finditer(r"\b(?:final\s+)?([A-Z][\w<>\[\],\s.]*?|int|long|double|float|boolean|short|byte|char|String)\s+(\w+)\s*=", method_body):
         t, v = m.group(1).strip(), m.group(2)
         # 去掉注解残留
         t = re.sub(r"@\w+", "", t).strip()
@@ -428,8 +588,12 @@ def infer_return_data(method_body, param_types):
             return "Integer"
         if expr in ("true", "false"):
             return "Boolean"
-        # 含方法调用(如 service.getList(...)): 不做推断, 避免误判
+        # 含方法调用: 优先识别 ClassName.staticMethod(...) 形式的 DTO 构造
+        # (如 OrderInfoResponse.getResponseList(...) / XxxResponse.build(...))
         if re.search(r"\w+\s*\(", expr):
+            mm = re.match(r"^([A-Z]\w*)\s*\.\s*\w+\s*\(", expr)
+            if mm and mm.group(1) in CLASS_INDEX:
+                return mm.group(1)
             # 三元表达式(如 cond ? a : b): 尝试取两分支
             tm = re.match(r"^(.+?)\s*\?\s*(.+?)\s*:\s*(.+?)$", expr)
             if tm:
@@ -456,7 +620,7 @@ def infer_return_data(method_body, param_types):
                 return t
         return None
 
-    types = []
+    types, hints = [], []
     for m in re.finditer(r"(?:JsonResult\.)?success\s*\(", method_body):
         args, depth, i, start = [], 0, m.end(), m.end()
         while i < len(method_body):
@@ -478,6 +642,11 @@ def infer_return_data(method_body, param_types):
             t = resolve(args[-1])
             if t and t != "JsonResult":
                 types.append(t)
+            else:
+                # 无法静态推断: 记录源码表达式, 供文档提示
+                hint = re.sub(r"\s+", " ", args[-1]).replace("`", "").replace("|", "\\|").strip()
+                if hint:
+                    hints.append(hint[:90])
         else:
             types.append("<none>")  # success() 无参: data 为空
     # 去重
@@ -486,7 +655,7 @@ def infer_return_data(method_body, param_types):
         if t not in seen:
             seen.append(t)
             out.append(t)
-    return out
+    return out, hints
 
 
 def parse_file(path):
@@ -612,12 +781,18 @@ def parse_file(path):
         # 返回 data 类型推断（仅针对 JsonResult 统一返回体）
         is_json_result = ret_raw == "JsonResult" or ret_raw.startswith("JsonResult<")
         param_types = [(pp["name"], pp["type"]) for pp in params]
-        data_types = infer_return_data(body, param_types) if (body and is_json_result) else []
+        data_types, data_hints = infer_return_data(body, param_types) if (body and is_json_result) else ([], [])
+
+        # 源码无方法注释时, 依据路径 + 出入参自动推断功能说明（文档中以斜体标注, 与源码注释区分）
+        desc_inferred = False
+        if not desc:
+            desc = infer_desc(method, full, params, data_types)
+            desc_inferred = bool(desc)
 
         results.append({
-            "method": method, "path": full, "desc": desc,
+            "method": method, "path": full, "desc": desc, "desc_inferred": desc_inferred,
             "params": params, "ret": ret_raw, "is_json_result": is_json_result,
-            "data_types": data_types,
+            "data_types": data_types, "data_hints": data_hints,
         })
     return pkg, cls, api, results
 
@@ -694,11 +869,14 @@ def render_body_dto(body_type, extra_visited=None):
     return md
 
 
-def render_data_block(data_types):
+def render_data_block(data_types, hints=None):
     """渲染出参 data 说明（递归展开字段）"""
     chunks = []
     if not data_types:
-        chunks.append("data 类型：`Object`（未能静态推断，以接口实际返回为准）")
+        if hints:
+            chunks.append("data 类型：`Object`（未能静态推断，源码返回表达式：`%s`，以接口实际返回为准）" % hints[0])
+        else:
+            chunks.append("data 类型：`Object`（未能静态推断，以接口实际返回为准）")
         return "\n".join(chunks)
     # 同一方法既有空返回(JsonResult.success() 早退)又有真实数据分支时, 只保留真实类型说明, 避免"data 类型: 无"冗余
     real = [d for d in data_types if d != "<none>"]
@@ -731,7 +909,10 @@ def render_data_block(data_types):
 def render_interface(idx, itf):
     lines = []
     lines.append("#### %d. %s `%s`\n" % (idx, itf["method"], itf["path"]))
-    lines.append("**功能说明**：%s\n" % (itf["desc"] or "—"))
+    desc_txt = itf["desc"] or "—"
+    if itf.get("desc_inferred"):
+        desc_txt = "*%s*（自动推断）" % desc_txt
+    lines.append("**功能说明**：%s\n" % desc_txt)
 
     # 入参
     if itf["params"]:
@@ -773,11 +954,44 @@ def render_interface(idx, itf):
         else:
             lines.append("| data | `Object` | 返回数据（类型见下） |")
         lines.append("")
-        lines.append(render_data_block(itf["data_types"]))
+        lines.append(render_data_block(itf["data_types"], itf.get("data_hints")))
     else:
         lines.append("**出参**：`%s`（非统一返回体，直接返回该类型数据）" % itf["ret"])
     lines.append("")
     return "\n".join(lines)
+
+
+# ============================================================
+# 金额字段变更记录（破坏性变更提示, 供接入方同步；稳定后可清空）
+# ============================================================
+AMOUNT_MIGRATION = [
+    ("2026-09-16", "/order/orderbusiness/list", "GET",
+     "orderFee、receivedFee、busFee、serviceFee、otherFee", "分 → 元"),
+    ("2026-09-16", "/admin/orderbusiness/list", "GET",
+     "orderFee、receivedFee、busFee、serviceFee、otherFee", "分 → 元"),
+    ("2026-09-16", "/admin/order/list", "GET", "payFee、refundFee", "分 → 元"),
+    ("2026-09-16", "/order/group/order/refund/recodes", "GET", "refundFee",
+     "原固定返回 `null`，现按「分 → 元」返回"),
+    ("2026-09-16", "/order/leader/myMember/list", "POST", "consumeAmount",
+     "`String` → `Double`（元）"),
+    ("2026-09-16", "/order/leader/myMember/detail", "GET", "consumeAmount、refundAmount",
+     "`String` → `Double`（元）"),
+]
+
+
+def render_amount_migration():
+    """渲染金额字段变更记录（字段名不变、数值语义变化, 需接入方同步）"""
+    if not AMOUNT_MIGRATION:
+        return ""
+    parts = ["## 金额字段变更记录\n"]
+    parts.append("> 接口金额字段已统一为「元」（`Double`）。下表为历史调整项：字段名保持不变，"
+                 "但数值语义或类型可能变化（如原「分」现值「元」，相差 100 倍），接入方需同步调整解析逻辑。\n")
+    parts.append("| 日期 | 接口 | 方式 | 受影响字段 | 变更 |")
+    parts.append("| --- | --- | --- | --- | --- |")
+    for date, path, method, fields, note in AMOUNT_MIGRATION:
+        parts.append("| %s | `%s` | %s | %s | %s |" % (date, path, method, fields, note))
+    parts.append("")
+    return "\n".join(parts)
 
 
 # ============================================================
@@ -868,6 +1082,8 @@ def render_readme_params(itf):
 def render_readme_api_section(module_datas):
     """生成 README 8.2 接口清单（按 Controller 分组）"""
     parts = ["### 8.2 接口清单\n"]
+    parts.append("> 功能说明优先取源码方法注释；*斜体* 为脚本依据路径与出入参自动推断（仅供参考），"
+                 "字段级说明见 [`API接口文档.md`](API接口文档.md)。\n")
     for n, (mod, label, total, ctrl_summary) in enumerate(module_datas, 1):
         parts.append("#### 8.2.%d %s（%s）— %d 个接口\n" % (n, mod, label, total))
         for cls, pkg, res in ctrl_summary:
@@ -876,6 +1092,8 @@ def render_readme_api_section(module_datas):
             parts.append("| --- | --- | --- | --- | --- |")
             for i, itf in enumerate(res, 1):
                 desc = (itf["desc"] or "—").strip().replace("|", "\\|") or "—"
+                if itf.get("desc_inferred"):
+                    desc = "*%s*" % desc
                 parts.append("| %d | %s | `%s` | %s | %s |"
                               % (i, itf["method"], itf["path"], desc, render_readme_params(itf)))
             parts.append("")
@@ -919,6 +1137,11 @@ def main():
     lines.append("> 参数约定：Query/Header 参数「必填」默认「是」（`@RequestParam` 默认必填，标注 `required=false` 则为「否」）；Body 请求对象各字段的「必填」取自字段校验注解（`@NotNull` 等），未注解时以实际逻辑为准\n")
     lines.append("> 分页约定：列表类接口一般通过 `page`（页码，从 1 开始）/ `pageSize`（每页条数）分页，配套 `count` 接口获取总数\n")
     lines.append("> 统一出参：所有接口返回 `JsonResult`（`code` 状态码 / `msg` 提示信息 / `data` 业务数据），`data` 字段说明见各接口；嵌套对象字段以 `→` 前缀递进展开\n")
+    lines.append("> 金额约定：接口返回的金额字段统一为 `Double`，单位「元」（最多 2 位小数）；字段名含 `fee` / `amount` / `price` / `money` / `balance` 的均为金额。数据库实体（`model` 包）内部仍以「分」存储，由 Response 层经 `MoneyUtil.centToYuan` 转换后返回，接口不暴露「分」\n")
+    lines.append("> 功能说明：优先取源码方法注释；源码无注释时由脚本依据路径、入参与出参自动推断（表格中显示为 *斜体*，仅供参考）；入参「位置」为 Query 参数 / Body（`@RequestBody` 对象）/ 请求头\n")
+
+    # 金额字段变更记录（破坏性变更提示, 由 AMOUNT_MIGRATION 维护）
+    lines.append(render_amount_migration())
 
     # 近期变更（从 git log 自动提取, 仅做接口变更追踪参考, 不替代人工 commit message）
     lines.append(render_recent_changes(collect_recent_changes()))
@@ -948,12 +1171,17 @@ def main():
                 blocks.append(render_interface(i, itf))
                 idx_global += 1
                 desc = (itf["desc"] or "—").strip().replace("|", "\\|") or "—"
-                index_rows.append("| %d | %s | %s | `%s` | %s |"
-                                  % (idx_global, mod.replace("gb-group-", ""), itf["method"], itf["path"], desc))
+                if itf.get("desc_inferred"):
+                    desc = "*%s*" % desc
+                anchor = slugify("%d. %s %s" % (idx_global, itf["method"], itf["path"]))
+                index_rows.append("| [%d](#%s) | %s | %s | `%s` | %s |"
+                                  % (idx_global, anchor, mod.replace("gb-group-", ""),
+                                     itf["method"], itf["path"], desc))
         if total:
             order += 1
             module_datas.append((mod, label, total, ctrl_summary))
-            toc.append("%d. **%s**（%s）— %d 个接口" % (order, mod, label, total))
+            toc.append("%d. [**%s**（%s）](#%s) — %d 个接口"
+                       % (order, mod, label, slugify("%d. %s（%s）" % (order, mod, label)), total))
             sections.append("\n## %d. %s（%s）\n" % (order, mod, label))
             sections.extend(blocks)
 

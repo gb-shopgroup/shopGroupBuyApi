@@ -1,6 +1,7 @@
 package cn.com.shopgroup.controller;
 
 import cn.com.shopgroup.common.utils.JsonResult;
+import cn.com.shopgroup.order.http.response.OrderInfoResponse;
 import cn.com.shopgroup.order.model.GbOrderInfo;
 import cn.com.shopgroup.order.service.GbOrderInfoService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,7 +28,8 @@ public class AdminOrderController {
 
         // 查询数据
         List<GbOrderInfo> result = service.getAdminOrderList(page, pageSize);
-        return JsonResult.success(result);
+        List<OrderInfoResponse> data = OrderInfoResponse.getResponseList(result);
+        return JsonResult.success(data);
     }
 
     // 查询订单总数

@@ -23,6 +23,11 @@ public interface GbOrderInfoService {
 
     Long getMiniOrderSalesCount(Long groupId);
 
+    /**
+     * 统计某团购活动的跟团人数（已支付、未取消、未退款的去重用户数）
+     */
+    Integer countGroupMemberNum(Long groupId);
+
     Long addMiniOrder(GbOrderInfo orderInfo, List<GbOrderGoodsInfo> goodsInfoList);
 
     List<GbOrderInfo> getMiniOrderList(Long memberId, Long leaderId, Integer page, Integer pageSize);

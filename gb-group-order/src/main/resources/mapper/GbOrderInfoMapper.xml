@@ -223,4 +223,14 @@
           AND o.add_time BETWEEN #{startTime} AND #{endTime}
     </select>
 
+    <!-- 用户端-统计某团购活动的跟团人数(未取消的去重用户数) -->
+    <select id="countGroupMemberNum" resultType="java.lang.Integer">
+        SELECT COUNT(DISTINCT member_id)
+        FROM gb_order_info
+        WHERE group_id = #{groupId}
+          AND pay_time &gt; 0
+          AND status &lt;&gt; 6
+          AND member_id &gt; 0
+    </select>
+
 </mapper>

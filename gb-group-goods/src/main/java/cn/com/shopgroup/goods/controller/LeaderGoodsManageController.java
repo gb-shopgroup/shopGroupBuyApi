@@ -192,7 +192,7 @@ public class LeaderGoodsManageController {
         // 限购
         data.setIsLimit(request.getIsLimit());
         data.setLimitNum(request.getLimitNum());
-        data.setGoodsUnit(request.getUnit());
+        data.setGoodsUnit(Optional.ofNullable(request.getUnit()).orElse(""));
         // 商品介绍
         data.setGoodsInfo(request.getGoodsInfo());
 
@@ -244,7 +244,7 @@ public class LeaderGoodsManageController {
         // 限购
         data.setIsLimit(request.getIsLimit());
         data.setLimitNum(request.getLimitNum());
-        data.setGoodsUnit(request.getUnit());
+        data.setGoodsUnit(Optional.ofNullable(request.getUnit()).orElse(""));
         // 商品介绍
         data.setGoodsInfo(request.getGoodsInfo());
 

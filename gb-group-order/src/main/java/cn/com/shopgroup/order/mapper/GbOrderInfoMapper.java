@@ -362,4 +362,9 @@ public interface GbOrderInfoMapper extends BaseMapper<GbOrderInfo> {
     Integer getLeaderBillGoodsCount(@Param("leaderId") Long leaderId,
                                     @Param("startTime") int startTime,
                                     @Param("endTime") int endTime);
+
+    /**
+     * 用户端-统计某团购活动的跟团人数 未取消的去重用户数
+     */
+    Integer countGroupMemberNum(@Param("groupId") Long groupId);
 }

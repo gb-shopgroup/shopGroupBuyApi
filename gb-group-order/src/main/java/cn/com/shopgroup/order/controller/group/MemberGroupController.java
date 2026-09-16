@@ -206,9 +206,8 @@ public class MemberGroupController {
         // 使用缓存
         GroupActivityResponse cacheData = redisHelper.getCacheObject(key);
 
-        // 订单销售数量
+        // 订单销售数量（跟团人次 = 实际支付订单数 + 虚拟订单数）
         cacheData.setNum(this.getRedisOrderTotal(groupId, cacheData.getNum2()));
-
         // 服务端自动埋点: 记录用户"查看"团购(未登录/防抖命中会忽略, 不影响主流程)
         this.recordViewQuietly(groupId);
 

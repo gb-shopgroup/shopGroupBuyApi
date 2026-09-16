@@ -30,7 +30,7 @@ public class LeaderMemberListResponse {
     private String lastActionDesc;
 
     @ApiModelProperty("消费总额，单位元")
-    private String consumeAmount;
+    private Double consumeAmount;
 
     @ApiModelProperty("跟团次数")
     private Integer orderCount;
@@ -42,7 +42,7 @@ public class LeaderMemberListResponse {
     }
 
     public LeaderMemberListResponse(Long memberId, String mobile, String nickname, String avatar,
-                                    String lastTimeDesc, String lastActionDesc, String consumeAmount,
+                                    String lastTimeDesc, String lastActionDesc, Double consumeAmount,
                                     Integer orderCount, Integer viewCount) {
         this.memberId = memberId;
         this.mobile = mobile;
