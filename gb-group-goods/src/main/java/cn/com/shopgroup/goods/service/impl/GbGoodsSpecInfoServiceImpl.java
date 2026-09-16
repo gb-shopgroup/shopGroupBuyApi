@@ -283,7 +283,7 @@ public class GbGoodsSpecInfoServiceImpl implements GbGoodsSpecInfoService {
         valWrapper.select(GbGoodsSpecValue::getGoodsId, GbGoodsSpecValue::getSpecId,
                 GbGoodsSpecValue::getValId, GbGoodsSpecValue::getSpecVal);
         valWrapper.in(GbGoodsSpecValue::getGoodsId, goodsIds);
-        valWrapper.eq(GbGoodsSpecValue::getIsClose, 0);
+        //valWrapper.eq(GbGoodsSpecValue::getIsClose, 0);
         valWrapper.orderByAsc(GbGoodsSpecValue::getValId);
         List<GbGoodsSpecValue> valList = valueMapper.selectList(valWrapper);
         if (CollectionUtils.isEmpty(valList)) {
@@ -298,7 +298,7 @@ public class GbGoodsSpecInfoServiceImpl implements GbGoodsSpecInfoService {
         LambdaQueryWrapper<GbGoodsSpecInfo> specWrapper = Wrappers.lambdaQuery();
         specWrapper.select(GbGoodsSpecInfo::getSpecId, GbGoodsSpecInfo::getSpecName);
         specWrapper.in(GbGoodsSpecInfo::getSpecId, specIdSet);
-        specWrapper.eq(GbGoodsSpecInfo::getIsClose, 0);
+        //specWrapper.eq(GbGoodsSpecInfo::getIsClose, 0);
         specWrapper.orderByAsc(GbGoodsSpecInfo::getSpecId);
         List<GbGoodsSpecInfo> specList = mapper.selectList(specWrapper);
         if (CollectionUtils.isEmpty(specList)) {

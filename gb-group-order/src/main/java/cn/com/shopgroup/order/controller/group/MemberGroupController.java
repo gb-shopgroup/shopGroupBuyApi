@@ -178,8 +178,8 @@ public class MemberGroupController {
         if (groupIds.isEmpty()) {
             return;
         }
-        // 批量查询商品后按团购id回填
-        Map<Long, List<GroupActGoodsResponse>> goodsMap = groupActivityInfoService.getGroupGoodsResponseMap(groupIds);
+        // 批量查询商品后按团购id回填(C端仅展示在线商品, 已下线商品不返回)
+        Map<Long, List<GroupActGoodsResponse>> goodsMap = groupActivityInfoService.getGroupGoodsResponseMap(groupIds, true);
         for (MemberHomeGroupActResponse item : data) {
             List<GroupActGoodsResponse> goodsList = goodsMap.get(item.getId());
             item.setGoods(goodsList == null ? new ArrayList<>() : goodsList);

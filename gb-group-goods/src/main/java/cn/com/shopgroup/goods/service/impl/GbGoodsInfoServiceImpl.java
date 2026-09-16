@@ -65,6 +65,18 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
     }
 
 
+    // 批量查询商品信息, 不过滤上下架状态(团长端查询商品需展示全部状态, 含已下线商品)
+    public List<GbGoodsInfo> getGoodsInfoListWithAllStatus(List<Long> goodsIds) {
+        if (CollectionUtils.isEmpty(goodsIds)) {
+            return new ArrayList<>();
+        }
+        LambdaQueryWrapper<GbGoodsInfo> queryWrapper = Wrappers.lambdaQuery();
+        queryWrapper.in(GbGoodsInfo::getGoodsId, goodsIds);
+        List<GbGoodsInfo> results = mapper.selectList(queryWrapper);
+        return results == null ? new ArrayList<>() : results;
+    }
+
+
     public List<GbGoodsInfo> getGoodsStockList(List<Long> goodsIds) {
 
         LambdaQueryWrapper<GbGoodsInfo> queryWrapper = Wrappers.lambdaQuery();
@@ -156,7 +168,7 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
             queryWrapper.like(GbGoodsInfo::getGoodsName, keyword.trim());
         }
         queryWrapper.eq(GbGoodsInfo::getLeaderId, leaderId);
-        queryWrapper.eq(GbGoodsInfo::getIsClose, (byte) 0);
+        //queryWrapper.eq(GbGoodsInfo::getIsClose, (byte) 0);
         queryWrapper.orderByDesc(GbGoodsInfo::getGoodsId);
         queryWrapper.last("limit " + (page - 1) * pageSize + "," + pageSize);
         List<GbGoodsInfo> result = mapper.selectList(queryWrapper);
@@ -170,7 +182,7 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
         if (catId != null && catId > 0) {
             queryWrapper.eq(GbGoodsInfo::getCatId, catId);
         }
-        queryWrapper.eq(GbGoodsInfo::getIsClose, (byte) 0);
+        //queryWrapper.eq(GbGoodsInfo::getIsClose, (byte) 0);
         if (keyword != null && keyword.trim().length() > 0) {
             queryWrapper.like(GbGoodsInfo::getGoodsName, keyword.trim());
         }

@@ -50,13 +50,14 @@ public class OrderGoodsReponse {
         // 输出订单冗余的SKU结构化字段
         this.skuId = goods.getSkuId();
         this.skuIds = goods.getSkuIds();
-        if(goods.getGoodsType() == 1){
-            // 普通商品
-            this.goodsInfo = goods.getSkuNames();
-        }else{
-            // 称重商品
-            this.goodsInfo = goods.getPackName();
-        }
+        this.goodsInfo = goods.getSkuNames();
+//        if(goods.getGoodsType() == 1){
+//            // 普通商品
+//            this.goodsInfo = goods.getSkuNames();
+//        }else{
+//            // 称重商品
+//            this.goodsInfo = goods.getPackName();
+//        }
     }
 
     // 列表转换

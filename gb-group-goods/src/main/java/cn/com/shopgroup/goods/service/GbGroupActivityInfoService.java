@@ -53,11 +53,19 @@ public interface GbGroupActivityInfoService {
                                                          String groupName,Long catId,int page, int pageSize);
 
     /**
-     * 批量查询多个团购活动的商品列表(价格取团购商品表冗余的团购价, 库存/单位取自商品表), 按团购id分组返回
+     * 批量查询多个团购活动的商品列表(价格取团购商品表冗余的团购价, 库存/单位取自商品表), 按团购id分组返回,
      * 一次批量查询完成, 避免团购列表在循环内做 N+1 查询
      *
-     * @param groupIds 团购id集合
+     * @param groupIds        团购id集合
+     * @param onlineGoodsOnly true=仅返回在线商品(is_close=0, C端用户查询活动列表/详情使用);
+     *                        false=返回全部状态商品(团长端查询使用)
      * @return key=团购id, value=该团购的商品列表(无商品的团购不会出现在map中)
      */
-    Map<Long, List<GroupActGoodsResponse>> getGroupGoodsResponseMap(List<Long> groupIds);
+    Map<Long, List<GroupActGoodsResponse>> getGroupGoodsResponseMap(List<Long> groupIds, boolean onlineGoodsOnly);
+
+
+    /**
+     * 查询商品参与的所有团购活动id(不过滤活动/商品状态), 用于商品上下架后清缓存等场景
+     */
+    List<Long> getGroupIdsByGoodsId(Long goodsId);
 }

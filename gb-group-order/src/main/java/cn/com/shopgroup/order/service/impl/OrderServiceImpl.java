@@ -246,10 +246,17 @@ public class OrderServiceImpl implements OrderService {
             if (packNum == 0) packNum = 1;
             orderGoodsInfo.setPackNum(packNum); // 不使用用户提交的
             orderGoodsInfo.setPackName(item.getPackName());
-            // 规格和sku信息
+            // 规格和sku信息: 优先使用后端查询到的SKU规格名称落库(前端可能未提交skunames, 避免订单商品规格名称落空), 前端提交值兜底
             orderGoodsInfo.setSkuId(item.getSkuId());
             orderGoodsInfo.setSkuIds(item.getSkuids());
-            orderGoodsInfo.setSkuNames(item.getSkunames());
+            if (skuId > 0 && !ObjectUtils.isEmpty(skuInfo) && skuInfo.getSkuNames() != null && skuInfo.getSkuNames().length() > 0) {
+                orderGoodsInfo.setSkuNames(skuInfo.getSkuNames());
+                if (orderGoodsInfo.getSkuIds() == null || orderGoodsInfo.getSkuIds().length() == 0) {
+                    orderGoodsInfo.setSkuIds(skuInfo.getSkuIds());
+                }
+            } else {
+                orderGoodsInfo.setSkuNames(item.getSkunames());
+            }
             // 添加订单商品列表中
             orderGoodsInfoList.add(orderGoodsInfo);
         }

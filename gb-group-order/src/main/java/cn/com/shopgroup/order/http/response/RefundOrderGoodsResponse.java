@@ -49,10 +49,11 @@ public class RefundOrderGoodsResponse {
         this.skuId = goods.getSkuId();
         this.skuIds = goods.getSkuIds();
         // 商品介绍: 普通商品输出规格名称, 称重商品输出包装名称
-        if (goods.getGoodsType() != null && goods.getGoodsType() == 1) {
-            this.goodsInfo = goods.getSkuNames();
-        } else {
-            this.goodsInfo = goods.getPackName();
-        }
+        this.goodsInfo = goods.getSkuNames();
+//        if (goods.getGoodsType() != null && goods.getGoodsType() == 1) {
+//            this.goodsInfo = goods.getSkuNames();
+//        } else {
+//            this.goodsInfo = goods.getPackName();
+//        }
     }
 }

@@ -1,5 +1,7 @@
 package cn.com.shopgroup.goods.controller;
 
+import cn.com.shopgroup.common.cache.RedisConstant;
+import cn.com.shopgroup.common.cache.RedisHelper;
 import cn.com.shopgroup.common.exception.BusinessException;
 import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.TimeUtils;
@@ -73,6 +75,9 @@ public class LeaderGoodsManageController {
     @Resource
     private GbGroupActivityInfoService groupActivityInfoService;
 
+    @Resource
+    private RedisHelper redisHelper;
+
     /******************************************************************************************/
 
     // 商品分类列表
@@ -88,6 +93,7 @@ public class LeaderGoodsManageController {
     // 查询所有审核通过且未关闭的商品, 添加团购时使用
     @GetMapping("/leader/goods/online")
     public JsonResult online() {
+        log.info("添加团购-查询团长在线的商品");
         Long leaderId = getLeaderId();
         List<GbGoodsInfo> result = goodsService.getMiniLeaderOnlineGoodsList(leaderId);
         List<LeaderGoodsResponse> data = LeaderGoodsResponse.getGoodsResponseList(result);
@@ -285,13 +291,21 @@ public class LeaderGoodsManageController {
         if (ObjectUtils.isEmpty(goodsInfo)) {
             throw new BusinessException(GoodsErrorCodeEnum.GOODS_NOT_EXIST);
         }
+        int status = goodsInfo.getIsClose().intValue();
         // 如果该商品正在团购中, 则不允许操作
         if (groupActivityInfoService.isGoodsGrouping(leaderId, goodsId)) {
-            throw new BusinessException(GoodsErrorCodeEnum.GOODS_GROUPING);
+            if (status == 1) {
+                throw new BusinessException(GoodsErrorCodeEnum.UNDER_LINE_NOT_ON);
+            }
         }
         // 切换上下架状态
-        int status = goodsInfo.getIsClose() == 0 ? 1 : 0;
+        status = goodsInfo.getIsClose() == 0 ? 1 : 0;
         goodsService.closeMiniLeaderGoodsInfo(leaderId, goodsId, status);
+        // 清除该商品参与活动的团购商品列表缓存(C端 /goods/group/goods/list 仅展示在线商品, 上下架后需立即失效)
+        List<Long> groupIds = groupActivityInfoService.getGroupIdsByGoodsId(goodsId);
+        for (Long groupId : groupIds) {
+            redisHelper.deleteObject(RedisConstant.RedisGroupGoodsListKey + groupId);
+        }
         return JsonResult.success();
     }
 

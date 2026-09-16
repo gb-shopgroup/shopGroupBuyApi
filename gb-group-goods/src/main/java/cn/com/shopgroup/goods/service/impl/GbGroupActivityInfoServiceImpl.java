@@ -86,7 +86,7 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
 
 
     @Override
-    public Map<Long, List<GroupActGoodsResponse>> getGroupGoodsResponseMap(List<Long> groupIds) {
+    public Map<Long, List<GroupActGoodsResponse>> getGroupGoodsResponseMap(List<Long> groupIds, boolean onlineGoodsOnly) {
 
         Map<Long, List<GroupActGoodsResponse>> result = new HashMap<>();
         if (groupIds == null || groupIds.isEmpty()) {
@@ -101,6 +101,7 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
             return result;
         }
         // 2. 批量查询商品表, 补充库存/单位
+        //    C端(onlineGoodsOnly=true)仅查在线商品; 团长端查全部状态商品(含已下线)
         Set<Long> goodsIdSet = new HashSet<>();
         for (GbGroupActivityGoods item : activityGoodsList) {
             if (item.getGoodsId() != null) {
@@ -108,22 +109,52 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
             }
         }
         Map<Long, GbGoodsInfo> goodsInfoMap = new HashMap<>();
-        List<GbGoodsInfo> goodsInfoList = goodsInfoService.getGoodsInfoList(new ArrayList<>(goodsIdSet));
+        List<GbGoodsInfo> goodsInfoList = onlineGoodsOnly
+                ? goodsInfoService.getGoodsInfoList(new ArrayList<>(goodsIdSet))
+                : goodsInfoService.getGoodsInfoListWithAllStatus(new ArrayList<>(goodsIdSet));
         if (goodsInfoList != null) {
             for (GbGoodsInfo item : goodsInfoList) {
                 goodsInfoMap.put(item.getGoodsId(), item);
             }
         }
         // 3. 按团购id分组组装返回
+        //    C端(onlineGoodsOnly=true)时, 已下线/已删除的商品(商品表查不到)不展示
         for (GbGroupActivityGoods item : activityGoodsList) {
+            GbGoodsInfo goodsInfo = goodsInfoMap.get(item.getGoodsId());
+            if (onlineGoodsOnly && (goodsInfo == null || goodsInfo.getIsClose() == null
+                    || goodsInfo.getIsClose().intValue() != 0)) {
+                continue;
+            }
             List<GroupActGoodsResponse> goodsList = result.get(item.getGroupId());
             if (goodsList == null) {
                 goodsList = new ArrayList<>();
                 result.put(item.getGroupId(), goodsList);
             }
-            goodsList.add(new GroupActGoodsResponse(item, goodsInfoMap.get(item.getGoodsId())));
+            goodsList.add(new GroupActGoodsResponse(item, goodsInfo));
         }
         return result;
+    }
+
+
+    // 查询商品参与的所有团购活动id(不过滤活动/商品状态)
+    @Override
+    public List<Long> getGroupIdsByGoodsId(Long goodsId) {
+        if (goodsId == null || goodsId <= 0) {
+            return new ArrayList<>();
+        }
+        LambdaQueryWrapper<GbGroupActivityGoods> queryWrapper = Wrappers.lambdaQuery();
+        queryWrapper.select(GbGroupActivityGoods::getGroupId);
+        queryWrapper.eq(GbGroupActivityGoods::getGoodsId, goodsId);
+        List<GbGroupActivityGoods> list = goodsMapper.selectList(queryWrapper);
+        List<Long> groupIds = new ArrayList<>();
+        if (list != null) {
+            for (GbGroupActivityGoods item : list) {
+                if (item.getGroupId() != null && !groupIds.contains(item.getGroupId())) {
+                    groupIds.add(item.getGroupId());
+                }
+            }
+        }
+        return groupIds;
     }
 
 

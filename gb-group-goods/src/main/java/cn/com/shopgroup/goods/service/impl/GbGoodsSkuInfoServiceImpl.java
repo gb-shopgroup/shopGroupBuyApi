@@ -26,10 +26,22 @@ public class GbGoodsSkuInfoServiceImpl implements GbGoodsSkuInfoService {
     }
 
 
+    // 批量查询SKU信息(按skuId集合), 用于订单商品规格名称回填等场景
+    public List<GbGoodsSkuInfo> getGoodsSkuInfoList(List<Long> skuIds) {
+        if (CollectionUtils.isEmpty(skuIds)) {
+            return new ArrayList<>();
+        }
+        LambdaQueryWrapper<GbGoodsSkuInfo> queryWrapper = Wrappers.lambdaQuery();
+        queryWrapper.in(GbGoodsSkuInfo::getSkuId, skuIds);
+        List<GbGoodsSkuInfo> result = mapper.selectList(queryWrapper);
+        return result == null ? new ArrayList<>() : result;
+    }
+
+
     public List<GbGoodsSkuInfo> getMiniGoodsSkuList(Long goodsId) {
         LambdaQueryWrapper<GbGoodsSkuInfo> queryWrapper = Wrappers.lambdaQuery();
         // 查询全部字段, 保证前端能拿到 skuNames/skuImages/marketPrice 等完整SKU信息(后台自动生成SKU后展示依赖)
-        queryWrapper.eq(GbGoodsSkuInfo::getIsClose, 0);
+        //queryWrapper.eq(GbGoodsSkuInfo::getIsClose, 0);
         queryWrapper.eq(GbGoodsSkuInfo::getGoodsId, goodsId);
         List<GbGoodsSkuInfo> result = mapper.selectList(queryWrapper);
         return result == null ? new ArrayList<>() : result;

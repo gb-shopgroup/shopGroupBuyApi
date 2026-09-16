@@ -218,8 +218,8 @@ public class LeaderGroupManageController {
         if (groupIds.isEmpty()) {
             return;
         }
-        // 批量查询商品并按团购id回填
-        Map<Long, List<GroupActGoodsResponse>> goodsMap = activityInfoService.getGroupGoodsResponseMap(groupIds);
+        // 批量查询商品并按团购id回填(团长端展示全部状态商品, 含已下线)
+        Map<Long, List<GroupActGoodsResponse>> goodsMap = activityInfoService.getGroupGoodsResponseMap(groupIds, false);
         for (GroupActResponse item : data) {
             List<GroupActGoodsResponse> goodsList = goodsMap.get(item.getId());
             item.setGoods(goodsList == null ? new ArrayList<>() : goodsList);
@@ -310,6 +310,48 @@ public class LeaderGroupManageController {
         data.setTagName(tagName);
     }
 
+    /**
+     * 团购商品在线校验: 提交的团购商品必须为在线(is_close=0)商品, 已下架/已删除的商品不能加入团购
+     *
+     * @param goods         提交的团购商品列表
+     * @param existGoodsIds 允许保留的原团购商品id集合(编辑场景原商品即使已下线也允许保留); 添加场景传null(全部校验)
+     */
+    private void validateGroupGoodsOnline(List<GroupActGoodsRequest> goods, Set<Long> existGoodsIds) {
+        if (CollectionUtils.isEmpty(goods)) {
+            return;
+        }
+        // 待校验的商品id(去重, 排除编辑场景原团购已有的商品)
+        Set<Long> checkGoodsIds = new LinkedHashSet<>();
+        for (GroupActGoodsRequest item : goods) {
+            if (item.getGid() != null && item.getGid() > 0
+                    && (existGoodsIds == null || !existGoodsIds.contains(item.getGid()))) {
+                checkGoodsIds.add(item.getGid());
+            }
+        }
+        if (checkGoodsIds.isEmpty()) {
+            return;
+        }
+        // 批量查询在线商品(getGoodsInfoList 仅返回 is_close=0 的商品), 查不到的即已下架/已删除
+        List<GbGoodsInfo> onlineGoodsList = goodsService.getGoodsInfoList(new ArrayList<>(checkGoodsIds));
+        Set<Long> onlineGoodsIds = new HashSet<>();
+        for (GbGoodsInfo item : onlineGoodsList) {
+            onlineGoodsIds.add(item.getGoodsId());
+        }
+        // 收集不在线的商品名称(未传名称时展示商品id)
+        List<String> offlineNames = new ArrayList<>();
+        for (GroupActGoodsRequest item : goods) {
+            if (checkGoodsIds.contains(item.getGid()) && !onlineGoodsIds.contains(item.getGid())) {
+                String name = (item.getGname() == null || item.getGname().length() == 0)
+                        ? "商品id=" + item.getGid() : item.getGname();
+                offlineNames.add(name);
+            }
+        }
+        if (!offlineNames.isEmpty()) {
+            throw new BusinessException(GoodsErrorCodeEnum.GROUP_GOODS_OFFLINE.getCode(),
+                    GoodsErrorCodeEnum.GROUP_GOODS_OFFLINE.getMessage() + ": " + String.join("、", offlineNames));
+        }
+    }
+
     // 添加团购活动
     @PostMapping("/groupActivity/add")
     public JsonResult addGroup(@Validated @RequestBody GroupActRequest request) {
@@ -362,6 +404,8 @@ public class LeaderGroupManageController {
 //        if (pointId.intValue() == 0) {
 //            throw new BusinessException(GoodsErrorCodeEnum.PICKUP_POINT_REQUIRED);
 //        }
+        // 团购商品在线校验: 添加团购选择的商品必须为在线(is_close=0)商品
+        validateGroupGoodsOnline(request.getGoods(), null);
         // 团购商品信息兜底: 价格/名称/图片/类型未传时, 取商品表数据(一次批量查询, 避免循环内 N+1)
         fillGroupActGoodsInfo(request.getGoods());
         // 团购id,主键自增
@@ -485,12 +529,12 @@ public class LeaderGroupManageController {
         if (CollectionUtils.isEmpty(activityGoodsList)) {
             throw new BusinessException(GoodsErrorCodeEnum.GROUP_GOODS_NOT_EXIST);
         }
-        // 商品表数据(补充单位/库存), 一次批量查询
+        // 商品表数据(补充单位/库存), 一次批量查询(团长端展示全部状态商品, 不过滤上下架)
         List<Long> goodsIds = new ArrayList<>();
         for (GbGroupActivityGoods item : activityGoodsList) {
             goodsIds.add(item.getGoodsId());
         }
-        List<GbGoodsInfo> goodsList = goodsService.getGoodsInfoList(goodsIds);
+        List<GbGoodsInfo> goodsList = goodsService.getGoodsInfoListWithAllStatus(goodsIds);
         Map<Long, GbGoodsInfo> goodsMap = new HashMap<>();
         for (GbGoodsInfo item : goodsList) {
             goodsMap.put(item.getGoodsId(), item);
@@ -585,6 +629,13 @@ public class LeaderGroupManageController {
             throw new BusinessException(GoodsErrorCodeEnum.GROUP_GOODS_MISSING.getCode(),
                     GoodsErrorCodeEnum.GROUP_GOODS_MISSING.getMessage() + ": " + String.join("、", missingGoodsNames));
         }
+
+        // 团购商品在线校验: 编辑时新增的商品必须为在线(is_close=0)商品, 原团购已有的下线商品允许保留(不允许删除)
+        Set<Long> originGoodsIds = new HashSet<>();
+        for (GbGroupActivityGoods originGoods : originGoodsList) {
+            originGoodsIds.add(originGoods.getGoodsId());
+        }
+        validateGroupGoodsOnline(request.getGoods(), originGoodsIds);
 
         // 团购商品信息兜底: 价格/名称/图片/类型未传时, 取商品表数据(一次批量查询, 避免循环内 N+1)
         fillGroupActGoodsInfo(request.getGoods());

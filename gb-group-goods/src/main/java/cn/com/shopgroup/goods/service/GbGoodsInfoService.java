@@ -22,6 +22,12 @@ public interface GbGoodsInfoService {
     List<GbGoodsInfo> getGoodsInfoList(List<Long> goodsIds);
 
 
+    /**
+     * 按商品id批量查询商品信息(全字段, 不过滤上下架状态), 团长端查询商品需展示全部状态(含已下线)
+     */
+    List<GbGoodsInfo> getGoodsInfoListWithAllStatus(List<Long> goodsIds);
+
+
     List<GbGoodsInfo> getGoodsStockList(List<Long> goodsIds);
 
 

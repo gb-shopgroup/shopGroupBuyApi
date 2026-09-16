@@ -2,6 +2,8 @@ package cn.com.shopgroup.order.service.impl;
 
 import cn.com.shopgroup.common.utils.MoneyUtil;
 import cn.com.shopgroup.common.utils.TimeUtils;
+import cn.com.shopgroup.goods.model.GbGoodsSkuInfo;
+import cn.com.shopgroup.goods.service.GbGoodsSkuInfoService;
 import cn.com.shopgroup.order.constants.OrderStatusEnum;
 import cn.com.shopgroup.order.http.request.LeaderBillListRequest;
 import cn.com.shopgroup.order.http.response.GroupOrderRecordResponse;
@@ -21,6 +23,7 @@ import cn.com.shopgroup.order.model.GbOrderInfo;
 import cn.com.shopgroup.order.service.GbGroupViewLogService;
 import cn.com.shopgroup.order.service.GbOrderInfoService;
 import cn.com.shopgroup.user.service.GbOrgMessageInfoService;
+import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -68,6 +71,8 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
     private TransactionTemplate transactionTemplate;
     @Resource
     private GbOrgMessageInfoService orgMessageInfoService;
+    @Resource
+    private GbGoodsSkuInfoService goodsSkuInfoService;
 
 
     @Override
@@ -245,6 +250,8 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
         queryWrapper2.eq(GbOrderGoodsInfo::getOrderNo, orderNo);
         queryWrapper2.orderByAsc(GbOrderGoodsInfo::getId);
         List<GbOrderGoodsInfo> goodsList = goodsMapper.selectList(queryWrapper2);
+        // 回填历史订单缺失的规格名称
+        fillOrderGoodsSkuNames(goodsList);
 
         if (!CollectionUtils.isEmpty(goodsList)) {
             data.setGoodsInfoList(goodsList);
@@ -1046,6 +1053,43 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
         return 0;
     }
 
+    // 回填订单商品规格名称(sku_names): 历史订单下单时前端未提交skunames导致落库为空,
+    // 此处依据 sku_id 批量查询SKU表在内存中补齐(不回写数据库), 保证 OrderResponse.goods[].goodsInfo(规格名称)不为空
+    private void fillOrderGoodsSkuNames(List<GbOrderGoodsInfo> goodsList) {
+        if (CollectionUtils.isEmpty(goodsList)) {
+            return;
+        }
+        // 仅处理: 普通商品(goodsType=1) + 选择了规格(skuId>0) + 规格名称为空 的商品行
+        List<Long> skuIds = goodsList.stream()
+                .filter(goods -> goods.getGoodsType() != null && goods.getGoodsType() == 1)
+                .filter(goods -> goods.getSkuId() != null && goods.getSkuId() > 0)
+                .filter(goods -> StringUtils.isEmpty(goods.getSkuNames()))
+                .map(GbOrderGoodsInfo::getSkuId)
+                .distinct()
+                .collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(skuIds)) {
+            return;
+        }
+        List<GbGoodsSkuInfo> skuList = goodsSkuInfoService.getGoodsSkuInfoList(skuIds);
+        if (CollectionUtils.isEmpty(skuList)) {
+            return;
+        }
+        Map<Long, String> skuNameMap = skuList.stream()
+                .filter(sku -> sku.getSkuNames() != null && sku.getSkuNames().length() > 0)
+                .collect(Collectors.toMap(GbGoodsSkuInfo::getSkuId, GbGoodsSkuInfo::getSkuNames, (a, b) -> a));
+        if (skuNameMap.isEmpty()) {
+            return;
+        }
+        for (GbOrderGoodsInfo goods : goodsList) {
+            if (goods.getGoodsType() != null && goods.getGoodsType() == 1
+                    && goods.getSkuId() != null && goods.getSkuId() > 0
+                    && StringUtils.isEmpty(goods.getSkuNames())
+                    && skuNameMap.containsKey(goods.getSkuId())) {
+                goods.setSkuNames(skuNameMap.get(goods.getSkuId()));
+            }
+        }
+    }
+
     //用户订单列表查询
     @Override
     public List<GbOrderInfo> getMemberOrderList(Long memberId, Integer status, String goodsName, int page, int pageSize) {
@@ -1095,6 +1139,8 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
         queryWrapper2.in(GbOrderGoodsInfo::getOrderNo, orderNos);
         queryWrapper2.orderByDesc(GbOrderGoodsInfo::getId);
         List<GbOrderGoodsInfo> goodsList = goodsMapper.selectList(queryWrapper2);
+        // 回填历史订单缺失的规格名称
+        fillOrderGoodsSkuNames(goodsList);
 
         Map<String, List<GbOrderGoodsInfo>> goodsMap = new HashMap<>();
         if (!CollectionUtils.isEmpty(goodsList)) {
@@ -1174,6 +1220,8 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
         if (CollectionUtils.isEmpty(goodsList)) {
             return new ArrayList<>();
         }
+        // 回填历史订单缺失的规格名称
+        fillOrderGoodsSkuNames(goodsList);
         Map<String, List<GbOrderGoodsInfo>> goodsMap = new HashMap<>();
         for (GbOrderGoodsInfo item : goodsList) {
             String orderNo = item.getOrderNo();
@@ -1670,7 +1718,9 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
         // pointId 有值时按提货点过滤
         LambdaQueryWrapper<GbOrderInfo> queryWrapper = Wrappers.lambdaQuery();
         queryWrapper.eq(GbOrderInfo::getLeaderId, leaderId);
-        queryWrapper.eq(GbOrderInfo::getGroupId, groupId);
+        if (groupId != null && groupId > 0) {
+            queryWrapper.eq(GbOrderInfo::getGroupId, groupId);
+        }
         queryWrapper.ne(GbOrderInfo::getStatus, OrderStatusEnum.CANCELED.getCode());
         if (pointId != null && pointId > 0) {
             queryWrapper.eq(GbOrderInfo::getPointId, pointId);
@@ -1698,7 +1748,7 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
             return null;
         }
         // 2. 查询该订单的商品明细
-        List<GbOrderGoodsInfo> goodsList = getOrderGoodsList(orderNo);
+        List<GbOrderGoodsInfo> goodsList = orderInfo.getGoodsInfoList();
         if (CollectionUtils.isEmpty(goodsList)) {
             return null;
         }
@@ -1716,8 +1766,6 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
             int receiptNum = goods.getReceiptNum() == null ? 0 : goods.getReceiptNum();
             //退货退款数（退已收货数）
             int refundedGoodNum = goods.getRefundGoodsNum() == null ? 0 : goods.getRefundGoodsNum();
-            //退款数（退支付待收货）
-            int refundedNum = goods.getRefundNum() == null ? 0 : goods.getRefundNum();
             int canRefundNum = 0;
             if (isReturnGoods == 2) {
                 // 退货退款: 只查询"已经收货"的商品(收货数量>0), 已收货但未退部分可退
@@ -1727,7 +1775,7 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
             }
             if (isReturnGoods == 1) {
                 // 退款: 只查询"待收货(尚未收货)"的商品(收货数量<购买数量), 待收货未退部分可退
-                int m = goodsNum - receiptNum - refundedNum;
+                int m = goodsNum - receiptNum;
                 if (m > 0) {
                     canRefundNum = m;
                 }

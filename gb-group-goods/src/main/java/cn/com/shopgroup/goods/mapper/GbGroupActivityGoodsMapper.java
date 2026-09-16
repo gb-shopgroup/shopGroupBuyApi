@@ -15,7 +15,8 @@ import java.util.List;
 public interface GbGroupActivityGoodsMapper extends BaseMapper<GbGroupActivityGoods> {
 
 
-    @Select("SELECT g.* FROM `gb_group_activity_goods` AS a JOIN `gb_goods_info` AS g ON g.`goods_id` = a.`goods_id` WHERE a.`group_id` = #{groupId} ")
+    // C端团购商品列表: 仅返回在线(is_close=0)商品, 已下线商品不展示
+    @Select("SELECT g.* FROM `gb_group_activity_goods` AS a JOIN `gb_goods_info` AS g ON g.`goods_id` = a.`goods_id` WHERE a.`group_id` = #{groupId} AND g.`is_close` = 0 ")
     List<GbGoodsInfo> getGroupGoodsList(Long groupId);
 
 

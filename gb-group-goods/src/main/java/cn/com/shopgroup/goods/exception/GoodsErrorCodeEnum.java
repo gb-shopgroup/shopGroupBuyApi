@@ -96,6 +96,10 @@ public enum GoodsErrorCodeEnum implements IErrorCode {
      * 编辑团购时, 原团购中的商品被删除
      */
     GROUP_GOODS_MISSING(300218, "修改失败, 原团购商品缺失, 只允许新增商品"),
+    //下线的商品不能再添加到在线活动中
+    UNDER_LINE_NOT_ON(300219, "在活动中下线过的商品不能再上线，如需要请重新添加商品"),
+    //已下架的商品不能添加到团购
+    GROUP_GOODS_OFFLINE(300220, "已下架的商品不能添加到团购"),
     ;
 
     /**

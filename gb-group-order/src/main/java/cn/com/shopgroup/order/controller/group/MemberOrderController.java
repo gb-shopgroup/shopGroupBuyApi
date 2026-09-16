@@ -122,6 +122,7 @@ public class MemberOrderController {
             return JsonResult.success();
         }
         List<OrderResponse> data = OrderResponse.getOrderResponseList(list);
+        log.info("用户端查询订单列表接口返回data:{}", JSON.toJSONString(data));
         return JsonResult.success(data);
     }
 
@@ -636,6 +637,7 @@ public class MemberOrderController {
 
         // 查询订单信息
         RefundOrderInfoResponse result = orderInfoService.getApplyRefundOrderInfo(memberId, request.getOrderNo(), request.getRefundFlag());
+        log.info("用户点击申请退货后查询订单信息返回result:{}", JSON.toJSONString(result));
         return JsonResult.success(result);
     }
 

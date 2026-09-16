@@ -9,6 +9,10 @@ public interface GbGoodsSkuInfoService {
    GbGoodsSkuInfo getGoodsSkuInfo(Long skuId);
 
 
+   // 批量查询SKU信息(按skuId集合), 用于订单商品规格名称回填等场景
+   List<GbGoodsSkuInfo> getGoodsSkuInfoList(List<Long> skuIds);
+
+
    List<GbGoodsSkuInfo> getMiniGoodsSkuList(Long goodsId);
 
 
