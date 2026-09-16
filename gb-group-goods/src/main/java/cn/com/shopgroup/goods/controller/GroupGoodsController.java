@@ -13,6 +13,7 @@ import cn.com.shopgroup.goods.service.GbGoodsPackageInfoService;
 import cn.com.shopgroup.goods.service.GbGoodsSkuInfoService;
 import cn.com.shopgroup.goods.service.GbGoodsSpecInfoService;
 import cn.com.shopgroup.goods.service.GbGroupActivityInfoService;
+import com.alibaba.fastjson2.JSON;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -89,7 +90,7 @@ public class GroupGoodsController {
 
         // 从缓存里面读取
         List<GroupGoodsResponse> responsesList = redisHelper.getCacheObject(key);
-
+        log.info("goods/group/goods/list responsesList:{}", JSON.toJSONString(responsesList));
         // 返回数据
         return JsonResult.success(responsesList);
     }

@@ -70,7 +70,8 @@ spring:
     port: 6379
     #username: xxxxxxxxxxx
     password: 3oq923T89#$o24sed
-    database: 2
+    # 模块db分配: user=2, goods=3, order/task=4(task消费order的延迟队列, 须与order同库)
+    database: 4
     lettuce:
       pool:
         # 连接池最小空闲连接数（默认0）

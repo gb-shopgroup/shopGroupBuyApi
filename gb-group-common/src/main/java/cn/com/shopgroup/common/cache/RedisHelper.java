@@ -1,15 +1,23 @@
 package cn.com.shopgroup.common.cache;
 
+import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
+import org.springframework.data.redis.connection.RedisPassword;
+import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.ListOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.data.redis.core.ZSetOperations;
+import org.springframework.data.redis.serializer.StringRedisSerializer;
 import org.springframework.stereotype.Component;
 
+import javax.annotation.PreDestroy;
 import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 @Component
@@ -17,6 +25,13 @@ public class RedisHelper {
 
     @Resource
     public RedisTemplate redisTemplate;
+
+    // 本模块的Redis连接配置(spring.redis), 构建跨库连接时复用host/port/password
+    @Resource
+    private RedisProperties redisProperties;
+
+    // 跨库RedisTemplate缓存: key=database编号, 跨模块缓存失效联动时懒加载构建, 一次构建长期复用
+    private final Map<Integer, RedisTemplate<Object, Object>> crossDbTemplates = new ConcurrentHashMap<>();
 
     // 缓存基本的对象，Integer、String、实体类等等
     public <T> void setCacheObject(String key, T value) {
@@ -43,6 +58,60 @@ public class RedisHelper {
     // 删除单个对象
     public boolean deleteObject(String key) {
         return redisTemplate.delete(key);
+    }
+
+    /**
+     * 跨库删除缓存key: 各模块分库使用Redis后, 跨模块的缓存失效联动通过本方法删除对方库中的缓存;
+     * 与本模块连接同一Redis实例(连接参数复用spring.redis配置), 仅database不同;
+     * 目标库恰为本模块当前库时, 退化为普通删除
+     *
+     * @param key      缓存key
+     * @param database 目标库编号(见 RedisDbConstant)
+     */
+    public boolean deleteObjectInDb(String key, int database) {
+        if (redisProperties.getDatabase() == database) {
+            return deleteObject(key);
+        }
+        RedisTemplate<Object, Object> template = crossDbTemplates.computeIfAbsent(database, this::buildCrossDbTemplate);
+        return Boolean.TRUE.equals(template.delete(key));
+    }
+
+    // 基于本模块Redis连接配置, 构建指向指定database的独立Lettuce连接与模板(懒加载构建一次, 之后缓存复用)
+    private RedisTemplate<Object, Object> buildCrossDbTemplate(int database) {
+        RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
+        config.setHostName(redisProperties.getHost());
+        config.setPort(redisProperties.getPort());
+        config.setDatabase(database);
+        String password = redisProperties.getPassword();
+        if (password != null && password.length() > 0) {
+            config.setPassword(RedisPassword.of(password));
+        }
+        LettuceConnectionFactory factory = new LettuceConnectionFactory(config);
+        factory.afterPropertiesSet();
+
+        // 序列化方式与主模板保持一致(key为String, value走FastJson2)
+        RedisTemplate<Object, Object> template = new RedisTemplate<>();
+        template.setConnectionFactory(factory);
+        StringRedisSerializer keySerializer = new StringRedisSerializer();
+        FastJson2JsonRedisSerializer valueSerializer = new FastJson2JsonRedisSerializer(Object.class);
+        template.setKeySerializer(keySerializer);
+        template.setValueSerializer(valueSerializer);
+        template.setHashKeySerializer(keySerializer);
+        template.setHashValueSerializer(valueSerializer);
+        template.afterPropertiesSet();
+        return template;
+    }
+
+    // 应用关闭时释放跨库连接工厂
+    @PreDestroy
+    public void destroyCrossDbTemplates() {
+        for (RedisTemplate<Object, Object> template : crossDbTemplates.values()) {
+            LettuceConnectionFactory factory = (LettuceConnectionFactory) template.getConnectionFactory();
+            if (factory != null) {
+                factory.destroy();
+            }
+        }
+        crossDbTemplates.clear();
     }
 
     // 设置有效时间及其时间单位

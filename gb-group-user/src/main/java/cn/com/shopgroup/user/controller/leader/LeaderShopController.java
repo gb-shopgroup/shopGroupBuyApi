@@ -1,6 +1,7 @@
 package cn.com.shopgroup.user.controller.leader;
 
 import cn.com.shopgroup.common.cache.RedisConstant;
+import cn.com.shopgroup.common.cache.RedisDbConstant;
 import cn.com.shopgroup.common.cache.RedisHelper;
 import cn.com.shopgroup.common.config.UploadConfig;
 import cn.com.shopgroup.common.exception.BusinessException;
@@ -127,9 +128,11 @@ public class LeaderShopController {
 
         // 返回
         if (flag) {
-            // 删除店铺缓存
+            // 删除店铺缓存(本模块库)
             String key = RedisConstant.RedisShopInfoKey + leaderId;
             redisHelper.deleteObject(key);
+            // 订单模块也缓存了店铺信息(团购分享页), 跨库删除保持缓存失效联动
+            redisHelper.deleteObjectInDb(key, RedisDbConstant.DB_ORDER);
             return JsonResult.success();
         } else {
             throw new BusinessException(UserErrorCodeEnum.UPDATE_FAILED);
@@ -156,9 +159,11 @@ public class LeaderShopController {
         boolean flag = shopInfoService.updateShopInfo(shopInfo);
         // 返回
         if (flag) {
-            // 删除店铺缓存
+            // 删除店铺缓存(本模块库)
             String key = RedisConstant.RedisShopInfoKey + leaderId;
             redisHelper.deleteObject(key);
+            // 订单模块也缓存了店铺信息(团购分享页), 跨库删除保持缓存失效联动
+            redisHelper.deleteObjectInDb(key, RedisDbConstant.DB_ORDER);
             return JsonResult.success();
         } else {
             throw new BusinessException(UserErrorCodeEnum.UPDATE_FAILED);
@@ -248,9 +253,11 @@ public class LeaderShopController {
         String url = domain + "/" + obsKey;
         shopInfo.setShopCodeUrl(url);
         shopInfoService.updateShopInfo(shopInfo);
-        // 删除店铺缓存
+        // 删除店铺缓存(本模块库)
         String key = RedisConstant.RedisShopInfoKey + leaderId;
         redisHelper.deleteObject(key);
+        // 订单模块也缓存了店铺信息(团购分享页), 跨库删除保持缓存失效联动
+        redisHelper.deleteObjectInDb(key, RedisDbConstant.DB_ORDER);
         // 返回访问路径
         return JsonResult.success("二维码生成成功", url);
     }

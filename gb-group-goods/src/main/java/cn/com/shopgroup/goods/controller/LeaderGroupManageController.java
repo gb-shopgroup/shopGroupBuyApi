@@ -1,6 +1,7 @@
 package cn.com.shopgroup.goods.controller;
 
 import cn.com.shopgroup.common.cache.RedisConstant;
+import cn.com.shopgroup.common.cache.RedisDbConstant;
 import cn.com.shopgroup.common.cache.RedisHelper;
 import cn.com.shopgroup.common.config.UploadConfig;
 import cn.com.shopgroup.common.exception.BusinessException;
@@ -657,10 +658,11 @@ public class LeaderGroupManageController {
         }
 
         // 清空团购缓存数据
+        // 该详情缓存在订单模块库(order, db4)中, 各模块分库后需跨库删除, 保持缓存失效联动
         String key = RedisConstant.RedisGroupInfoKey + groupId;
-        redisHelper.deleteObject(key);
+        redisHelper.deleteObjectInDb(key, RedisDbConstant.DB_ORDER);
 
-        // 清空团购商品缓存数据
+        // 清空团购商品缓存数据(本模块自己的缓存, 直接删除)
         String key2 = RedisConstant.RedisGroupGoodsListKey + groupId;
         redisHelper.deleteObject(key2);
 

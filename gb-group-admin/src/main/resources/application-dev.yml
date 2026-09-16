@@ -72,7 +72,8 @@ spring:
     port: 6379
     #username: xxxxxxxxxxx
     ###password: 12345678
-    database: 2
+    # 模块db分配: user=2, goods=3, order/task=4, admin=5
+    database: 5
 
 # 图片上传配置
 upload-config:
