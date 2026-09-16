@@ -15,6 +15,8 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -161,11 +163,58 @@ public class WxMiniProgramHelper {
     }
 
 
-    public static BufferedImage getMiniProgramPageERcodeBufferedImage(String accessToken, String page, String scene, int wh) {
+    /**
+     * 小程序码(getwxacodeunlimit)生成结果
+     * imageBytes非空表示成功; 否则errcode/errmsg为微信返回的失败原因
+     */
+    public static class WxQrCodeResult {
 
+        /** 成功时的小程序码图片字节, 失败时为null */
+        private final byte[] imageBytes;
+        /** 失败时微信返回的错误码 */
+        private final Integer errcode;
+        /** 失败时微信返回的错误信息 */
+        private final String errmsg;
+
+        public WxQrCodeResult(byte[] imageBytes, Integer errcode, String errmsg) {
+            this.imageBytes = imageBytes;
+            this.errcode = errcode;
+            this.errmsg = errmsg;
+        }
+
+        public boolean isOk() {
+            return imageBytes != null && imageBytes.length > 0;
+        }
+
+        /**
+         * 是否access_token失效(40001 invalid credential / 42001 expired)
+         * 可强刷token后重试
+         */
+        public boolean isTokenInvalid() {
+            return errcode != null && (errcode == 40001 || errcode == 42001);
+        }
+
+        public byte[] getImageBytes() {
+            return imageBytes;
+        }
+
+        public Integer getErrcode() {
+            return errcode;
+        }
+
+        public String getErrmsg() {
+            return errmsg;
+        }
+    }
+
+    /**
+     * 调用微信小程序码接口(getwxacodeunlimit)
+     * 成功返回图片字节, 失败返回带errcode/errmsg的结果
+     * 常见错误: 40001 token失效 / 41030 page不存在(未发布) / 40097 scene非法(超32字符)
+     */
+    public static WxQrCodeResult getWxaCodeUnlimit(String accessToken, String page, String scene, int wh) {
 
         String url = "https://api.weixin.qq.com/wxa/getwxacodeunlimit?access_token=" + accessToken;
-
 
         JSONObject params = new JSONObject();
         params.put("page", page);
@@ -175,11 +224,8 @@ public class WxMiniProgramHelper {
         params.put("is_hyaline", false);
         params.put("env_version", "release");
 
-
         HttpURLConnection connection = null;
         try {
-
-
             URL urlObj = new URL(url);
             connection = (HttpURLConnection) urlObj.openConnection();
             connection.setRequestMethod("POST");
@@ -190,44 +236,87 @@ public class WxMiniProgramHelper {
             connection.setReadTimeout(5000);
             connection.setUseCaches(false);
 
-
             PrintWriter printWriter = new PrintWriter(connection.getOutputStream());
             printWriter.write(params.toJSONString());
             printWriter.flush();
 
-
-            return ImageIO.read(connection.getInputStream());
-
+            // 读取完整响应: 微信成功时返回图片字节, 失败时返回JSON错误(HTTP错误流)
+            InputStream is = connection.getErrorStream() != null ? connection.getErrorStream() : connection.getInputStream();
+            byte[] bytes = readAll(is);
+            if (bytes == null || bytes.length == 0) {
+                return new WxQrCodeResult(null, -1, "微信返回空响应");
+            }
+            // 通过图片魔数(PNG/JPEG)判定, 避免把JSON错误当图片解析成null
+            boolean isImage = ((bytes[0] & 0xFF) == 0x89 && (bytes[1] & 0xFF) == 0x50)
+                    || ((bytes[0] & 0xFF) == 0xFF && (bytes[1] & 0xFF) == 0xD8);
+            if (isImage) {
+                return new WxQrCodeResult(bytes, 0, null);
+            }
+            // 失败: 解析微信错误码, 便于定位真实原因
+            try {
+                JSONObject err = JSON.parseObject(new String(bytes, StandardCharsets.UTF_8));
+                return new WxQrCodeResult(null, err.getInteger("errcode"), err.getString("errmsg"));
+            } catch (Exception e) {
+                return new WxQrCodeResult(null, -1, new String(bytes, StandardCharsets.UTF_8));
+            }
         } catch (Exception e) {
-            e.printStackTrace();
-            log.info("获取微信小程序二维码失败：" + e.toString());
+            log.error("调用微信小程序码接口异常 page:{} scene:{}", page, scene, e);
+            return new WxQrCodeResult(null, -1, e.toString());
         } finally {
-            connection.disconnect();
+            if (connection != null) {
+                connection.disconnect();
+            }
         }
+    }
 
-        return null;
+    private static byte[] readAll(InputStream is) throws IOException {
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        byte[] buffer = new byte[4096];
+        int len;
+        while ((len = is.read(buffer)) != -1) {
+            baos.write(buffer, 0, len);
+        }
+        return baos.toByteArray();
+    }
+
+    public static BufferedImage getMiniProgramPageERcodeBufferedImage(String accessToken, String page, String scene, int wh) {
+
+        WxQrCodeResult result = getWxaCodeUnlimit(accessToken, page, scene, wh);
+        if (!result.isOk()) {
+            log.error("获取微信小程序码失败 page:{} scene:{} errcode:{} errmsg:{}",
+                    page, scene, result.getErrcode(), result.getErrmsg());
+            return null;
+        }
+        try {
+            return ImageIO.read(new ByteArrayInputStream(result.getImageBytes()));
+        } catch (IOException e) {
+            log.error("解析微信小程序码图片失败", e);
+            return null;
+        }
     }
 
 
     public static boolean getMiniProgramPageERcode(String accessToken, String page, String scene, String filePath, int wh, int type) {
 
-
-        String url = "https://api.weixin.qq.com/wxa/getwxacodeunlimit?access_token=" + accessToken;
-
-
-        JSONObject params = new JSONObject();
-        params.put("page", page);
-        params.put("scene", scene);
-        params.put("width", wh);
-        params.put("auto_color", false);
-        params.put("is_hyaline", false);
-        params.put("env_version", "release");
-
-
-        httpPostForImage(url, params.toJSONString(), filePath, type);
-
-
-        return true;
+        WxQrCodeResult result = getWxaCodeUnlimit(accessToken, page, scene, wh);
+        if (!result.isOk()) {
+            log.error("获取微信小程序码失败 page:{} scene:{} errcode:{} errmsg:{}",
+                    page, scene, result.getErrcode(), result.getErrmsg());
+            return false;
+        }
+        try {
+            InputStream is = new ByteArrayInputStream(result.getImageBytes());
+            if (type == 1) {
+                saveLocalFile(filePath, is);
+            } else {
+                HuaWeiOBS.upload(filePath, is);
+            }
+            return true;
+        } catch (Exception e) {
+            log.error("保存微信小程序码失败 filePath:{}", filePath, e);
+            return false;
+        }
     }
 
 

@@ -384,6 +384,19 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
         return result != null && result.getGroupId() > 0 ? true : false;
     }
 
+
+    @Override
+    public List<GbGroupActivityInfo> listAllByLeaderId(Long leaderId) {
+        // 入参校验: 团长 id 缺失时不查库, 直接返回空集合, 避免被 where 1=1 之类的查询穿透
+        if (leaderId == null || leaderId <= 0) {
+            return new ArrayList<>();
+        }
+        // 仅按团长 id 过滤, 不附加 is_close / 时间区间等业务状态, 用于团长端活动下拉/选择场景
+        return mapper.selectList(Wrappers.<GbGroupActivityInfo>lambdaQuery()
+                .eq(GbGroupActivityInfo::getLeaderId, leaderId)
+                .orderByDesc(GbGroupActivityInfo::getAddTime, GbGroupActivityInfo::getGroupId));
+    }
+
     @Override
     public List<GbGroupActivityInfo> getMemberGroupActivityList(Long leaderId, Double longitude, Double latitude,
                                                                 String groupName, Long catId, int page, int pageSize) {

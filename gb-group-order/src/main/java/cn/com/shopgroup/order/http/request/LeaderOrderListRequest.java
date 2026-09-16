@@ -15,6 +15,13 @@ public class LeaderOrderListRequest {
     //自提点id
     private Long pointId;
 
+    //开始日期 yyyy-MM-dd, 与结束日期成对传入,
+    private String startDate;
+
+    //结束日期 yyyy-MM-dd, 与开始日期成对传入
+    private String endDate;
+
+
     private Integer page;
 
     private Integer pageSize;

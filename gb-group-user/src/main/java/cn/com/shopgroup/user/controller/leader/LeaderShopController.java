@@ -9,7 +9,6 @@ import cn.com.shopgroup.common.utils.HuaWeiOBS;
 import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.TimeUtils;
 import cn.com.shopgroup.common.wxmini.WxMiniAccessTokenHelper;
-import cn.com.shopgroup.common.wxmini.WxMiniProgramHelper;
 import cn.com.shopgroup.user.exception.UserErrorCodeEnum;
 import cn.com.shopgroup.user.http.request.ShopErCodeRequest;
 import cn.com.shopgroup.user.http.request.ShopRequest;
@@ -32,10 +31,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.Resource;
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.util.UUID;
@@ -195,27 +191,19 @@ public class LeaderShopController {
             throw new BusinessException(UserErrorCodeEnum.QRCODE_EXISTED);
         }
 
-        // 统一获取AccessToken
-        String accessToken = helper.getAccessToken(false);
-        if (StringUtil.isEmpty(accessToken)) {
-            throw new BusinessException(UserErrorCodeEnum.ACCESS_TOKEN_FAILED);
-        }
-
         // 生成店铺小程序码图片(与 /order/group/order/makeErcode 一致,走微信小程序码接口)
+        // access_token失效时自动强刷重试一次, 真实失败原因会记录日志
         byte[] bytes;
         try {
             // 小程序码落地页与scene参数: 需与小程序前端onLoad解析保持一致
             String page = "pages/order/index";
             String scene = "shopId=" + shopId;
             int wh = 1280; // 图片像素(最高1280像素)
-            BufferedImage qrImg = WxMiniProgramHelper.getMiniProgramPageERcodeBufferedImage(accessToken, page, scene, wh);
-            if (ObjectUtils.isEmpty(qrImg)) {
+            bytes = helper.getWxaCodeUnlimitWithRetry(page, scene, wh);
+            if (ObjectUtils.isEmpty(bytes)) {
                 log.error("生成店铺小程序码失败,微信返回空图片 shopId:{}", shopId);
                 throw new BusinessException(UserErrorCodeEnum.QRCODE_GEN_FAILED);
             }
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            ImageIO.write(qrImg, "png", baos);
-            bytes = baos.toByteArray();
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {

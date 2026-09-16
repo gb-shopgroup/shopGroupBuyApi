@@ -9,9 +9,12 @@ import cn.com.shopgroup.common.utils.TokenUtils;
 import cn.com.shopgroup.goods.http.response.group.GroupActGoodsResponse;
 import cn.com.shopgroup.goods.http.response.group.GroupActivityResponse;
 import cn.com.shopgroup.goods.http.response.group.GroupCategoryResponse;
+import cn.com.shopgroup.goods.http.response.group.GroupSpecResponse;
+import cn.com.shopgroup.goods.model.GbGoodsSpecInfo;
 import cn.com.shopgroup.goods.model.GbGroupActivityGoods;
 import cn.com.shopgroup.goods.model.GbGroupActivityInfo;
 import cn.com.shopgroup.goods.model.GbGroupCategoryInfo;
+import cn.com.shopgroup.goods.service.GbGoodsSpecInfoService;
 import cn.com.shopgroup.goods.service.GbGroupActivityInfoService;
 import cn.com.shopgroup.goods.service.GbGroupCategoryInfoService;
 import cn.com.shopgroup.order.exception.OrderErrorCodeEnum;
@@ -45,6 +48,7 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -76,6 +80,9 @@ public class MemberGroupController {
     @Resource
     private GbGroupViewLogService viewLogService;
 
+    @Resource
+    private GbGoodsSpecInfoService specService;
+
 
     // 团购分类列表（首页）
     @GetMapping("/group/groupActivity/cat")
@@ -106,6 +113,8 @@ public class MemberGroupController {
         List<MemberHomeGroupActResponse> data = MemberHomeGroupActResponse.getGroupActResponseList(result);
         // 填充每个团购活动的商品列表(列表页需要展示团购里的商品)
         fillGroupGoodsList(data);
+        // 填充每个团购活动中商品的规格(含规格值), 一次批量查询避免 N+1
+        fillGoodsSpecList(extractAllGoods(data));
         fillGroupLogList(data);
         for (MemberHomeGroupActResponse item : data) {
             item.setOrder(this.getRedisOrderTotal(item.getId(), item.getVirtual()));
@@ -174,6 +183,51 @@ public class MemberGroupController {
         for (MemberHomeGroupActResponse item : data) {
             List<GroupActGoodsResponse> goodsList = goodsMap.get(item.getId());
             item.setGoods(goodsList == null ? new ArrayList<>() : goodsList);
+        }
+    }
+
+    /**
+     * 提取团购活动列表里所有商品的扁平列表(用于后续批量填充规格)
+     */
+    private List<GroupActGoodsResponse> extractAllGoods(List<MemberHomeGroupActResponse> data) {
+        List<GroupActGoodsResponse> all = new ArrayList<>();
+        if (CollectionUtils.isEmpty(data)) {
+            return all;
+        }
+        for (MemberHomeGroupActResponse item : data) {
+            if (item.getGoods() != null) {
+                all.addAll(item.getGoods());
+            }
+        }
+        return all;
+    }
+
+    /**
+     * 为商品列表填充规格(含规格值)
+     * 一次批量查询多个商品id, 避免循环内 N+1
+     */
+    private void fillGoodsSpecList(List<GroupActGoodsResponse> goodsList) {
+        if (CollectionUtils.isEmpty(goodsList)) {
+            return;
+        }
+        // 1. 收集去重的商品id(保持插入顺序便于排查)
+        Set<Long> goodsIdSet = new LinkedHashSet<>();
+        for (GroupActGoodsResponse item : goodsList) {
+            if (item.getGid() != null) {
+                goodsIdSet.add(item.getGid());
+            }
+        }
+        if (goodsIdSet.isEmpty()) {
+            return;
+        }
+        // 2. 一次批量查询所有商品的规格(含规格值)
+        Map<Long, List<GbGoodsSpecInfo>> specMap = specService.getGoodsSpecListByGoodsIds(new ArrayList<>(goodsIdSet));
+        // 3. 回填到每个商品对象
+        for (GroupActGoodsResponse item : goodsList) {
+            List<GbGoodsSpecInfo> specs = specMap.get(item.getGid());
+            if (specs != null) {
+                item.setSpecList(GroupSpecResponse.getSpecResponseList(specs));
+            }
         }
     }
 

@@ -66,6 +66,7 @@ public class OrderController {
     private GbOrgLeaderInfoService leaderInfoService;
 
     // 团长订单列表（按团活动/订单状态/关键字筛选, 关键字支持商品名称或手机号, 分页查询）
+    //团购详情调用必须传groupId，团购订单按钮，全部传传0
     @PostMapping("/leader/order/list")
     public JsonResult leaderOrderList(@RequestBody LeaderOrderListRequest request) {
         log.info("团长端查询订单列表接口-参数request:{}", JSON.toJSONString(request));
@@ -427,11 +428,13 @@ public class OrderController {
         }
     }
 
-    // 团长首页订单汇总(head部分): 返回有效订单总数/订单总金额/退款总金额; pointId 传 0 或不传表示不区分提货点, 传具体值则按提货点过滤
+    // 团长首页订单汇总(head部分): 返回有效订单总数/订单总金额/退款总金额;groupId必传，
+    // pointId 传 0 或不传表示不区分提货点, 传具体值则按提货点过滤
     @GetMapping("/leader/home/show/orders")
-    public JsonResult homeShowOrderTotal(@RequestParam("pointId") Long pointId) {
+    public JsonResult homeShowOrderTotal(@RequestParam("groupId") Long groupId,
+                                         @RequestParam("pointId") Long pointId) {
         // 从请求头中获取团长id
-        log.info("团长获取订单统计情况/leader/home/show/orders,pointId:{}", pointId);
+        log.info("团长获取订单统计情况/leader/home/show/orders,groupId:{},pointId:{}", groupId, pointId);
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
             throw new BusinessException(OrderErrorCodeEnum.LEADER_NOT_EXIST);
@@ -444,7 +447,7 @@ public class OrderController {
         // 订单数量
         Double refundAmountTotal = 0D;
         // 订单总数（取消除外）
-        List<GbOrderInfo> list = orderInfoService.getAllByLeaderIdAndPointId(leaderId, pointId);
+        List<GbOrderInfo> list = orderInfoService.getAllByLeaderIdAndPointId(leaderId, groupId, pointId);
         if (!CollectionUtils.isEmpty(list)) {
             orderTotal = list.size();
             // refundFee 单位:分, 汇总前需转元
@@ -461,14 +464,15 @@ public class OrderController {
         return JsonResult.success(response);
     }
 
-    // 团长端订单-商品统计: 返回订单商品总件数/待核销总件数 + 每个商品的总件数/待核销件数, 支持商品名称+自提点pointId搜索与分页
+    // 团长端订单-商品统计: 返回订单商品总件数/待核销总件数 + 每个商品的总件数/待核销件数, 支持按团购活动groupId/自提点pointId/商品名称keyword过滤与分页
     @GetMapping("/leader/home/order/goodsSummary")
-    public JsonResult homeGoodsSummary(@RequestParam(value = "pointId", defaultValue = "0") Long pointId,
+    public JsonResult homeGoodsSummary(@RequestParam(value = "groupId") Long groupId,
+                                       @RequestParam(value = "pointId", defaultValue = "0") Long pointId,
                                        @RequestParam(value = "keyword", required = false) String keyword,
                                        @RequestParam(value = "page", defaultValue = "1") Integer page,
                                        @RequestParam(value = "pageSize", defaultValue = "10") Integer pageSize) {
         // 从请求头中获取团长id
-        log.info("团长端订单-商品统计/leader/home/order/goodsSummary,pointId:{},keyword:{}", pointId, keyword);
+        log.info("团长端订单-商品统计/leader/home/order/goodsSummary,groupId:{},pointId:{},keyword:{}", groupId, pointId, keyword);
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
             throw new BusinessException(OrderErrorCodeEnum.LEADER_NOT_EXIST);
@@ -479,7 +483,7 @@ public class OrderController {
         int offset = (currentPage - 1) * size;
 
         // 订单商品总件数 + 待核销总件数(不受分页影响)
-        Map<String, Object> totalMap = orderInfoService.getSummaryGoodsTotal(leaderId, pointId, keyword);
+        Map<String, Object> totalMap = orderInfoService.getSummaryGoodsTotal(leaderId, groupId, pointId, keyword);
         long goodsTotal = 0l;
         long unVerifyTotal = 0l;
         if (totalMap != null && !totalMap.isEmpty()) {
@@ -488,7 +492,7 @@ public class OrderController {
         }
 
         // 商品维度统计列表(分页)
-        List<Map<String, Object>> results = orderInfoService.getSummaryGoodsPageList(leaderId, pointId, keyword, offset, size);
+        List<Map<String, Object>> results = orderInfoService.getSummaryGoodsPageList(leaderId, groupId, pointId, keyword, offset, size);
         List<SummaryOrderGoodsResponse> itemList = new ArrayList<>();
         if (results != null) {
             for (Map<String, Object> item : results) {

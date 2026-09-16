@@ -8,6 +8,7 @@ import cn.com.shopgroup.order.http.response.LeaderMemberListResponse;
 import cn.com.shopgroup.order.http.response.RefundOrderInfoResponse;
 import cn.com.shopgroup.order.model.GbOrderGoodsInfo;
 import cn.com.shopgroup.order.model.GbOrderInfo;
+
 import java.util.List;
 import java.util.Map;
 
@@ -86,7 +87,7 @@ public interface GbOrderInfoService {
     Boolean receiptMiniLeaderOrder(Long leaderId, String orderNo, String receiptCode, Long staffId, String staffName, Long pointId, String pointName);
 
     Boolean receiptMiniLeaderOrder(Long leaderId, String orderNo, String receiptCode, Long staffId, String staffName,
-                                          Long pointId, String pointName, List<GbOrderGoodsInfo> goodsList);
+                                   Long pointId, String pointName, List<GbOrderGoodsInfo> goodsList);
 
     Boolean editMiniLeaderRefundOrder(String orderNo);
 
@@ -134,11 +135,11 @@ public interface GbOrderInfoService {
 
     List<Map<String, Object>> getSummaryPointOrderGoodsList(Long leaderId, Long pointId, Integer startTime, Integer endTime);
 
-    // (团长端首页)商品统计汇总: 订单商品总件数 + 待核销总件数
-    Map<String, Object> getSummaryGoodsTotal(Long leaderId, Long pointId, String keyword);
+    // (团长端首页)商品统计汇总: 订单商品总件数 + 待核销总件数, groupId/pointId<=0 或 null 表示不过滤
+    Map<String, Object> getSummaryGoodsTotal(Long leaderId, Long groupId, Long pointId, String keyword);
 
-    // (团长端首页)商品维度统计分页列表
-    List<Map<String, Object>> getSummaryGoodsPageList(Long leaderId, Long pointId, String keyword, int offset, int limit);
+    // (团长端首页)商品维度统计分页列表, groupId/pointId<=0 或 null 表示不过滤
+    List<Map<String, Object>> getSummaryGoodsPageList(Long leaderId, Long groupId, Long pointId, String keyword, int offset, int limit);
 
     List<Map<String, Object>> getSummaryPointOrderGoodsSkuList(Long leaderId, Long pointId, Long goodsId, Integer startTime, Integer endTime);
 
@@ -208,10 +209,10 @@ public interface GbOrderInfoService {
     List<GbOrderInfo> getMemberApplyRefundOrderList(Long memberId, Integer status, String goodsName, int page, int pageSize);
 
     List<GbOrderInfo> getLeaderOrderList(Long leaderId, Long groupId, Long pointId, String keyword,
-                                                Integer status, int page, int pageSize);
+                                         Integer status, int page, int pageSize);
 
     List<GbOrderInfo> getLeaderApplyRefundOrderList(Long leaderId, Long groupId, Long pointId, String keyword,
-                                                           Integer applyStatus, int page, int pageSize);
+                                                    Integer applyStatus, int page, int pageSize);
 
     Integer getSumOfGroupActivityOrder(Long groupId);
 
@@ -234,7 +235,7 @@ public interface GbOrderInfoService {
      */
     LeaderMemberDetailResponse getLeaderMemberDetail(Long leaderId, Long memberId);
 
-    List<GbOrderInfo> getAllByLeaderIdAndPointId(Long leaderId, Long pointId);
+    List<GbOrderInfo> getAllByLeaderIdAndPointId(Long leaderId, Long groupId, Long pointId);
 
     /**
      * 用户端-申请退款/退货前查询订单与可申请商品(快照)

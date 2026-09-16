@@ -1,12 +1,13 @@
 package cn.com.shopgroup.order.controller.group;
 
+import cn.com.shopgroup.common.cache.RedisConstant;
+import cn.com.shopgroup.common.cache.RedisHelper;
 import cn.com.shopgroup.common.exception.BusinessException;
 import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.MoneyUtil;
 import cn.com.shopgroup.common.utils.TimeUtils;
 import cn.com.shopgroup.common.utils.TokenUtils;
 import cn.com.shopgroup.common.wxmini.WxMiniAccessTokenHelper;
-import cn.com.shopgroup.common.wxmini.WxMiniProgramHelper;
 import cn.com.shopgroup.order.constants.OrderStatusEnum;
 import cn.com.shopgroup.order.exception.OrderErrorCodeEnum;
 import cn.com.shopgroup.order.http.request.MemberOrderListRequest;
@@ -49,6 +50,7 @@ import org.springframework.web.bind.annotation.RestController;
 import javax.annotation.Resource;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -81,6 +83,9 @@ public class MemberOrderController {
 
     @Resource
     private WxMiniAccessTokenHelper helper;
+
+    @Resource
+    private RedisHelper redisHelper;
     @Resource
     private GbOrgShopInfoService shopInfoService;
 
@@ -247,35 +252,42 @@ public class MemberOrderController {
             throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
         }
 
-        // 统一获取AccessToken
-        String accessToken = helper.getAccessToken(false);
-        if (accessToken == null || accessToken.length() == 0)
-            throw new BusinessException(OrderErrorCodeEnum.ACCESS_TOKEN_FAILED);
+        // 小程序码永久有效: 优先读缓存, 生成一次后永久复用, 不再依赖access_token与微信接口
+        String cacheKey = RedisConstant.WxMiniOrderErCodeKey + orderNo;
+        String cached = redisHelper.getCacheObject(cacheKey);
+        if (cached != null && cached.length() > 0) {
+            return JsonResult.success("二维码生成成功", cached);
+        }
 
-        // 生成小程序码, 返回base64格式
-        String base64 = "";
+        // 生成小程序码(access_token失效自动强刷重试), 返回base64格式
+        String base64;
         try {
             // 小程序码落地页与scene参数: 需与小程序前端onLoad解析保持一致
             String page = "pages/order/index";
             String scene = "orderNo=" + orderNo;
             int wh = 640; // 图片像素(最高1280像素)
-            BufferedImage qrImg = WxMiniProgramHelper.getMiniProgramPageERcodeBufferedImage(accessToken, page, scene, wh);
-            if (qrImg != null) {
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                ImageIO.write(qrImg, "png", baos);
-                base64 = "data:image/png;base64," + Base64.getEncoder().encodeToString(baos.toByteArray());
+            byte[] qrBytes = helper.getWxaCodeUnlimitWithRetry(page, scene, wh);
+            if (qrBytes == null || qrBytes.length == 0) {
+                log.error("生成小程序码失败 orderNo:{}", orderNo);
+                throw new BusinessException(OrderErrorCodeEnum.ERCODE_GEN_FAILED);
             }
+            // 统一转png编码输出
+            BufferedImage qrImg = ImageIO.read(new ByteArrayInputStream(qrBytes));
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            ImageIO.write(qrImg, "png", baos);
+            base64 = "data:image/png;base64," + Base64.getEncoder().encodeToString(baos.toByteArray());
+        } catch (BusinessException e) {
+            throw e;
         } catch (Exception e) {
-            log.error("生成小程序码失败：" + e.getMessage());
-            e.printStackTrace();
+            log.error("生成小程序码失败 orderNo:{}", orderNo, e);
+            throw new BusinessException(OrderErrorCodeEnum.ERCODE_GEN_FAILED);
         }
 
+        // 生成成功后永久缓存, 之后直接返回缓存(小程序码内容不变)
+        redisHelper.setCacheObject(cacheKey, base64);
+
         // 返回
-        if (base64.length() == 0) {
-            throw new BusinessException(OrderErrorCodeEnum.ERCODE_GEN_FAILED);
-        } else {
-            return JsonResult.success("二维码生成成功", base64);
-        }
+        return JsonResult.success("二维码生成成功", base64);
     }
 
 

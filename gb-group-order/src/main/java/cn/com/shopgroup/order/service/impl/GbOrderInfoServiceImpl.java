@@ -18,9 +18,9 @@ import cn.com.shopgroup.order.mapper.GbOrderInfoMapper;
 import cn.com.shopgroup.order.model.GbGroupViewLog;
 import cn.com.shopgroup.order.model.GbOrderGoodsInfo;
 import cn.com.shopgroup.order.model.GbOrderInfo;
-import cn.com.shopgroup.user.service.GbOrgMessageInfoService;
-import cn.com.shopgroup.order.service.GbOrderInfoService;
 import cn.com.shopgroup.order.service.GbGroupViewLogService;
+import cn.com.shopgroup.order.service.GbOrderInfoService;
+import cn.com.shopgroup.user.service.GbOrgMessageInfoService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -830,19 +830,19 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
     }
 
 
-    // (团长端首页)商品统计汇总: 订单商品总件数 + 待核销总件数
+    // (团长端首页)商品统计汇总: 订单商品总件数 + 待核销总件数, groupId/pointId<=0 或 null 表示不过滤
     @Override
-    public Map<String, Object> getSummaryGoodsTotal(Long leaderId, Long pointId, String keyword) {
+    public Map<String, Object> getSummaryGoodsTotal(Long leaderId, Long groupId, Long pointId, String keyword) {
 
-        return mapper.getSummaryGoodsTotal(leaderId, pointId, keyword);
+        return mapper.getSummaryGoodsTotal(leaderId, groupId, pointId, keyword);
     }
 
 
-    // (团长端首页)商品维度统计分页列表
+    // (团长端首页)商品维度统计分页列表, groupId/pointId<=0 或 null 表示不过滤
     @Override
-    public List<Map<String, Object>> getSummaryGoodsPageList(Long leaderId, Long pointId, String keyword, int offset, int limit) {
+    public List<Map<String, Object>> getSummaryGoodsPageList(Long leaderId, Long groupId, Long pointId, String keyword, int offset, int limit) {
 
-        return mapper.getSummaryPointGoodsPageList(leaderId, pointId, keyword, offset, limit);
+        return mapper.getSummaryPointGoodsPageList(leaderId, groupId, pointId, keyword, offset, limit);
     }
 
 
@@ -1665,11 +1665,12 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
     }
 
     @Override
-    public List<GbOrderInfo> getAllByLeaderIdAndPointId(Long leaderId, Long pointId) {
+    public List<GbOrderInfo> getAllByLeaderIdAndPointId(Long leaderId, Long groupId, Long pointId) {
         // 团长首页 head 订单统计: 查询该团长的有效订单(排除已取消),
         // pointId 有值时按提货点过滤
         LambdaQueryWrapper<GbOrderInfo> queryWrapper = Wrappers.lambdaQuery();
         queryWrapper.eq(GbOrderInfo::getLeaderId, leaderId);
+        queryWrapper.eq(GbOrderInfo::getGroupId, groupId);
         queryWrapper.ne(GbOrderInfo::getStatus, OrderStatusEnum.CANCELED.getCode());
         if (pointId != null && pointId > 0) {
             queryWrapper.eq(GbOrderInfo::getPointId, pointId);
@@ -1751,7 +1752,7 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
 
 
         LambdaQueryWrapper<GbOrderInfo> queryWrapper = Wrappers.lambdaQuery();
-        queryWrapper.in(GbOrderInfo::getStatus, Arrays.asList(4,5));
+        queryWrapper.in(GbOrderInfo::getStatus, Arrays.asList(4, 5));
         queryWrapper.eq(GbOrderInfo::getOrderNo, orderNo);
         GbOrderInfo data = mapper.selectOne(queryWrapper);
         if (ObjectUtils.isEmpty(data)) {

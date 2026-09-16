@@ -52,6 +52,9 @@ public class RedisConstant {
     public final static long RedisOrderCodeExpired = 1*24*60*60;
     public final static String RedisOrderCodeKey = "OrderCode:";
 
+    // 用户订单核销小程序码(base64): 小程序码永久有效, 生成一次后永久缓存复用, 后续请求不再依赖微信接口(access_token)
+    public final static String WxMiniOrderErCodeKey = "WxMiniOrderErCode:";
+
 
 
     public final static long RedisLeaderOrderDividePageExpired = 5*60*60;

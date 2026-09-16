@@ -41,6 +41,14 @@ public interface GbGroupActivityInfoService {
 
     Boolean isGoodsGrouping(Long leaderId, Long goodsId);
 
+    /**
+     * 查询团长 id 下的所有团购活动（不过滤状态/时间, 按添加时间倒序, 主要用于团长端活动下拉选择）。
+     *
+     * @param leaderId 团长 id, 为空或<=0 时返回空列表
+     * @return 该团长下的全部团购活动列表
+     */
+    List<GbGroupActivityInfo> listAllByLeaderId(Long leaderId);
+
     List<GbGroupActivityInfo> getMemberGroupActivityList(Long leaderId, Double longitude, Double latitude,
                                                          String groupName,Long catId,int page, int pageSize);
 

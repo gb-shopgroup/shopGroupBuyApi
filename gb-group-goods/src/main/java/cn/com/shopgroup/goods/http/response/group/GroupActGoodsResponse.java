@@ -25,6 +25,9 @@ public class GroupActGoodsResponse {
     // 库存(商品数量+单位, 如 100斤)
     private String stock;
 
+    // 商品规格列表(包含规格值, 不含禁用规格/规格值); 调用方需按 goodsId 填充
+    private List<GroupSpecResponse> specList = new ArrayList<>();
+
     public GroupActGoodsResponse() {
 
     }

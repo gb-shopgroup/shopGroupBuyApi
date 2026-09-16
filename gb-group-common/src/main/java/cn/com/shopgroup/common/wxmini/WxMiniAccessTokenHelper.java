@@ -74,6 +74,42 @@ public class WxMiniAccessTokenHelper {
         redisHelper.deleteObject(RedisConstant.WxMiniAccessTokenKey);
     }
 
+    /**
+     * 生成微信小程序码(getwxacodeunlimit), access_token失效(40001/42001)时自动强刷token重试一次
+     * 注意: 小程序码本身永久有效, 调用方可将生成结果缓存长期复用, 与微信接口解耦
+     *
+     * @return 小程序码图片字节, 失败返回null(真实原因已记录日志)
+     */
+    public byte[] getWxaCodeUnlimitWithRetry(String page, String scene, int wh) {
+
+        String accessToken = getAccessToken(false);
+        if (accessToken == null || accessToken.length() == 0) {
+            log.error("生成小程序码失败: 获取access_token失败 page:{} scene:{}", page, scene);
+            return null;
+        }
+
+        WxMiniProgramHelper.WxQrCodeResult result = WxMiniProgramHelper.getWxaCodeUnlimit(accessToken, page, scene, wh);
+        if (result.isOk()) {
+            return result.getImageBytes();
+        }
+
+        // access_token失效: 强制刷新后重试一次
+        if (result.isTokenInvalid()) {
+            log.warn("小程序码接口返回token失效(errcode:{}), 强制刷新access_token后重试", result.getErrcode());
+            accessToken = getAccessToken(true);
+            if (accessToken != null && accessToken.length() > 0) {
+                result = WxMiniProgramHelper.getWxaCodeUnlimit(accessToken, page, scene, wh);
+                if (result.isOk()) {
+                    return result.getImageBytes();
+                }
+            }
+        }
+
+        log.error("生成小程序码失败 page:{} scene:{} errcode:{} errmsg:{}",
+                page, scene, result.getErrcode(), result.getErrmsg());
+        return null;
+    }
+
     //判断小程序用户的token是否失效
     // 校验微信小程序用户token是否失效, 有效返回true
     // 失效场景: token解析失败/非数字用户id/未登录(Redis无登录态)/登录态已变更(退出登录或重新登录)

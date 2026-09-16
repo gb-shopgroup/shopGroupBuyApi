@@ -3,10 +3,10 @@ package cn.com.shopgroup.user.controller.leader;
 import cn.com.shopgroup.common.cache.RedisConstant;
 import cn.com.shopgroup.common.config.UploadConfig;
 import cn.com.shopgroup.common.exception.BusinessException;
+import cn.com.shopgroup.common.utils.HuaWeiOBS;
 import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.TimeUtils;
 import cn.com.shopgroup.common.wxmini.WxMiniAccessTokenHelper;
-import cn.com.shopgroup.common.wxmini.WxMiniProgramHelper;
 import cn.com.shopgroup.user.exception.UserErrorCodeEnum;
 import cn.com.shopgroup.user.http.request.PointRequest;
 import cn.com.shopgroup.user.http.response.PointResponse;
@@ -26,7 +26,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.Resource;
+import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -202,27 +204,34 @@ public class LeaderPointController {
             if (!fileFolder.exists()) fileFolder.mkdirs();
         }
 
-        // 统一获取AccessToken
-        String accessToken = helper.getAccessToken(false);
-        if (accessToken == null || accessToken.length() == 0)
-            throw new BusinessException(UserErrorCodeEnum.ACCESS_TOKEN_FAILED);
-
-        // 再获取二维码
+        // 再获取二维码(access_token失效时自动强刷重试一次, 真实失败原因会记录日志)
         String page = "pages/order/index";
         String scene = "pid=" + pointId;
         int wh = 1280; // 图片像素(最高1280像素)
+        byte[] qrBytes = helper.getWxaCodeUnlimitWithRetry(page, scene, wh);
+        if (ObjectUtils.isEmpty(qrBytes)) {
+            log.error("生成提货点小程序码失败 pointId:{}", pointId);
+            throw new BusinessException(UserErrorCodeEnum.QRCODE_GEN_FAILED);
+        }
 
         // 区分本地上传还是云端上传
-        if (type == 1) {
-            WxMiniProgramHelper.getMiniProgramPageERcode(accessToken, page, scene, rootPath + "/" + obsKey, wh, type);
-        } else {
-            WxMiniProgramHelper.getMiniProgramPageERcode(accessToken, page, scene, obsKey, wh, type);
+        try {
+            if (type == 1) {
+                FileOutputStream fos = new FileOutputStream(rootPath + "/" + obsKey);
+                fos.write(qrBytes);
+                fos.close();
+            } else {
+                HuaWeiOBS.upload(obsKey, new ByteArrayInputStream(qrBytes));
+            }
+        } catch (Exception e) {
+            log.error("上传提货点二维码失败 pointId:{}", pointId, e);
+            throw new BusinessException(UserErrorCodeEnum.QRCODE_UPLOAD_FAILED);
         }
 
         // 获取图片访问路径
         String url = domain + "/" + obsKey;
 
-        // 同步修改用户数据表
+        // 同步修改用户数据表(小程序码永久有效, 生成一次后库里地址长期复用)
         service.updatePointErcode(pointId, url);
 
         // 返回访问路径

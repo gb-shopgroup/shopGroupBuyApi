@@ -135,7 +135,7 @@ Maven 依赖仓库使用阿里云镜像（`https://maven.aliyun.com/repository/p
 
 ### 4.5 gb-group-order — 订单 / 支付 / 分账服务
 
-覆盖：下单、订单查询、核销（整单 / 部分核销）、退款（申请 / 审批 / 回调）、微信发货、易宝支付发起与回调、团长数据汇总、报表查询，以及团长端「我的团员」（含团购查看埋点，数据表 `gb_group_view_log`）、团长端「对账单」（按时间范围 + 按商品 / 按订单维度统计）等。**44 个接口**。
+覆盖：下单、订单查询、核销（整单 / 部分核销）、退款（申请 / 审批 / 回调）、微信发货、易宝支付发起与回调、团长数据汇总、报表查询，以及团长端「我的团员」（含团购查看埋点，数据表 `gb_group_view_log`）、团长端「对账单」（按时间范围 + 按商品 / 按订单维度统计）等。**45 个接口**。
 
 ### 4.6 gb-group-admin — 平台管理后台服务
 
@@ -288,7 +288,7 @@ mvn -pl gb-group-task spring-boot:run
 | `page` / `pageSize` | 页码（从 1 开始）/ 每页条数 |
 | `start` / `end` | 开始时间 / 结束时间（如 yyyy-MM-dd） |
 
-- **接口数量统计**：user 46 个、order 44 个、goods 22 个、admin 29 个、task 8 个，合计 **149 个**。
+- **接口数量统计**：user 46 个、order 45 个、goods 22 个、admin 29 个、task 8 个，合计 **150 个**。
 - **详细版接口文档**（含每个接口的完整入参 / 出参字段说明，参数含义、必填、嵌套字段均已细化）见根目录 **`API接口文档.md`**，可通过 `python3 generate_api_doc.py` 扫描各模块 `*Controller.java` 重新生成。下方为接口总览清单。
 
 ### 8.2 接口清单
@@ -403,7 +403,7 @@ mvn -pl gb-group-task spring-boot:run
 | 1 | GET | `/user/member/info` | *查询会员详情* | 无 |
 | 2 | GET | `/user/member/isleader` | *查询会员是否为团长* | 无 |
 
-#### 8.2.2 gb-group-order（订单/退款/分账）— 44 个接口
+#### 8.2.2 gb-group-order（订单/退款/分账）— 45 个接口
 
 **OrderBusinessController**（`cn.com.shopgroup.order.controller`）
 
@@ -460,6 +460,12 @@ mvn -pl gb-group-task spring-boot:run
 | --- | --- | --- | --- | --- |
 | 1 | POST | `/order/leader/bill/list` | 团长端-对账单 | Body: **request** (LeaderBillListRequest, JSON) |
 
+**LeaderGroupActivityController**（`cn.com.shopgroup.order.controller.leader`）
+
+| 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
+| --- | --- | --- | --- | --- |
+| 1 | GET | `/order/leader/activity/list` | 查询团长 id 下的所有团购活动(不过滤状态/时间, 按添加时间倒序)。  leaderId 优先取自 Query 参数(便于后台/管理端查询指定团长); 未传或非法时回退到请求头 lid; 两者均缺失则抛 lid不存在 业务异常。 | 无 |
+
 **LeaderMemberController**（`cn.com.shopgroup.order.controller.leader`）
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
@@ -480,8 +486,8 @@ mvn -pl gb-group-task spring-boot:run
 | 7 | POST | `/order/leader/order/writeOff` | *核销（团长订单）* | **orderNo** (String); **pid** (Long) |
 | 8 | POST | `/order/leader/order/partWriteOff` | *部分核销（团长订单）* | Body: **request** (OrderVerifyRequest, JSON) |
 | 9 | GET | `/order/leader/order/send` | *发送（团长订单）* | **orderNo** (String) |
-| 10 | GET | `/order/leader/home/show/orders` | *查询团长首页展示订单* | **pointId** (Long) |
-| 11 | GET | `/order/leader/home/order/goodsSummary` | *查询团长首页订单商品* | **pointId** (Long); **keyword** (String); **page** (Integer); **pageSize** (Integer) |
+| 10 | GET | `/order/leader/home/show/orders` | *查询团长首页展示订单* | **groupId** (Long); **pointId** (Long) |
+| 11 | GET | `/order/leader/home/order/goodsSummary` | *查询团长首页订单商品* | **groupId** (Long); **pointId** (Long); **keyword** (String); **page** (Integer); **pageSize** (Integer) |
 | 12 | POST | `/order/get/groupActivity/totalOrder` | *提交（团购活动汇总订单）* | **groupId** (Long) |
 
 **OrderRefundController**（`cn.com.shopgroup.order.controller.leader`）

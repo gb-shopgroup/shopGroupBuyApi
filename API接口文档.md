@@ -1,6 +1,6 @@
 # ShopGroupBuyApi 接口文档（详细版）
 
-> 自动生成时间：2026-09-16 19:16:29
+> 自动生成时间：2026-09-16 23:03:16
 
 > 生成方式：扫描各模块 `*Controller.java` 源码（`python3 generate_api_doc.py` 可重新生成）
 
@@ -36,6 +36,9 @@
 
 | 日期 | 提交 | 摘要 | 涉及文件 |
 | --- | --- | --- | --- |
+| 2026-09-16 | `b8b257a` | redis分模块分区 | GroupGoodsController.java, LeaderGroupManageController.java, LeaderShopController.java |
+| 2026-09-16 | `b3454cd` | 活动相关 | LeaderGroupManageController.java |
+| 2026-09-16 | `1621b8b` | 活动相关 | AdminOrderBusinessController.java, AdminOrderController.java, GroupActResponse.java, GroupActivityResponse.java, LeaderGoodsManageController.java 等 |
 | 2026-09-15 | `b144578` | 团购活动列表汇总数据 | GroupActResponse.java, LeaderGroupManageController.java, LeaderGroupSummaryResponse.java |
 | 2026-09-15 | `0226057` | 团购新增。编辑 | LeaderGroupManageController.java |
 | 2026-09-15 | `b4cde52` | 团购活动修改，下单15分钟不支付延迟取消 | LeaderGroupManageController.java, MemberGroupController.java, MemberOrderController.java |
@@ -48,14 +51,11 @@
 | 2026-09-10 | `1c730e8` | 售后 | MemberOrderController.java, MemberOrderRefundListRequest.java, OrderGoodsReponse.java, OrderMainRefundResponse.java |
 | 2026-09-10 | `a23d057` | 团长店铺保存问题修复 | LeaderShopController.java |
 | 2026-09-10 | `be51c30` | 异常信息统一处理拦截 | GroupGoodsController.java, LoginMemberResponse.java, MemberOrderController.java, MemberOrderRefundListRequest.java, OrderPaymentController.java 等 |
-| 2026-09-09 | `6a6916b` | 异常信息统一处理拦截 | AdminBusinessController.java, AdminGroupTagController.java, AdminLeaderController.java, AdminLoginController.java, BlackController.java 等 |
-| 2026-09-09 | `dc8c33c` | 项目优化 | LeaderPointController.java, MemberGroupController.java, OrderPaymentController.java, OrderRefundController.java, TaskController.java |
-| 2026-09-08 | `1327fe7` | 用户查询首页团购活动列表 | AdminReportController.java, GroupActRequest.java, GroupActResponse.java, GroupGoodsController.java, GroupPointController.java 等 |
 
 ## 目录
 
 1. [**gb-group-user**（用户/团长/员工）](#1-gb-group-user用户团长员工) — 46 个接口
-2. [**gb-group-order**（订单/退款/分账）](#2-gb-group-order订单退款分账) — 44 个接口
+2. [**gb-group-order**（订单/退款/分账）](#2-gb-group-order订单退款分账) — 45 个接口
 3. [**gb-group-goods**（商品/团购）](#3-gb-group-goods商品团购) — 22 个接口
 4. [**gb-group-admin**（后台管理）](#4-gb-group-admin后台管理) — 29 个接口
 5. [**gb-group-task**（定时任务）](#5-gb-group-task定时任务) — 8 个接口
@@ -64,7 +64,7 @@
 
 ## 接口总览索引
 
-> 共 149 个接口，按下表序号定位到下方各模块接口详情；「功能说明」列为 `—` 表示源码无方法注释，可按入参 / 出参字段推断用途。
+> 共 150 个接口，按下表序号定位到下方各模块接口详情；「功能说明」列为 `—` 表示源码无方法注释，可按入参 / 出参字段推断用途。
 
 | 序号 | 模块 | 方式 | 路径 | 功能说明 |
 | --- | --- | --- | --- | --- |
@@ -139,84 +139,85 @@
 | [69](#69-post-ordergrouporderapplyrefundorderinfo) | order | POST | `/order/group/order/applyRefund/orderInfo` | *查询团购订单退款申请订单详情* |
 | [70](#70-get-ordergroupwxorder) | order | GET | `/order/group/wx/order` | *查询团购微信订单* |
 | [71](#71-post-orderleaderbilllist) | order | POST | `/order/leader/bill/list` | 团长端-对账单 |
-| [72](#72-post-orderleadermymemberlist) | order | POST | `/order/leader/myMember/list` | 我的团员列表（支持手机号/昵称搜索，分页） |
-| [73](#73-get-orderleadermymemberdetail) | order | GET | `/order/leader/myMember/detail` | 团员详情（消费/退款/跟团次数/查看次数/动态） |
-| [74](#74-post-orderleaderorderlist) | order | POST | `/order/leader/order/list` | *查询团长订单列表* |
-| [75](#75-post-orderleaderapplyrefundlist) | order | POST | `/order/leader/apply/refundList` | *查询团长退款列表* |
-| [76](#76-get-orderleaderordercount) | order | GET | `/order/leader/order/count` | *查询团长订单总数* |
-| [77](#77-get-orderleaderorderstatus) | order | GET | `/order/leader/order/status` | *查询团长订单状态* |
-| [78](#78-post-orderleaderorderscanqrcode) | order | POST | `/order/leader/order/scanQRCode` | *扫码核销（团长订单）* |
-| [79](#79-get-orderleaderorderquery) | order | GET | `/order/leader/order/query` | *查询团长订单* |
-| [80](#80-post-orderleaderorderwriteoff) | order | POST | `/order/leader/order/writeOff` | *核销（团长订单）* |
-| [81](#81-post-orderleaderorderpartwriteoff) | order | POST | `/order/leader/order/partWriteOff` | *部分核销（团长订单）* |
-| [82](#82-get-orderleaderordersend) | order | GET | `/order/leader/order/send` | *发送（团长订单）* |
-| [83](#83-get-orderleaderhomeshoworders) | order | GET | `/order/leader/home/show/orders` | *查询团长首页展示订单* |
-| [84](#84-get-orderleaderhomeordergoodssummary) | order | GET | `/order/leader/home/order/goodsSummary` | *查询团长首页订单商品* |
-| [85](#85-post-ordergetgroupactivitytotalorder) | order | POST | `/order/get/groupActivity/totalOrder` | *提交（团购活动汇总订单）* |
-| [86](#86-get-orderleaderrefundcount) | order | GET | `/order/leader/refund/count` | *查询团长退款总数* |
-| [87](#87-post-orderleaderrefundapprove) | order | POST | `/order/leader/refund/approve` | *审核（团长退款）* |
-| [88](#88-post-orderleaderrefundnotify) | order | POST | `/order/leader/refund/notify` | *回调（团长退款）* |
-| [89](#89-get-orderpaymentorderpay) | order | GET | `/order/payment/order/pay` | *支付（支付订单）* |
-| [90](#90-post-orderpaymentordernotify) | order | POST | `/order/payment/order/notify` | *回调（支付订单）* |
-| [91](#91-get-goodsgroupgoodslist) | goods | GET | `/goods/group/goods/list` | *查询团购商品列表* |
-| [92](#92-get-goodsgroupgoodsstock) | goods | GET | `/goods/group/goods/stock` | *查询团购商品库存* |
-| [93](#93-get-goodsgetgoodscat) | goods | GET | `/goods/get/goods/cat` | *查询商品分类* |
-| [94](#94-get-goodsleadergoodsonline) | goods | GET | `/goods/leader/goods/online` | *查询团长商品上架* |
-| [95](#95-get-goodsleadergoodslist) | goods | GET | `/goods/leader/goods/list` | *查询团长商品列表* |
-| [96](#96-get-goodsleadergoodscount) | goods | GET | `/goods/leader/goods/count` | *查询团长商品总数* |
-| [97](#97-get-goodsleadergoodsinfo) | goods | GET | `/goods/leader/goods/info` | *查询团长商品详情* |
-| [98](#98-post-goodsleadergoodsaddgoods) | goods | POST | `/goods/leader/goods/addGoods` | *新增商品团长商品* |
-| [99](#99-post-goodsleadergoodsedit) | goods | POST | `/goods/leader/goods/edit` | *修改团长商品* |
-| [100](#100-get-goodsleadergoodsclose) | goods | GET | `/goods/leader/goods/close` | *启用/关闭团长商品* |
-| [101](#101-get-goodsleadergoodsskuspec) | goods | GET | `/goods/leader/goods/sku/spec` | *查询团长商品SKU规格* |
-| [102](#102-post-goodsleadergoodsskusave) | goods | POST | `/goods/leader/goods/sku/save` | *保存团长商品SKU* |
-| [103](#103-post-goodsleadergetgroupactivitylist) | goods | POST | `/goods/Leader/get/groupActivity/list` | 团长端-查询所有团购活动列表<br>返回每个团购活动的订单汇总数据 `groupSummaryResponse`（实际收入、退款金额、跟团人数）, 由 LeaderGroupSummaryService 批量聚合 gb_order_info 得出; 已取消订单不计入。 |
-| [104](#104-get-goodsleadergetgroupactivitycount) | goods | GET | `/goods/Leader/get/groupActivity/count` | *查询团长团购活动总数* |
-| [105](#105-get-goodsleadergroupactivitytaglist) | goods | GET | `/goods/Leader/groupActivity/tag/list` | *查询团长团购活动标签列表* |
-| [106](#106-post-goodsleadergroupactivityadd) | goods | POST | `/goods/Leader/groupActivity/add` | *新增团长团购活动* |
-| [107](#107-get-goodsleadergetgroupactivityinfo) | goods | GET | `/goods/Leader/get/groupActivity/info` | *查询团长团购活动详情* |
-| [108](#108-post-goodsleadergroupactivityedit) | goods | POST | `/goods/Leader/groupActivity/edit` | *修改团长团购活动* |
-| [109](#109-post-goodsleadergroupactivityclose) | goods | POST | `/goods/Leader/groupActivity/close` | *启用/关闭团长团购活动* |
-| [110](#110-get-goodsleadergetgroupactivitycat) | goods | GET | `/goods/Leader/get/groupActivity/cat` | *查询团长团购活动分类* |
-| [111](#111-post-goodsleadersharegroupactivityposter) | goods | POST | `/goods/Leader/share/groupActivity/poster` | *提交（团长分享团购活动海报）* |
-| [112](#112-post-goodsleadersharegroupactivitymakeposter) | goods | POST | `/goods/Leader/share/groupActivity/make/poster` | *提交（团长分享团购活动海报）* |
-| [113](#113-get-adminbusinesslist) | admin | GET | `/admin/business/list` | *查询收款账户列表* |
-| [114](#114-get-adminbusinesscount) | admin | GET | `/admin/business/count` | *查询收款账户总数* |
-| [115](#115-get-adminbusinessinfo) | admin | GET | `/admin/business/info` | *查询收款账户详情* |
-| [116](#116-post-adminbusinessadd) | admin | POST | `/admin/business/add` | *新增收款账户* |
-| [117](#117-get-admingoodslist) | admin | GET | `/admin/goods/list` | *查询商品列表* |
-| [118](#118-get-admingoodscount) | admin | GET | `/admin/goods/count` | *查询商品总数* |
-| [119](#119-get-admingoodsinfo) | admin | GET | `/admin/goods/info` | *查询商品详情* |
-| [120](#120-get-admingoodsimg) | admin | GET | `/admin/goods/img` | *查询商品图片* |
-| [121](#121-get-admingrouplist) | admin | GET | `/admin/group/list` | *查询团购列表* |
-| [122](#122-get-admingroupcount) | admin | GET | `/admin/group/count` | *查询团购总数* |
-| [123](#123-get-admingroupinfo) | admin | GET | `/admin/group/info` | *查询团购详情* |
-| [124](#124-get-admintaglist) | admin | GET | `/admin/tag/list` | *查询标签列表* |
-| [125](#125-get-admintagcount) | admin | GET | `/admin/tag/count` | *查询标签总数* |
-| [126](#126-get-admintaginfo) | admin | GET | `/admin/tag/info` | *查询标签详情* |
-| [127](#127-post-admintagadd) | admin | POST | `/admin/tag/add` | *新增标签* |
-| [128](#128-post-admintagedit) | admin | POST | `/admin/tag/edit` | *修改标签* |
-| [129](#129-post-admintagdelete) | admin | POST | `/admin/tag/delete` | *删除标签* |
-| [130](#130-get-adminleaderlist) | admin | GET | `/admin/leader/list` | *查询团长列表* |
-| [131](#131-get-adminleadercount) | admin | GET | `/admin/leader/count` | *查询团长总数* |
-| [132](#132-post-adminleaderadd) | admin | POST | `/admin/leader/add` | *新增团长* |
-| [133](#133-get-adminleaderselect) | admin | GET | `/admin/leader/select` | *查询团长* |
-| [134](#134-get-adminloginkaptcha) | admin | GET | `/admin/login/kaptcha` | *查询验证码* |
-| [135](#135-post-adminloginsubmit) | admin | POST | `/admin/login/submit` | *提交* |
-| [136](#136-get-adminmemberlist) | admin | GET | `/admin/member/list` | *查询会员列表* |
-| [137](#137-get-adminmembercount) | admin | GET | `/admin/member/count` | *查询会员总数* |
-| [138](#138-get-adminorderbusinesslist) | admin | GET | `/admin/orderbusiness/list` | *查询订单收款账户列表* |
-| [139](#139-get-adminorderbusinesscount) | admin | GET | `/admin/orderbusiness/count` | *查询订单收款账户总数* |
-| [140](#140-get-adminorderlist) | admin | GET | `/admin/order/list` | *查询订单列表* |
-| [141](#141-get-adminordercount) | admin | GET | `/admin/order/count` | *查询订单总数* |
-| [142](#142-get-taskordersend) | task | GET | `/task/order/send` | *发送（订单）* |
-| [143](#143-get-taskorderdivide) | task | GET | `/task/order/divide` | *分账（订单）* |
-| [144](#144-get-taskorderquery) | task | GET | `/task/order/query` | *查询订单* |
-| [145](#145-get-taskorderrefund) | task | GET | `/task/order/refund` | *退款（订单）* |
-| [146](#146-get-taskordercash) | task | GET | `/task/order/cash` | *查询订单提现* |
-| [147](#147-get-taskorderverify) | task | GET | `/task/order/verify` | *核销（订单）* |
-| [148](#148-get-taskorderbackstock) | task | GET | `/task/order/backstock` | *回库（订单）* |
-| [149](#149-get-tasktestuser) | task | GET | `/task/test/user` | *查询测试用户* |
+| [72](#72-get-orderleaderactivitylist) | order | GET | `/order/leader/activity/list` | 查询团长 id 下的所有团购活动(不过滤状态/时间, 按添加时间倒序)。  leaderId 优先取自 Query 参数(便于后台/管理端查询指定团长); 未传或非法时回退到请求头 lid; 两者均缺失则抛 lid不存在 业务异常。 |
+| [73](#73-post-orderleadermymemberlist) | order | POST | `/order/leader/myMember/list` | 我的团员列表（支持手机号/昵称搜索，分页） |
+| [74](#74-get-orderleadermymemberdetail) | order | GET | `/order/leader/myMember/detail` | 团员详情（消费/退款/跟团次数/查看次数/动态） |
+| [75](#75-post-orderleaderorderlist) | order | POST | `/order/leader/order/list` | *查询团长订单列表* |
+| [76](#76-post-orderleaderapplyrefundlist) | order | POST | `/order/leader/apply/refundList` | *查询团长退款列表* |
+| [77](#77-get-orderleaderordercount) | order | GET | `/order/leader/order/count` | *查询团长订单总数* |
+| [78](#78-get-orderleaderorderstatus) | order | GET | `/order/leader/order/status` | *查询团长订单状态* |
+| [79](#79-post-orderleaderorderscanqrcode) | order | POST | `/order/leader/order/scanQRCode` | *扫码核销（团长订单）* |
+| [80](#80-get-orderleaderorderquery) | order | GET | `/order/leader/order/query` | *查询团长订单* |
+| [81](#81-post-orderleaderorderwriteoff) | order | POST | `/order/leader/order/writeOff` | *核销（团长订单）* |
+| [82](#82-post-orderleaderorderpartwriteoff) | order | POST | `/order/leader/order/partWriteOff` | *部分核销（团长订单）* |
+| [83](#83-get-orderleaderordersend) | order | GET | `/order/leader/order/send` | *发送（团长订单）* |
+| [84](#84-get-orderleaderhomeshoworders) | order | GET | `/order/leader/home/show/orders` | *查询团长首页展示订单* |
+| [85](#85-get-orderleaderhomeordergoodssummary) | order | GET | `/order/leader/home/order/goodsSummary` | *查询团长首页订单商品* |
+| [86](#86-post-ordergetgroupactivitytotalorder) | order | POST | `/order/get/groupActivity/totalOrder` | *提交（团购活动汇总订单）* |
+| [87](#87-get-orderleaderrefundcount) | order | GET | `/order/leader/refund/count` | *查询团长退款总数* |
+| [88](#88-post-orderleaderrefundapprove) | order | POST | `/order/leader/refund/approve` | *审核（团长退款）* |
+| [89](#89-post-orderleaderrefundnotify) | order | POST | `/order/leader/refund/notify` | *回调（团长退款）* |
+| [90](#90-get-orderpaymentorderpay) | order | GET | `/order/payment/order/pay` | *支付（支付订单）* |
+| [91](#91-post-orderpaymentordernotify) | order | POST | `/order/payment/order/notify` | *回调（支付订单）* |
+| [92](#92-get-goodsgroupgoodslist) | goods | GET | `/goods/group/goods/list` | *查询团购商品列表* |
+| [93](#93-get-goodsgroupgoodsstock) | goods | GET | `/goods/group/goods/stock` | *查询团购商品库存* |
+| [94](#94-get-goodsgetgoodscat) | goods | GET | `/goods/get/goods/cat` | *查询商品分类* |
+| [95](#95-get-goodsleadergoodsonline) | goods | GET | `/goods/leader/goods/online` | *查询团长商品上架* |
+| [96](#96-get-goodsleadergoodslist) | goods | GET | `/goods/leader/goods/list` | *查询团长商品列表* |
+| [97](#97-get-goodsleadergoodscount) | goods | GET | `/goods/leader/goods/count` | *查询团长商品总数* |
+| [98](#98-get-goodsleadergoodsinfo) | goods | GET | `/goods/leader/goods/info` | *查询团长商品详情* |
+| [99](#99-post-goodsleadergoodsaddgoods) | goods | POST | `/goods/leader/goods/addGoods` | *新增商品团长商品* |
+| [100](#100-post-goodsleadergoodsedit) | goods | POST | `/goods/leader/goods/edit` | *修改团长商品* |
+| [101](#101-get-goodsleadergoodsclose) | goods | GET | `/goods/leader/goods/close` | *启用/关闭团长商品* |
+| [102](#102-get-goodsleadergoodsskuspec) | goods | GET | `/goods/leader/goods/sku/spec` | *查询团长商品SKU规格* |
+| [103](#103-post-goodsleadergoodsskusave) | goods | POST | `/goods/leader/goods/sku/save` | *保存团长商品SKU* |
+| [104](#104-post-goodsleadergetgroupactivitylist) | goods | POST | `/goods/Leader/get/groupActivity/list` | 团长端-查询所有团购活动列表<br>返回每个团购活动的订单汇总数据 `groupSummaryResponse`（实际收入、退款金额、跟团人数）, 由 LeaderGroupSummaryService 批量聚合 gb_order_info 得出; 已取消订单不计入。 |
+| [105](#105-get-goodsleadergetgroupactivitycount) | goods | GET | `/goods/Leader/get/groupActivity/count` | *查询团长团购活动总数* |
+| [106](#106-get-goodsleadergroupactivitytaglist) | goods | GET | `/goods/Leader/groupActivity/tag/list` | *查询团长团购活动标签列表* |
+| [107](#107-post-goodsleadergroupactivityadd) | goods | POST | `/goods/Leader/groupActivity/add` | *新增团长团购活动* |
+| [108](#108-get-goodsleadergetgroupactivityinfo) | goods | GET | `/goods/Leader/get/groupActivity/info` | *查询团长团购活动详情* |
+| [109](#109-post-goodsleadergroupactivityedit) | goods | POST | `/goods/Leader/groupActivity/edit` | *修改团长团购活动* |
+| [110](#110-post-goodsleadergroupactivityclose) | goods | POST | `/goods/Leader/groupActivity/close` | *启用/关闭团长团购活动* |
+| [111](#111-get-goodsleadergetgroupactivitycat) | goods | GET | `/goods/Leader/get/groupActivity/cat` | *查询团长团购活动分类* |
+| [112](#112-post-goodsleadersharegroupactivityposter) | goods | POST | `/goods/Leader/share/groupActivity/poster` | *提交（团长分享团购活动海报）* |
+| [113](#113-post-goodsleadersharegroupactivitymakeposter) | goods | POST | `/goods/Leader/share/groupActivity/make/poster` | *提交（团长分享团购活动海报）* |
+| [114](#114-get-adminbusinesslist) | admin | GET | `/admin/business/list` | *查询收款账户列表* |
+| [115](#115-get-adminbusinesscount) | admin | GET | `/admin/business/count` | *查询收款账户总数* |
+| [116](#116-get-adminbusinessinfo) | admin | GET | `/admin/business/info` | *查询收款账户详情* |
+| [117](#117-post-adminbusinessadd) | admin | POST | `/admin/business/add` | *新增收款账户* |
+| [118](#118-get-admingoodslist) | admin | GET | `/admin/goods/list` | *查询商品列表* |
+| [119](#119-get-admingoodscount) | admin | GET | `/admin/goods/count` | *查询商品总数* |
+| [120](#120-get-admingoodsinfo) | admin | GET | `/admin/goods/info` | *查询商品详情* |
+| [121](#121-get-admingoodsimg) | admin | GET | `/admin/goods/img` | *查询商品图片* |
+| [122](#122-get-admingrouplist) | admin | GET | `/admin/group/list` | *查询团购列表* |
+| [123](#123-get-admingroupcount) | admin | GET | `/admin/group/count` | *查询团购总数* |
+| [124](#124-get-admingroupinfo) | admin | GET | `/admin/group/info` | *查询团购详情* |
+| [125](#125-get-admintaglist) | admin | GET | `/admin/tag/list` | *查询标签列表* |
+| [126](#126-get-admintagcount) | admin | GET | `/admin/tag/count` | *查询标签总数* |
+| [127](#127-get-admintaginfo) | admin | GET | `/admin/tag/info` | *查询标签详情* |
+| [128](#128-post-admintagadd) | admin | POST | `/admin/tag/add` | *新增标签* |
+| [129](#129-post-admintagedit) | admin | POST | `/admin/tag/edit` | *修改标签* |
+| [130](#130-post-admintagdelete) | admin | POST | `/admin/tag/delete` | *删除标签* |
+| [131](#131-get-adminleaderlist) | admin | GET | `/admin/leader/list` | *查询团长列表* |
+| [132](#132-get-adminleadercount) | admin | GET | `/admin/leader/count` | *查询团长总数* |
+| [133](#133-post-adminleaderadd) | admin | POST | `/admin/leader/add` | *新增团长* |
+| [134](#134-get-adminleaderselect) | admin | GET | `/admin/leader/select` | *查询团长* |
+| [135](#135-get-adminloginkaptcha) | admin | GET | `/admin/login/kaptcha` | *查询验证码* |
+| [136](#136-post-adminloginsubmit) | admin | POST | `/admin/login/submit` | *提交* |
+| [137](#137-get-adminmemberlist) | admin | GET | `/admin/member/list` | *查询会员列表* |
+| [138](#138-get-adminmembercount) | admin | GET | `/admin/member/count` | *查询会员总数* |
+| [139](#139-get-adminorderbusinesslist) | admin | GET | `/admin/orderbusiness/list` | *查询订单收款账户列表* |
+| [140](#140-get-adminorderbusinesscount) | admin | GET | `/admin/orderbusiness/count` | *查询订单收款账户总数* |
+| [141](#141-get-adminorderlist) | admin | GET | `/admin/order/list` | *查询订单列表* |
+| [142](#142-get-adminordercount) | admin | GET | `/admin/order/count` | *查询订单总数* |
+| [143](#143-get-taskordersend) | task | GET | `/task/order/send` | *发送（订单）* |
+| [144](#144-get-taskorderdivide) | task | GET | `/task/order/divide` | *分账（订单）* |
+| [145](#145-get-taskorderquery) | task | GET | `/task/order/query` | *查询订单* |
+| [146](#146-get-taskorderrefund) | task | GET | `/task/order/refund` | *退款（订单）* |
+| [147](#147-get-taskordercash) | task | GET | `/task/order/cash` | *查询订单提现* |
+| [148](#148-get-taskorderverify) | task | GET | `/task/order/verify` | *核销（订单）* |
+| [149](#149-get-taskorderbackstock) | task | GET | `/task/order/backstock` | *回库（订单）* |
+| [150](#150-get-tasktestuser) | task | GET | `/task/test/user` | *查询测试用户* |
 
 ---
 
@@ -313,7 +314,7 @@ data 类型：`String`（基本类型，无子字段）
 
 | 参数 | 类型 | 位置 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
-| lid | `Long` | Query 参数 | 是 | 团长 ID（变量名 leaderId） |
+| lid | `Long` | Query 参数 | 是 | 团长 ID（<=0 或 null 时表示不过滤）（变量名 leaderId） |
 
 **出参（JsonResult 统一返回体）**
 
@@ -907,7 +908,7 @@ data 类型：无（接口仅返回操作结果，data 为 null）
 
 | 参数 | 类型 | 位置 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
-| pointId | `Long` | Query 参数 | 是 | 提货点（自提点）ID |
+| pointId | `Long` | Query 参数 | 是 | 提货点（自提点）ID（<=0 或 null 时表示不过滤） |
 
 **出参（JsonResult 统一返回体）**
 
@@ -1053,7 +1054,7 @@ data 类型：无（接口仅返回操作结果，data 为 null）
 
 | 参数 | 类型 | 位置 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
-| leaderId | `Long` | Query 参数 | 是 | 团长 ID |
+| leaderId | `Long` | Query 参数 | 是 | 团长 ID（<=0 或 null 时表示不过滤） |
 
 **出参（JsonResult 统一返回体）**
 
@@ -1784,6 +1785,24 @@ data 类型：`List<MemberHomeGroupActResponse>`（数组，元素类型 `Member
 | price | `Double` | 否 | 团购价 |
 | price2 | `Double` | 否 | 市场价 |
 | stock | `String` | 否 | 库存(商品数量+单位, 如 100斤) |
+| specList | `List<GroupSpecResponse>` | 否 | 商品规格列表(包含规格值, 不含禁用规格/规格值); 调用方需按 goodsId 填充 |
+
+
+**→→GroupSpecResponse 字段**（字段 `specList`（List<GroupSpecResponse>））
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| specId | `Long` | 否 | — |
+| specName | `String` | 否 | — |
+| valList | `List<GroupSpecValResponse>` | 否 | — |
+
+
+**→→→GroupSpecValResponse 字段**（字段 `valList`（List<GroupSpecValResponse>））
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| valId | `Long` | 否 | — |
+| valName | `String` | 否 | — |
 
 
 **→GroupLogs 字段**（字段 `groupLogs`（List<GroupLogs>））
@@ -1805,7 +1824,7 @@ data 类型：`List<MemberHomeGroupActResponse>`（数组，元素类型 `Member
 
 | 参数 | 类型 | 位置 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
-| groupId | `Long` | Query 参数 | 是 | 团购活动 ID |
+| groupId | `Long` | Query 参数 | 是 | 团购活动 ID（<=0 或 null 时表示不过滤） |
 
 **出参（JsonResult 统一返回体）**
 
@@ -1873,7 +1892,7 @@ data 类型：`Boolean`（基本类型，无子字段）
 
 | 参数 | 类型 | 位置 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
-| leaderId | `Long` | Query 参数 | 是 | 团长 ID |
+| leaderId | `Long` | Query 参数 | 是 | 团长 ID（<=0 或 null 时表示不过滤） |
 
 **出参（JsonResult 统一返回体）**
 
@@ -1907,7 +1926,7 @@ data 类型：`ShopResponse`（字段说明见下）
 
 | 参数 | 类型 | 位置 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
-| groupId | `Long` | Query 参数 | 是 | 团购活动 ID |
+| groupId | `Long` | Query 参数 | 是 | 团购活动 ID（<=0 或 null 时表示不过滤） |
 
 **出参（JsonResult 统一返回体）**
 
@@ -1969,7 +1988,7 @@ data 类型：`List<GroupLogs>`（数组，元素类型 `GroupLogs`，字段说�
 
 | 参数 | 类型 | 位置 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
-| groupId | `Long` | Query 参数 | 否 | 团购活动 ID |
+| groupId | `Long` | Query 参数 | 否 | 团购活动 ID（<=0 或 null 时表示不过滤） |
 | limit | `Integer` | Query 参数 | 否 | 每页条数 |
 
 **出参（JsonResult 统一返回体）**
@@ -2170,7 +2189,7 @@ data 类型：`List<OrderResponse>`（数组，元素类型 `OrderResponse`，�
 
 | 参数 | 类型 | 位置 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
-| pid | `Long` | Query 参数 | 是 | 提货点（自提点）ID（变量名 pointId） |
+| pid | `Long` | Query 参数 | 是 | 提货点（自提点）ID（<=0 或 null 时表示不过滤）（变量名 pointId） |
 
 **出参（JsonResult 统一返回体）**
 
@@ -2281,7 +2300,7 @@ data 类型：`String`（基本类型，无子字段）
 | 参数 | 类型 | 位置 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
 | orderNo | `String` | Query 参数 | 是 | 订单编号 |
-| point | `Long` | Query 参数 | 是 | 提货点（自提点）ID（变量名 pointId） |
+| point | `Long` | Query 参数 | 是 | 提货点（自提点）ID（<=0 或 null 时表示不过滤）（变量名 pointId） |
 
 **出参（JsonResult 统一返回体）**
 
@@ -2677,6 +2696,41 @@ data 类型：`LeaderBillListResponse`（字段说明见下）
 
 
 
+### LeaderGroupActivityController
+
+> 类路径：`cn.com.shopgroup.order.controller.leader.LeaderGroupActivityController`
+
+> 接口数量：1
+
+#### 1. GET `/order/leader/activity/list`
+
+**功能说明**：查询团长 id 下的所有团购活动(不过滤状态/时间, 按添加时间倒序)。  leaderId 优先取自 Query 参数(便于后台/管理端查询指定团长); 未传或非法时回退到请求头 lid; 两者均缺失则抛 lid不存在 业务异常。
+
+**入参**：无
+
+**出参（JsonResult 统一返回体）**
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| code | `Integer` | 状态码：200=成功，300=失败，400=无权限，500=错误 |
+| msg | `String` | 提示信息 |
+| data | `Object` | 返回数据，类型：`List<LeaderGroupActivityResponse>`（具体字段见下方表格） |
+
+data 类型：`List<LeaderGroupActivityResponse>`（数组，元素类型 `LeaderGroupActivityResponse`，字段说明见下）
+
+**LeaderGroupActivityResponse 字段**
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| groupId | `Long` | 否 | 团购活动 ID |
+| groupName | `String` | 否 | 团购活动名称 |
+| startTime | `Integer` | 否 | 开团时间(秒级时间戳) |
+| endTime | `Integer` | 否 | 结束时间(秒级时间戳) |
+| orderTotal | `Integer` | 否 | 实际订单数量 |
+| isClose | `Byte` | 否 | 是否关闭: 0 上线 1 下线 |
+
+
+
 ### LeaderMemberController
 
 > 类路径：`cn.com.shopgroup.order.controller.leader.LeaderMemberController`
@@ -2958,8 +3012,8 @@ data 类型：`List<OrderResponse>`（数组，元素类型 `OrderResponse`，�
 
 | 参数 | 类型 | 位置 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
-| gid | `Long` | Query 参数 | 是 | 团购活动 ID（变量名 groupId） |
-| pid | `Long` | Query 参数 | 是 | 提货点（自提点）ID（变量名 pointId） |
+| gid | `Long` | Query 参数 | 是 | 团购活动 ID（<=0 或 null 时表示不过滤）（变量名 groupId） |
+| pid | `Long` | Query 参数 | 是 | 提货点（自提点）ID（<=0 或 null 时表示不过滤）（变量名 pointId） |
 
 **出参（JsonResult 统一返回体）**
 
@@ -2979,8 +3033,8 @@ data 类型：`Long`（基本类型，无子字段）
 
 | 参数 | 类型 | 位置 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
-| gid | `Long` | Query 参数 | 是 | 团购活动 ID（变量名 groupId） |
-| pid | `Long` | Query 参数 | 是 | 提货点（自提点）ID（变量名 pointId） |
+| gid | `Long` | Query 参数 | 是 | 团购活动 ID（<=0 或 null 时表示不过滤）（变量名 groupId） |
+| pid | `Long` | Query 参数 | 是 | 提货点（自提点）ID（<=0 或 null 时表示不过滤）（变量名 pointId） |
 
 **出参（JsonResult 统一返回体）**
 
@@ -3160,7 +3214,7 @@ data 类型：`OrderResponse`（字段说明见下）
 | 参数 | 类型 | 位置 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
 | orderNo | `String` | Query 参数 | 是 | 订单编号 |
-| pid | `Long` | Query 参数 | 是 | 提货点（自提点）ID（变量名 pointId） |
+| pid | `Long` | Query 参数 | 是 | 提货点（自提点）ID（<=0 或 null 时表示不过滤）（变量名 pointId） |
 
 **出参（JsonResult 统一返回体）**
 
@@ -3237,7 +3291,8 @@ data 类型：`String`（基本类型，无子字段）
 
 | 参数 | 类型 | 位置 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
-| pointId | `Long` | Query 参数 | 是 | 提货点（自提点）ID |
+| groupId | `Long` | Query 参数 | 是 | 团购活动 ID（<=0 或 null 时表示不过滤） |
+| pointId | `Long` | Query 参数 | 是 | 提货点（自提点）ID（<=0 或 null 时表示不过滤） |
 
 **出参（JsonResult 统一返回体）**
 
@@ -3266,7 +3321,8 @@ data 类型：`LeaderHomeShowDataResponse`（字段说明见下）
 
 | 参数 | 类型 | 位置 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
-| pointId | `Long` | Query 参数 | 是 | 提货点（自提点）ID |
+| groupId | `Long` | Query 参数 | 是 | 团购活动 ID（<=0 或 null 时表示不过滤） |
+| pointId | `Long` | Query 参数 | 是 | 提货点（自提点）ID（<=0 或 null 时表示不过滤） |
 | keyword | `String` | Query 参数 | 否 | 搜索关键字 |
 | page | `Integer` | Query 参数 | 是 | 页码（从 1 开始） |
 | pageSize | `Integer` | Query 参数 | 是 | 每页条数（默认 10） |
@@ -3312,7 +3368,7 @@ data 类型：`LeaderHomeGoodsSummaryResponse`（字段说明见下）
 
 | 参数 | 类型 | 位置 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
-| groupId | `Long` | Query 参数 | 是 | 团购活动 ID |
+| groupId | `Long` | Query 参数 | 是 | 团购活动 ID（<=0 或 null 时表示不过滤） |
 
 **出参（JsonResult 统一返回体）**
 
@@ -3341,8 +3397,8 @@ data 类型：`Integer`（基本类型，无子字段）
 
 | 参数 | 类型 | 位置 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
-| gid | `Long` | Query 参数 | 是 | 团购活动 ID（变量名 groupId） |
-| pid | `Long` | Query 参数 | 是 | 提货点（自提点）ID（变量名 pointId） |
+| gid | `Long` | Query 参数 | 是 | 团购活动 ID（<=0 或 null 时表示不过滤）（变量名 groupId） |
+| pid | `Long` | Query 参数 | 是 | 提货点（自提点）ID（<=0 或 null 时表示不过滤）（变量名 pointId） |
 
 **出参（JsonResult 统一返回体）**
 
@@ -3470,8 +3526,8 @@ data 类型：`Object`（未能静态推断，源码返回表达式：`JSONObjec
 
 | 参数 | 类型 | 位置 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
-| lid | `Long` | Query 参数 | 是 | 团长 ID（变量名 leaderId） |
-| groupId | `Long` | Query 参数 | 是 | 团购活动 ID |
+| lid | `Long` | Query 参数 | 是 | 团长 ID（<=0 或 null 时表示不过滤）（变量名 leaderId） |
+| groupId | `Long` | Query 参数 | 是 | 团购活动 ID（<=0 或 null 时表示不过滤） |
 
 **出参（JsonResult 统一返回体）**
 
@@ -3548,7 +3604,7 @@ data 类型：`List<GroupGoodsResponse>`（数组，元素类型 `GroupGoodsResp
 
 | 参数 | 类型 | 位置 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
-| gid | `String` | Query 参数 | 是 | 团购活动 ID（变量名 goodsIds） |
+| gid | `String` | Query 参数 | 是 | 团购活动 ID（<=0 或 null 时表示不过滤）（变量名 goodsIds） |
 
 **出参（JsonResult 统一返回体）**
 
@@ -4136,6 +4192,24 @@ data 类型：`List<GroupActResponse>`（数组，元素类型 `GroupActResponse
 | price | `Double` | 否 | 团购价 |
 | price2 | `Double` | 否 | 市场价 |
 | stock | `String` | 否 | 库存(商品数量+单位, 如 100斤) |
+| specList | `List<GroupSpecResponse>` | 否 | 商品规格列表(包含规格值, 不含禁用规格/规格值); 调用方需按 goodsId 填充 |
+
+
+**→→GroupSpecResponse 字段**（字段 `specList`（List<GroupSpecResponse>））
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| specId | `Long` | 否 | — |
+| specName | `String` | 否 | — |
+| valList | `List<GroupSpecValResponse>` | 否 | — |
+
+
+**→→→GroupSpecValResponse 字段**（字段 `valList`（List<GroupSpecValResponse>））
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| valId | `Long` | 否 | — |
+| valName | `String` | 否 | — |
 
 
 **→LeaderGroupSummaryResponse 字段**（字段 `groupSummaryResponse`（LeaderGroupSummaryResponse））
@@ -4237,7 +4311,7 @@ data 类型：`Long`（基本类型，无子字段）
 
 | 参数 | 类型 | 位置 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
-| groupId | `Long` | Query 参数 | 是 | 团购活动 ID |
+| groupId | `Long` | Query 参数 | 是 | 团购活动 ID（<=0 或 null 时表示不过滤） |
 
 **出参（JsonResult 统一返回体）**
 
@@ -4290,6 +4364,24 @@ data 类型：`GroupActResponse`（字段说明见下）
 | price | `Double` | 否 | 团购价 |
 | price2 | `Double` | 否 | 市场价 |
 | stock | `String` | 否 | 库存(商品数量+单位, 如 100斤) |
+| specList | `List<GroupSpecResponse>` | 否 | 商品规格列表(包含规格值, 不含禁用规格/规格值); 调用方需按 goodsId 填充 |
+
+
+**→→GroupSpecResponse 字段**（字段 `specList`（List<GroupSpecResponse>））
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| specId | `Long` | 否 | — |
+| specName | `String` | 否 | — |
+| valList | `List<GroupSpecValResponse>` | 否 | — |
+
+
+**→→→GroupSpecValResponse 字段**（字段 `valList`（List<GroupSpecValResponse>））
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| valId | `Long` | 否 | — |
+| valName | `String` | 否 | — |
 
 
 **→LeaderGroupSummaryResponse 字段**（字段 `groupSummaryResponse`（LeaderGroupSummaryResponse））
@@ -4353,7 +4445,7 @@ data 类型：`String`（基本类型，无子字段）
 
 | 参数 | 类型 | 位置 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
-| groupId | `Long` | Query 参数 | 是 | 团购活动 ID |
+| groupId | `Long` | Query 参数 | 是 | 团购活动 ID（<=0 或 null 时表示不过滤） |
 
 **出参（JsonResult 统一返回体）**
 
@@ -4397,7 +4489,7 @@ data 类型：`List<GroupCatResponse>`（数组，元素类型 `GroupCatResponse
 
 | 参数 | 类型 | 位置 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
-| groupId | `Long` | Query 参数 | 是 | 团购活动 ID |
+| groupId | `Long` | Query 参数 | 是 | 团购活动 ID（<=0 或 null 时表示不过滤） |
 
 **出参（JsonResult 统一返回体）**
 
@@ -4417,7 +4509,7 @@ data 类型：`String`（基本类型，无子字段）
 
 | 参数 | 类型 | 位置 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
-| groupId | `Long` | Query 参数 | 是 | 团购活动 ID |
+| groupId | `Long` | Query 参数 | 是 | 团购活动 ID（<=0 或 null 时表示不过滤） |
 
 **出参（JsonResult 统一返回体）**
 
@@ -4600,11 +4692,11 @@ data 类型：无（接口仅返回操作结果，data 为 null）
 | --- | --- | --- |
 | code | `Integer` | 状态码：200=成功，300=失败，400=无权限，500=错误 |
 | msg | `String` | 提示信息 |
-| data | `Object` | 返回数据，类型：`List<GbGoodsInfo>`（具体字段见下方表格） |
+| data | `Object` | 返回数据，类型：`List<AdminGoodsResponse>`（具体字段见下方表格） |
 
-data 类型：`List<GbGoodsInfo>`（数组，元素类型 `GbGoodsInfo`，字段说明见下）
+data 类型：`List<AdminGoodsResponse>`（数组，元素类型 `AdminGoodsResponse`，字段说明见下）
 
-**GbGoodsInfo 字段**
+**AdminGoodsResponse 字段**
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
@@ -4617,16 +4709,34 @@ data 类型：`List<GbGoodsInfo>`（数组，元素类型 `GbGoodsInfo`，字段
 | costPrice | `Double` | 否 | 进货价格 |
 | salesPrice | `Double` | 否 | 销售价格 |
 | marketPrice | `Double` | 否 | 市场价格 |
-| isStock | `Byte` | 否 | 是否启用库存, 1=启用 |
-| goodsNum | `Integer` | 否 | 商品库存,总库存 |
-| isLimit | `Byte` | 否 | 是否启用限购, 1=启用 |
+| isStock | `Byte` | 否 | 是否启用库存 |
+| goodsNum | `Integer` | 否 | 商品库存 |
+| isLimit | `Byte` | 否 | 是否启用限购 |
 | limitNum | `Integer` | 否 | 限购数量 |
 | goodsUnit | `String` | 否 | 商品单位 |
 | goodsInfo | `String` | 否 | 商品介绍 |
 | isClose | `Byte` | 否 | 是否禁用 0 开启 1关闭 |
-| isCheck | `Byte` | 否 | 平台审核（ |
-| checkRemark | `String` | 否 | 审核备注 0待审核 1 通过 2 不同意 |
+| isCheck | `Byte` | 否 | 平台审核 |
+| checkRemark | `String` | 否 | 审核备注 |
 | addTime | `Integer` | 否 | 添加时间 |
+| specList | `List<LeaderSpecResponse>` | 否 | 商品规格列表(包含规格值, 不含禁用规格/规格值); 调用方需按 goodsId 填充 |
+
+
+**→LeaderSpecResponse 字段**（字段 `specList`（List<LeaderSpecResponse>））
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| specId | `Long` | 否 | — |
+| specName | `String` | 否 | — |
+| valList | `List<LeaderSpecValResponse>` | 否 | — |
+
+
+**→→LeaderSpecValResponse 字段**（字段 `valList`（List<LeaderSpecValResponse>））
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| valId | `Long` | 否 | — |
+| valName | `String` | 否 | — |
 
 
 #### 2. GET `/admin/goods/count`
@@ -4661,11 +4771,11 @@ data 类型：`long`（基本类型，无子字段）
 | --- | --- | --- |
 | code | `Integer` | 状态码：200=成功，300=失败，400=无权限，500=错误 |
 | msg | `String` | 提示信息 |
-| data | `Object` | 返回数据，类型：`GbGoodsInfo`（具体字段见下方表格） |
+| data | `Object` | 返回数据，类型：`AdminGoodsResponse`（具体字段见下方表格） |
 
-data 类型：`GbGoodsInfo`（字段说明见下）
+data 类型：`AdminGoodsResponse`（字段说明见下）
 
-**GbGoodsInfo 字段**
+**AdminGoodsResponse 字段**
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
@@ -4678,16 +4788,34 @@ data 类型：`GbGoodsInfo`（字段说明见下）
 | costPrice | `Double` | 否 | 进货价格 |
 | salesPrice | `Double` | 否 | 销售价格 |
 | marketPrice | `Double` | 否 | 市场价格 |
-| isStock | `Byte` | 否 | 是否启用库存, 1=启用 |
-| goodsNum | `Integer` | 否 | 商品库存,总库存 |
-| isLimit | `Byte` | 否 | 是否启用限购, 1=启用 |
+| isStock | `Byte` | 否 | 是否启用库存 |
+| goodsNum | `Integer` | 否 | 商品库存 |
+| isLimit | `Byte` | 否 | 是否启用限购 |
 | limitNum | `Integer` | 否 | 限购数量 |
 | goodsUnit | `String` | 否 | 商品单位 |
 | goodsInfo | `String` | 否 | 商品介绍 |
 | isClose | `Byte` | 否 | 是否禁用 0 开启 1关闭 |
-| isCheck | `Byte` | 否 | 平台审核（ |
-| checkRemark | `String` | 否 | 审核备注 0待审核 1 通过 2 不同意 |
+| isCheck | `Byte` | 否 | 平台审核 |
+| checkRemark | `String` | 否 | 审核备注 |
 | addTime | `Integer` | 否 | 添加时间 |
+| specList | `List<LeaderSpecResponse>` | 否 | 商品规格列表(包含规格值, 不含禁用规格/规格值); 调用方需按 goodsId 填充 |
+
+
+**→LeaderSpecResponse 字段**（字段 `specList`（List<LeaderSpecResponse>））
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| specId | `Long` | 否 | — |
+| specName | `String` | 否 | — |
+| valList | `List<LeaderSpecValResponse>` | 否 | — |
+
+
+**→→LeaderSpecValResponse 字段**（字段 `valList`（List<LeaderSpecValResponse>））
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| valId | `Long` | 否 | — |
+| valName | `String` | 否 | — |
 
 
 #### 4. GET `/admin/goods/img`

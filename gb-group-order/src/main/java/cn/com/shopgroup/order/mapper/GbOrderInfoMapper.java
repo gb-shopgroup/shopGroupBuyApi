@@ -144,24 +144,27 @@ public interface GbOrderInfoMapper extends BaseMapper<GbOrderInfo> {
 
     // (团长端首页)商品统计汇总: 订单商品总件数(SUM(goods_num*pack_num)),
     // 待核销总件数(按商品行计算: goods_num - receipt_num - refund_num, 即已退款部分不计入待核销, 支持部分核销),
-    // 已支付(pay_time>0)
+    // 已支付(pay_time>0), 按 团购活动 group_id / 自提点 pointId / 关键字 goods_name 过滤
+    // (groupId / pointId 为 0 或 null 时表示不过滤)
     @Select({
             "SELECT COALESCE(SUM(g.`goods_num` * g.`pack_num`), 0) AS goods_total,",
             "       COALESCE(SUM(GREATEST(g.`goods_num` - IFNULL(g.`receipt_num`, 0) - IFNULL(g.`refund_num`, 0) , 0) * g.`pack_num`), 0) AS unverify_total",
             "FROM `gb_order_goods_info` AS g",
             "JOIN `gb_order_info` AS o ON g.`order_no` = o.`order_no`",
             "WHERE o.`leader_id` = #{leaderId}",
+            "AND (o.`group_id` = #{groupId} OR IFNULL(#{groupId}, 0) <= 0)",
             "AND (o.`point_id` = #{pointId} OR IFNULL(#{pointId}, 0) <= 0)",
             "  AND o.`pay_time` > 0",
             "  AND g.`goods_name` LIKE CONCAT('%', IFNULL(#{keyword}, ''), '%')"
     })
-    Map<String, Object> getSummaryGoodsTotal(@Param("leaderId") Long leaderId, @Param("pointId") Long pointId,
-                                             @Param("keyword") String keyword);
+    Map<String, Object> getSummaryGoodsTotal(@Param("leaderId") Long leaderId, @Param("groupId") Long groupId,
+                                             @Param("pointId") Long pointId, @Param("keyword") String keyword);
 
 
     // (团长端首页)商品维度统计分页列表: 每商品总件数(num_total)/已核销件数(receipt_total)/
     // 待核销件数(unverify_num = goods_num - receipt_num - refund_num, 已退款部分不计入待核销, 支持部分核销),
-    // 已支付(pay_time>0), goods_name 关键字搜索, 分页
+    // 已支付(pay_time>0), 按 团购活动 group_id / 自提点 pointId / 关键字 goods_name 过滤,
+    // (groupId / pointId 为 0 或 null 时表示不过滤), 分页
     @Select({
             "SELECT g.`goods_id`, g.`goods_name`, g.`goods_unit`,",
             "       COALESCE(SUM(g.`goods_num` * g.`pack_num`), 0) AS num_total,",
@@ -170,6 +173,7 @@ public interface GbOrderInfoMapper extends BaseMapper<GbOrderInfo> {
             "FROM `gb_order_goods_info` AS g",
             "JOIN `gb_order_info` AS o ON g.`order_no` = o.`order_no`",
             "WHERE o.`leader_id` = #{leaderId}",
+            "AND (o.`group_id` = #{groupId} OR IFNULL(#{groupId}, 0) <= 0)",
             "AND (o.`point_id` = #{pointId} OR IFNULL(#{pointId}, 0) <= 0)",
             "  AND o.`pay_time` > 0",
             "  AND g.`goods_name` LIKE CONCAT('%', IFNULL(#{keyword}, ''), '%')",
@@ -177,9 +181,9 @@ public interface GbOrderInfoMapper extends BaseMapper<GbOrderInfo> {
             "ORDER BY g.`goods_id` ASC",
             "LIMIT #{offset}, #{limit}"
     })
-    List<Map<String, Object>> getSummaryPointGoodsPageList(@Param("leaderId") Long leaderId, @Param("pointId") Long pointId,
-                                                           @Param("keyword") String keyword, @Param("offset") int offset,
-                                                           @Param("limit") int limit);
+    List<Map<String, Object>> getSummaryPointGoodsPageList(@Param("leaderId") Long leaderId, @Param("groupId") Long groupId,
+                                                           @Param("pointId") Long pointId, @Param("keyword") String keyword,
+                                                           @Param("offset") int offset, @Param("limit") int limit);
 
 
     // (店员)指定 提货点id 和 商品id 汇总订单商品"sku"数量, 已支付(pay_time>0), 未退款(refund_time=0), 不区分是否核销
