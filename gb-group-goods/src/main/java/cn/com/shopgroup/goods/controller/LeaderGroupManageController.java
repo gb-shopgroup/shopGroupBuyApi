@@ -418,6 +418,7 @@ public class LeaderGroupManageController {
         response.setGoods(goodsResponses);
         // 跟团统计: 团员人数及其下单数
         response.setGenTuanResponse(leaderGroupSummaryService.getGenTuanByGroupId(groupId));
+        log.info("团长端-团购详情，groupId:{},data{}", groupId, JSON.toJSONString(response));
         return JsonResult.success(response);
     }
 
