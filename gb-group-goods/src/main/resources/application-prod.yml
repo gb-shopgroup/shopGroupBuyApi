@@ -91,3 +91,8 @@ upload-config:
   domain: https://shopgroup.obs.cn-north-9.myhuaweicloud.com # 公有文件访问域名
   domain2: https://api.shopgroup.com.cn/image/access # 私有文件访问域名
 
+
+# 微信小程序配置: prod 环境生成的二维码扫码后落地到正式版(release)
+# 若体验版/正式版需使用不同 appid/secret, 在此覆盖 wx-mini.appid/wx-mini.secret
+wx-mini:
+  env-version: release

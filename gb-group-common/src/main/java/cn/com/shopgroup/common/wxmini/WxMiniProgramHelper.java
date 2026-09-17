@@ -35,8 +35,22 @@ import java.util.regex.Pattern;
 @Slf4j
 public class WxMiniProgramHelper {
 
-    private final static String AppID = "wx959de27ff559b753";
-    private final static String AppSecret = "8dbfa901d0f7f692f9479d3b6743fb65";
+    /**
+     * 微信小程序 appid; 由 WxMiniConfig 在启动时按 wx-mini.appid 覆盖(空配置保持默认值)
+     */
+    public static String APP_ID = "wx959de27ff559b753";
+
+    /**
+     * 微信小程序 secret; 由 WxMiniConfig 在启动时按 wx-mini.secret 覆盖(空配置保持默认值)
+     */
+    public static String APP_SECRET = "8dbfa901d0f7f692f9479d3b6743fb65";
+
+    /**
+     * 小程序码(getwxacodeunlimit)扫码目标版本:
+     * trial=体验版, release=正式版, develop=开发版
+     * 由 WxMiniConfig 在启动时按 wx-mini.env-version 覆盖, 用于不同部署环境(dev/test=体验版, prod=正式版)
+     */
+    public static String ENV_VERSION = "release";
 
 
     public static Map<String, String> getAccessToken() {
@@ -56,8 +70,8 @@ public class WxMiniProgramHelper {
 
         Map<String, Object> paramMap = new HashMap<>();
         paramMap.put("grant_type", "client_credential");
-        paramMap.put("appid", AppID);
-        paramMap.put("secret", AppSecret);
+        paramMap.put("appid", APP_ID);
+        paramMap.put("secret", APP_SECRET);
         paramMap.put("force_refresh", forceRefresh);
 
         try {
@@ -144,7 +158,7 @@ public class WxMiniProgramHelper {
     public static Map<String, String> getOpenId(String code) {
 
         Map<String, String> result = new HashMap();
-        String url = String.format("https://api.weixin.qq.com/sns/jscode2session?appid=%s&secret=%s&js_code=%s&grant_type=authorization_code", AppID, AppSecret, code);
+        String url = String.format("https://api.weixin.qq.com/sns/jscode2session?appid=%s&secret=%s&js_code=%s&grant_type=authorization_code", APP_ID, APP_SECRET, code);
         RestTemplate restTemplate = new RestTemplate();
         ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
 
@@ -169,11 +183,17 @@ public class WxMiniProgramHelper {
      */
     public static class WxQrCodeResult {
 
-        /** 成功时的小程序码图片字节, 失败时为null */
+        /**
+         * 成功时的小程序码图片字节, 失败时为null
+         */
         private final byte[] imageBytes;
-        /** 失败时微信返回的错误码 */
+        /**
+         * 失败时微信返回的错误码
+         */
         private final Integer errcode;
-        /** 失败时微信返回的错误信息 */
+        /**
+         * 失败时微信返回的错误信息
+         */
         private final String errmsg;
 
         public WxQrCodeResult(byte[] imageBytes, Integer errcode, String errmsg) {
@@ -222,8 +242,9 @@ public class WxMiniProgramHelper {
         params.put("width", wh);
         params.put("auto_color", false);
         params.put("is_hyaline", false);
-        params.put("env_version", "release");
-
+        // 扫码目标版本: 由 WxMiniConfig 按 wx-mini.env-version 覆盖(默认 release)
+        params.put("env_version", ENV_VERSION);
+        log.info("调用微信生成小程序码参数parars:{}", JSON.toJSONString(params));
         HttpURLConnection connection = null;
         try {
             URL urlObj = new URL(url);

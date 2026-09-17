@@ -233,7 +233,7 @@ public class MemberOrderController {
     // 用户订单小程序码(微信小程序码, 扫码进入C端小程序对应订单页面)
     @GetMapping("/group/order/makeErcode")
     public JsonResult orderMakeErcode(@RequestParam("orderNo") String orderNo) {
-
+        log.info("生成订单二维码,orderNo:{}",orderNo);
         // 查询用户信息
         String token = TokenUtils.getToken();
         if (token == null || token.length() == 0) {

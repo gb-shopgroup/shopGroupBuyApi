@@ -66,3 +66,8 @@ upload-config:
   domain2: https://test.api.shopgroup.com.cn/access # 私有文件访问域名
 
 
+
+# 微信小程序配置: dev 环境生成的二维码扫码后落地到体验版(trial)
+# appid/secret 不填时使用 WxMiniProgramHelper 内置默认值
+wx-mini:
+  env-version: trial

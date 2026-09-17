@@ -75,3 +75,8 @@ pay-config:
   mer-notify-url: https://test.shopgroup.com.cn/admin/leader/notify # 添加收款商户结果通知地址
 
 
+
+# 微信小程序配置: test 环境生成的二维码扫码后落地到体验版(trial)
+# appid/secret 不填时使用 WxMiniProgramHelper 内置默认值
+wx-mini:
+  env-version: trial
