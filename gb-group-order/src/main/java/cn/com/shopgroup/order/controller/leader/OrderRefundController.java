@@ -7,14 +7,16 @@ import cn.com.shopgroup.common.utils.CustomIdGenerator;
 import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.MoneyUtil;
 import cn.com.shopgroup.common.utils.TimeUtils;
-import cn.com.shopgroup.yeepay.YeePayUtils;
-import cn.com.shopgroup.order.exception.OrderErrorCodeEnum;
 import cn.com.shopgroup.goods.service.GbGoodsInfoService;
 import cn.com.shopgroup.goods.service.GbGoodsSkuInfoService;
 import cn.com.shopgroup.order.constants.PaymentStatusEnum;
+import cn.com.shopgroup.order.exception.OrderErrorCodeEnum;
+import cn.com.shopgroup.order.http.request.LeaderRefundApplyListRequest;
 import cn.com.shopgroup.order.http.request.OrderApproveRequest;
 import cn.com.shopgroup.order.http.request.OrderRefundGoodsRequest;
 import cn.com.shopgroup.order.http.request.OrderRefundInfoRequest;
+import cn.com.shopgroup.order.http.response.LeaderRefundApplyListResponse;
+import cn.com.shopgroup.order.http.response.LeaderRefundApplyResponse;
 import cn.com.shopgroup.order.model.GbOrderGoodsInfo;
 import cn.com.shopgroup.order.model.GbOrderGoodsRefundRecord;
 import cn.com.shopgroup.order.model.GbOrderInfo;
@@ -27,6 +29,7 @@ import cn.com.shopgroup.user.model.GbOrgStaffInfo;
 import cn.com.shopgroup.user.service.GbOrgMessageInfoService;
 import cn.com.shopgroup.user.service.GbOrgStaffInfoService;
 import cn.com.shopgroup.user.utils.RequestParamsUtils;
+import cn.com.shopgroup.yeepay.YeePayUtils;
 import com.alibaba.fastjson2.JSON;
 import io.swagger.annotations.Api;
 import lombok.extern.slf4j.Slf4j;
@@ -45,6 +48,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @Slf4j
@@ -83,7 +87,7 @@ public class OrderRefundController {
     // 退款订单数量: 订单中存在商品发生过退款(部分退/整单全退, 审核同意)即计入
     @GetMapping("/leader/refund/count")
     public JsonResult refundOrderCount(@RequestParam("gid") Long groupId, @RequestParam("pid") Long pointId) {
-        log.info("退款订单数量 /leader/refund/count groupId:{},pointId:{}",groupId,pointId);
+        log.info("退款订单数量 /leader/refund/count groupId:{},pointId:{}", groupId, pointId);
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
@@ -93,6 +97,70 @@ public class OrderRefundController {
         // 查询总数
         Long total = orderInfoService.getMiniLeaderRefundOrderCount(leaderId, groupId, pointId);
         return JsonResult.success(total);
+    }
+
+    // 批量查询用户退款申请数据(团长端): 把用户申请退的数据按订单+商品行结构化展示,
+    // 只查"待审核"申请(售后订单 status=5 + 商品行 apply_refund=1),
+    // 关键字 keyword(商品名称/手机号) 过滤, 分页返回;
+    @PostMapping("/leader/refund/applyList")
+    public JsonResult refundApplyList(@RequestBody LeaderRefundApplyListRequest request) {
+        log.info("团长端-批量查询退款申请数据 /leader/refund/applyList, 参数request:{}", JSON.toJSONString(request));
+        // 从请求头中获取团长id
+        Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
+        if (leaderId == 0) {
+            throw new BusinessException(OrderErrorCodeEnum.LEADER_NOT_EXIST);
+        }
+        // 请求参数矫正
+        int page = Optional.ofNullable(request.getPage()).orElse(1);
+        int pageSize = Optional.ofNullable(request.getPageSize())
+                .map(size -> Math.min(size, 20))
+                .orElse(10);
+
+        // 待审核申请订单总数(不受分页影响, 口径与列表一致: 售后订单+商品行apply_refund=1)
+        Long total = orderInfoService.getLeaderApplyRefundOrderCount(leaderId, request.getKeyword());
+        // 待审核申请订单分页列表(每单带待审核商品行, applyStatus=1)
+        List<GbOrderInfo> orderList = orderInfoService.getLeaderApplyRefundOrderList(leaderId, 0L, 0L,
+                request.getKeyword(), 1, page, pageSize);
+        // 组装: 订单 + 最近一笔申请记录(类型/原因/金额)
+        List<LeaderRefundApplyResponse> list = new ArrayList<>();
+        if (!CollectionUtils.isEmpty(orderList)) {
+            for (GbOrderInfo order : orderList) {
+                GbOrderGoodsRefundRecord applyRecord = pickLatestApplyRecord(order.getOrderNo());
+                list.add(LeaderRefundApplyResponse.build(order, applyRecord));
+            }
+        }
+        // 组装返回
+        LeaderRefundApplyListResponse response = new LeaderRefundApplyListResponse();
+        response.setTotal(total);
+        response.setPage(page);
+        response.setPageSize(pageSize);
+        response.setList(list);
+        log.info("团长端-批量查询退款申请数据完成, leaderId:{}, total:{}", leaderId, total);
+        return JsonResult.success(response);
+    }
+
+    // 取该订单最近一笔"用户申请"记录: 优先取待审核(is_agree=0)的申请记录;
+    // 无待审核记录时(查询已同意/已拒绝历史)按最近一笔带类型/金额的非系统记录兜底,
+    // 口径与审核端 resolveRefundFlag / getApplyRefundCent 的兜底逻辑一致, 排除"系统退款成功"回调落库记录
+    private GbOrderGoodsRefundRecord pickLatestApplyRecord(String orderNo) {
+        List<GbOrderGoodsRefundRecord> recordList = refundRecordService.getRefundRecordListByOrderNo(orderNo);
+        GbOrderGoodsRefundRecord fallback = null;
+        for (int i = recordList.size() - 1; i >= 0; i--) {
+            GbOrderGoodsRefundRecord record = recordList.get(i);
+            // 排除退款回调的系统落库记录(非用户申请/人工审核)
+            if ("系统退款成功".equals(record.getOperateName())) {
+                continue;
+            }
+            // 最近一笔待审核申请记录
+            if (record.getIsAgree() != null && record.getIsAgree().intValue() == 0) {
+                return record;
+            }
+            // 兜底: 最近一笔带类型或金额的记录
+            if (fallback == null && (record.getRefundFlag() != null || record.getRefundAmount() != null)) {
+                fallback = record;
+            }
+        }
+        return fallback;
     }
 
     //售后订单审核（同意/不同意）。status: 1=同意, 2=不同意; 每单一行key=订单号, value.refundGoodsMap为本次申请的订单商品行(行内refundNum/refundAmount为本次申请值); 同意=按本次申请金额向易宝发起退款(支持部分退款)、保留申请时占坑的商品数量并把商品售后状态置同意, 同时维护订单主状态: 订单商品全部退完=已退款(4), 否则只要有未退完的=售后(5)(主表退款金额refund_fee不在此累加, 统一由退款回调成功后按实际退款金额累加; 商品维度退款金额以退款数量体现, 可由 退款数量×商品单价 推算); 不同意=主表退款金额不变(申请/审核阶段均未累加, 天然回到申请前), 按行回退商品退款/退货退款数量并把商品售后状态置不同意; 团长端旧版本未回传refundFlag/金额时后端按该订单最近一笔售后记录兜底
@@ -238,7 +306,7 @@ public class OrderRefundController {
         // 同步分账订单表, 核销之后的订单才能分账, 这样只要不核销订单, 就可以随时退款
         //businessService.updateBusinessOrderCheckStatus(request.getOrderNo());
         // 3. 恢复订单主状态: 拒绝并不产生真实退款, 该订单无其它待审核售后时从售后(5)恢复为申请前状态, 否则订单一直卡在售后
-       // orderInfoService.restoreOrderStatusAfterRefundReview(request.getOrderNo());
+        // orderInfoService.restoreOrderStatusAfterRefundReview(request.getOrderNo());
 
         // 添加日志, 消息类型: 1=系统消息2=内部消息3=业务消息
         Byte type = 2;

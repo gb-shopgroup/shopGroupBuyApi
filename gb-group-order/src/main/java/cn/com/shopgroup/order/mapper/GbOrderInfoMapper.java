@@ -15,6 +15,21 @@ import java.util.Map;
 @Repository
 public interface GbOrderInfoMapper extends BaseMapper<GbOrderInfo> {
 
+    // (团长端-退款申请列表)统计存在指定售后状态商品行的售后订单总数:
+    // 口径与 getLeaderApplyRefundOrderList 一致(订单状态4已退款/5售后, 商品行 apply_refund=applyStatus(null=全部),
+    // keyword 匹配手机号或商品名), 分页总数用
+    @Select({
+            "SELECT COUNT(DISTINCT o.`order_no`)",
+            "FROM `gb_order_info` AS o",
+            "JOIN `gb_order_goods_info` AS g ON g.`order_no` = o.`order_no`",
+            "WHERE o.`leader_id` = #{leaderId}",
+            "  AND o.`status` = 5",
+            "  AND g.`apply_refund` = 1",
+            "  AND (IFNULL(#{keyword}, '') = '' OR o.`mobile` LIKE CONCAT('%', #{keyword}, '%')",
+            "       OR g.`goods_name` LIKE CONCAT('%', #{keyword}, '%'))"
+    })
+    Long getLeaderApplyRefundOrderCount(@Param("leaderId") Long leaderId, @Param("keyword") String keyword);
+
     // (团长)汇总订单数量, 已支付(pay_time>0), 未退款(refund_time=0), 区分已核销(verify_time>0)/未核销的数量
     @Select({
             "SELECT (CASE WHEN `verify_time` > 0 THEN 1 ELSE 0 END) AS is_receipt, COUNT(*) AS num_total",
@@ -164,9 +179,11 @@ public interface GbOrderInfoMapper extends BaseMapper<GbOrderInfo> {
     // (团长端首页)商品维度统计分页列表: 每商品总件数(num_total)/已核销件数(receipt_total)/
     // 待核销件数(unverify_num = goods_num - receipt_num - refund_num, 已退款部分不计入待核销, 支持部分核销),
     // 已支付(pay_time>0), 按 团购活动 group_id / 自提点 pointId / 关键字 goods_name 过滤,
-    // (groupId / pointId 为 0 或 null 时表示不过滤), 分页
+    // (groupId / pointId 为 0 或 null 时表示不过滤), 分页;
+    // sku_names: 该商品下所有订单行的规格(GROUP_CONCAT 去重, 逗号拼接, 空规格行自动忽略)
     @Select({
             "SELECT g.`goods_id`, g.`goods_name`, g.`goods_unit`,",
+            "       GROUP_CONCAT(DISTINCT NULLIF(g.`sku_names`, '') SEPARATOR ',') AS sku_names,",
             "       COALESCE(SUM(g.`goods_num` * g.`pack_num`), 0) AS num_total,",
             "       COALESCE(SUM(IFNULL(g.`receipt_num`, 0) * g.`pack_num`), 0) AS receipt_total,",
             "       COALESCE(SUM(GREATEST(g.`goods_num` - IFNULL(g.`receipt_num`, 0) - IFNULL(g.`refund_num`, 0), 0) * g.`pack_num`), 0) AS unverify_num",

@@ -43,6 +43,11 @@ public interface GbOrderInfoService {
 
     Boolean miniReceiptOrder(Long memberId, String orderNo, Long pointId, String pointName);
 
+    // 用户扫码核销(整单/部分): 订单置部分收货(2)+核销时间+实际领取自提点, setReceiptTime=true(整单核销)时同时记录收货时间;
+    // 并按调用方内存累加后的收货数量同步商品行核销数量(整单核销=剩余全部, 部分核销=所选数量)
+    Boolean miniVerifyOrder(Long memberId, String orderNo, Long pointId, String pointName,
+                            List<GbOrderGoodsInfo> goodsList, boolean setReceiptTime);
+
     // 用户申请退款: 仅把订单置为售后(5)待团长审核并记录申请时间; 主表退费金额refund_fee在申请/审核阶段都不维护(占坑),
     // 待退款回调成功后才由 addMiniOrderRefundFee 按实际退款金额累加到订单主表; 拒绝/退款失败时金额无需回退即回到申请前
     Boolean miniRefundOrder(Long memberId, String orderNo);
@@ -135,11 +140,11 @@ public interface GbOrderInfoService {
 
     List<Map<String, Object>> getSummaryPointOrderGoodsList(Long leaderId, Long pointId, Integer startTime, Integer endTime);
 
-    // (团长端首页)商品统计汇总: 订单商品总件数 + 待核销总件数, groupId/pointId<=0 或 null 表示不过滤
-    Map<String, Object> getSummaryGoodsTotal(Long leaderId, Long groupId, Long pointId, String keyword);
+    // (团长端首页)商品统计汇总: 订单商品总件数 + 待核销总件数
+    Map<String, Object> getSummaryGoodsTotal(Long leaderId, Long groupId,Long pointId, String keyword);
 
-    // (团长端首页)商品维度统计分页列表, groupId/pointId<=0 或 null 表示不过滤
-    List<Map<String, Object>> getSummaryGoodsPageList(Long leaderId, Long groupId, Long pointId, String keyword, int offset, int limit);
+    // (团长端首页)商品维度统计分页列表
+    List<Map<String, Object>> getSummaryGoodsPageList(Long leaderId, Long groupId,Long pointId, String keyword, int offset, int limit);
 
     List<Map<String, Object>> getSummaryPointOrderGoodsSkuList(Long leaderId, Long pointId, Long goodsId, Integer startTime, Integer endTime);
 
@@ -256,4 +261,7 @@ public interface GbOrderInfoService {
      */
     LeaderBillListResponse getLeaderBillList(Long leaderId, LeaderBillListRequest request);
 
+    // (团长端-退款申请列表)待审核售后订单总数: 口径与 getLeaderApplyRefundOrderCount 的 mapper SQL 一致
+    // (订单状态5售后, 存在待审核(apply_refund=1)商品行, keyword 匹配手机号/商品名)
+    Long getLeaderApplyRefundOrderCount(Long leaderId, String keyword);
 }

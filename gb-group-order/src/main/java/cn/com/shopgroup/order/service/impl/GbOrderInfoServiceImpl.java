@@ -305,6 +305,40 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
         return flag > 0 ? true : false;
     }
 
+    // 用户扫码核销(整单/部分): 订单置部分收货(2)+核销时间+实际领取自提点, setReceiptTime=true(整单核销)时同时记录收货时间;
+    // 并按调用方内存累加后的收货数量同步商品行核销数量(整单核销=剩余全部, 部分核销=所选数量)
+    @Override
+    public Boolean miniVerifyOrder(Long memberId, String orderNo, Long pointId, String pointName,
+                                   List<GbOrderGoodsInfo> goodsList, boolean setReceiptTime) {
+
+        LambdaUpdateWrapper<GbOrderInfo> updateWrapper = Wrappers.lambdaUpdate();
+        updateWrapper.eq(GbOrderInfo::getOrderNo, orderNo);
+        updateWrapper.eq(GbOrderInfo::getMemberId, memberId);
+        updateWrapper.set(GbOrderInfo::getStatus, OrderStatusEnum.PART_RECEIVED.getCode());
+        updateWrapper.set(GbOrderInfo::getVerifyTime, TimeUtils.getTimeStamp());
+        if (setReceiptTime) {
+            updateWrapper.set(GbOrderInfo::getReceiptTime, TimeUtils.getTimeStamp());
+        }
+        updateWrapper.set(GbOrderInfo::getPointId2, pointId);
+        updateWrapper.set(GbOrderInfo::getPointName2, pointName);
+        updateWrapper.set(GbOrderInfo::getUpdateTime, TimeUtils.getTimeStamp());
+        int flag = mapper.update(updateWrapper);
+        if (flag <= 0) {
+            return false;
+        }
+        // 同步商品行核销(收货)数量(入参为内存累加后的值)
+        if (!CollectionUtils.isEmpty(goodsList)) {
+            for (GbOrderGoodsInfo item : goodsList) {
+                LambdaUpdateWrapper<GbOrderGoodsInfo> updateGoodsWrapper = Wrappers.lambdaUpdate();
+                updateGoodsWrapper.eq(GbOrderGoodsInfo::getOrderNo, orderNo);
+                updateGoodsWrapper.eq(GbOrderGoodsInfo::getId, item.getId());
+                updateGoodsWrapper.set(GbOrderGoodsInfo::getReceiptNum, item.getReceiptNum());
+                goodsMapper.update(updateGoodsWrapper);
+            }
+        }
+        return true;
+    }
+
 
     // 用户申请退款: 仅把订单置为售后(5)待团长审核并记录申请时间; 主表退费金额refund_fee在申请/审核阶段都不维护(占坑),
     // 待退款回调成功后才由 addMiniOrderRefundFee 按实际退款金额累加到订单主表; 拒绝/退款失败时金额无需回退即回到申请前
@@ -1431,6 +1465,14 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
             }
         }
         return result;
+    }
+
+    // (团长端-退款申请列表)待审核售后订单总数: 口径与列表一致(订单状态5售后, 存在待审核(apply_refund=1)商品行)
+    @Override
+    public Long getLeaderApplyRefundOrderCount(Long leaderId, String keyword) {
+
+        Long count = mapper.getLeaderApplyRefundOrderCount(leaderId, keyword);
+        return count == null ? 0L : count;
     }
 
     // 判断 keyword 是否为手机号(纯数字)

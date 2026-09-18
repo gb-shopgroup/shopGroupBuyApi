@@ -196,7 +196,8 @@ public class LeaderShopController {
         byte[] bytes;
         try {
             // 小程序码落地页与scene参数: 需与小程序前端onLoad解析保持一致
-            String page = "pages/order/index";
+            //String page = "pages/order/index";
+            String page = "pages/order/verify";
             String scene = "shopId=" + shopId;
             int wh = 1280; // 图片像素(最高1280像素)
             bytes = helper.getWxaCodeUnlimitWithRetry(page, scene, wh);

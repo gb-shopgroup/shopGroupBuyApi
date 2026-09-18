@@ -16,12 +16,15 @@ import cn.com.shopgroup.order.http.response.LeaderHomeGoodsSummaryResponse;
 import cn.com.shopgroup.order.http.response.LeaderHomeShowDataResponse;
 import cn.com.shopgroup.order.http.response.OrderResponse;
 import cn.com.shopgroup.order.http.response.OrderStatusResponse;
+import cn.com.shopgroup.order.http.response.OrderVerifyRecordResponse;
 import cn.com.shopgroup.order.http.response.SummaryOrderGoodsResponse;
 import cn.com.shopgroup.order.model.GbOrderBusinessInfo;
 import cn.com.shopgroup.order.model.GbOrderGoodsInfo;
 import cn.com.shopgroup.order.model.GbOrderInfo;
+import cn.com.shopgroup.order.model.GbOrderVerifyRecord;
 import cn.com.shopgroup.order.service.GbOrderBusinessInfoService;
 import cn.com.shopgroup.order.service.GbOrderInfoService;
+import cn.com.shopgroup.order.service.GbOrderVerifyRecordService;
 import cn.com.shopgroup.user.model.GbOrgLeaderInfo;
 import cn.com.shopgroup.user.model.GbOrgPointInfo;
 import cn.com.shopgroup.user.model.GbOrgStaffInfo;
@@ -44,6 +47,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -64,6 +68,8 @@ public class OrderController {
     private WxMiniAccessTokenHelper wxAccessTokenHelper;
     @Resource
     private GbOrgLeaderInfoService leaderInfoService;
+    @Resource
+    private GbOrderVerifyRecordService verifyRecordService;
 
     // 团长订单列表（按团活动/订单状态/关键字筛选, 关键字支持商品名称或手机号, 分页查询）
     //团购详情调用必须传groupId，团购订单按钮，全部传传0
@@ -156,6 +162,9 @@ public class OrderController {
             throw new BusinessException(OrderErrorCodeEnum.ORDER_NOT_EXIST);
         } else {
             OrderResponse data = new OrderResponse(info);
+            // 核销记录(支持一单多次部分核销, 按核销时间正序; 未核销过的订单返回空列表)
+            List<GbOrderVerifyRecord> verifyRecordList = verifyRecordService.getVerifyRecordListByOrderNo(request.getOrderNo());
+            data.setVerifyRecords(OrderVerifyRecordResponse.getOrderVerifyRecordResponseList(verifyRecordList));
             return JsonResult.success(data);
         }
     }
@@ -172,6 +181,9 @@ public class OrderController {
             throw new BusinessException(OrderErrorCodeEnum.ORDER_NOT_EXIST);
         } else {
             OrderResponse data = new OrderResponse(info);
+            // 核销记录(支持一单多次部分核销, 按核销时间正序; 未核销过的订单返回空列表)
+            List<GbOrderVerifyRecord> verifyRecordList = verifyRecordService.getVerifyRecordListByOrderNo(orderNo);
+            data.setVerifyRecords(OrderVerifyRecordResponse.getOrderVerifyRecordResponseList(verifyRecordList));
             return JsonResult.success(data);
         }
     }
@@ -235,6 +247,11 @@ public class OrderController {
         businessService.updateBusinessOrderCheckStatus(orderNo);
         // 返回结果
         if (flag) {
+            // 核销成功: 落核销记录表(核销类型:0=团长后台核销, 核销人=团长/店员);
+            // 此时商品行收货数量仍为核销前值, 明细按"剩余可核销数(购买数-已核销-已退)"记录本次核销数量
+            verifyRecordService.addVerifyRecord(verifyRecordService.buildVerifyRecord(orderInfo, goodsList, null,
+                    GbOrderVerifyRecordService.VERIFY_TYPE_LEADER,
+                    staffId != 0 ? staffId : leaderId, opName, pointId, pointName));
             //核销成功后。同步订单商品数量全部收货（方便展示同步商品核销数量）
             int m = orderInfoService.updateGoodsNum(goodsList);
             //核销成功后，订单对应的团长的cashType[结算到账方式,0=支付时延迟到账型,1=核销时延迟到账型]
@@ -289,6 +306,8 @@ public class OrderController {
 
         // 订单商品收货数量计算
         Map<Long, OrderVerifyGoodsRequest> goodsMap = request.getGoodsMap();
+        // 本次核销的商品行数量映射(核销记录用): key=订单商品id, value=本次核销数量
+        Map<Long, Integer> verifyNumMap = new HashMap<>();
         for (GbOrderGoodsInfo goods : goodsList) {
             //未核销商品数量
             Long tempId = goods.getId();
@@ -303,6 +322,10 @@ public class OrderController {
             }
             if (goodsMap.containsKey(tempId)) {
                 OrderVerifyGoodsRequest temp = goodsMap.get(tempId);
+                // 记录本次核销数量(此时商品行收货数量尚未累加, 仍为核销前值)
+                if (temp.getNum() != null && temp.getNum() > 0) {
+                    verifyNumMap.put(tempId, temp.getNum());
+                }
                 goods.setReceiptNum(temp.getNum() + tempReceiptNum);
             }
         }
@@ -321,6 +344,11 @@ public class OrderController {
         businessService.updateBusinessOrderCheckStatus(orderInfo.getOrderNo());
         // 返回结果
         if (flag) {
+            // 核销成功: 落核销记录表(核销类型:0=团长后台核销, 核销人=团长/店员);
+            // 此时商品行收货数量已含本次核销, 明细按入参核销数量(verifyNumMap)记录本次核销数量
+            verifyRecordService.addVerifyRecord(verifyRecordService.buildVerifyRecord(orderInfo, goodsList, verifyNumMap,
+                    GbOrderVerifyRecordService.VERIFY_TYPE_LEADER,
+                    staffId != 0 ? staffId : leaderId, opName, request.getPid(), pointName));
             //订单对应的团长的cashType[结算到账方式,0=支付时延迟到账型,1=核销时延迟到账型]
             int type = leaderInfo.getCashType().intValue();
             // 核销时延迟到账型(1) 且未调用过微信发货的订单, 核销后补调用微信发货(同步发货状态)
@@ -500,6 +528,7 @@ public class OrderController {
                 resp.setId(((Number) item.get("goods_id")).longValue());
                 resp.setName((String) item.get("goods_name"));
                 resp.setUnit((String) item.get("goods_unit"));
+                resp.setSkuNames((String) item.get("sku_names")); // 商品规格(去重拼接)
                 long numTotal = ((Number) item.get("num_total")).longValue();
                 long receiptTotal = item.get("receipt_total") == null ? 0L : ((Number) item.get("receipt_total")).longValue();
                 long unVerifyNum = ((Number) item.get("unverify_num")).longValue();

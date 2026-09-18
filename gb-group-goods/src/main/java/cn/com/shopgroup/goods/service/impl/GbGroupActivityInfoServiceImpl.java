@@ -49,7 +49,7 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
     public List<GbGroupActivityInfo> getAdminGroupList(int page, int pageSize) {
 
         LambdaQueryWrapper<GbGroupActivityInfo> queryWrapper = Wrappers.lambdaQuery();
-        queryWrapper.orderByDesc(GbGroupActivityInfo::getGroupId);
+        queryWrapper.orderByDesc(GbGroupActivityInfo::getGroupId).orderByAsc(GbGroupActivityInfo::getIsClose);
         queryWrapper.last("limit " + (page - 1) * pageSize + "," + pageSize);
         List<GbGroupActivityInfo> result = mapper.selectList(queryWrapper);
         return result == null ? new ArrayList<>() : result;
@@ -267,7 +267,7 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
         if (cid != 0) {
             queryWrapper.eq(GbGroupActivityInfo::getCatId, catId);
         }
-        queryWrapper.orderByDesc(GbGroupActivityInfo::getGroupId);
+        queryWrapper.orderByDesc(GbGroupActivityInfo::getGroupId).orderByAsc(GbGroupActivityInfo::getIsClose);
         queryWrapper.last("limit " + (page - 1) * pageSize + "," + pageSize);
         List<GbGroupActivityInfo> result = mapper.selectList(queryWrapper);
         return result == null ? new ArrayList<>() : result;
@@ -460,7 +460,7 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
         lightWrapper.select(GbGroupActivityInfo::getGroupId, GbGroupActivityInfo::getLeaderId);
         // 名称/分类过滤下推到 SQL, 先缩小候选活动集再做距离过滤, 避免全量在线活动都参与球面距离计算
         applyNameAndCatFilter(lightWrapper, groupName, catId);
-        lightWrapper.orderByDesc(GbGroupActivityInfo::getGroupId);
+        lightWrapper.orderByDesc(GbGroupActivityInfo::getGroupId).orderByAsc(GbGroupActivityInfo::getIsClose);
         List<GbGroupActivityInfo> lightList = mapper.selectList(lightWrapper);
         if (lightList == null || lightList.isEmpty()) {
             return new ArrayList<>();

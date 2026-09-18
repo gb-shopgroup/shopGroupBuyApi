@@ -664,3 +664,30 @@ ALTER TABLE `gb_group_activity_info`
 ALTER TABLE `gb_order_goods_refund_record`
   ADD COLUMN `refund_no` varchar(64) NOT NULL DEFAULT '' COMMENT '易宝退款单号(uniqueRefundNo),审核同意发起退款时记录,用于对账与回调幂等' AFTER `refund_amount`,
   ADD KEY `idx_refund_no` (`refund_no`);
+
+-- 订单核销记录表: 核销(团长后台整单/部分核销, 用户扫码核销)成功后落库,
+-- 记录订单主要信息/核销商品明细(JSON)/核销人/核销类型
+CREATE TABLE `gb_order_verify_record` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '主键自增',
+  `order_no` varchar(18) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '订单号',
+  `member_id` int unsigned NOT NULL DEFAULT '0' COMMENT '用户id(下单人)',
+  `nickname` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '用户昵称(下单人)',
+  `mobile` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '用户手机号(下单人)',
+  `leader_id` int unsigned NOT NULL DEFAULT '0' COMMENT '团长id',
+  `group_id` int unsigned NOT NULL DEFAULT '0' COMMENT '团购活动id',
+  `group_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '团购活动名称',
+  `point_id` int unsigned NOT NULL DEFAULT '0' COMMENT '下单自提点id',
+  `point_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '下单自提点名称',
+  `pay_fee` int unsigned NOT NULL DEFAULT '0' COMMENT '订单实付金额(单位:分)',
+  `receipt_code` varchar(32) NOT NULL DEFAULT '' COMMENT '核销码',
+  `verify_type` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '核销类型:0=团长后台核销,2=用户扫码核销',
+  `staff_id` int unsigned NOT NULL DEFAULT '0' COMMENT '核销人id:团长后台核销=团长/店员id,用户扫码核销=用户id',
+  `staff_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '核销人姓名:团长后台核销=团长/店员姓名,用户扫码核销=用户昵称',
+  `verify_point_id` int unsigned NOT NULL DEFAULT '0' COMMENT '核销(实际领取)自提点id',
+  `verify_point_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '核销(实际领取)自提点名称',
+  `verify_goods_msg` text COMMENT '核销商品明细(JSON,仅本次核销数量>0的商品行):goodsId/goodsName/skuNames/goodsPrice/goodsUnit/goodsNum/verifyNum(本次核销数)/receiptNum(累计已核销数)',
+  `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '核销时间,秒级时间戳',
+  PRIMARY KEY (`id`),
+  KEY `idx_order_no` (`order_no`),
+  KEY `idx_leader_id` (`leader_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='订单核销记录表';

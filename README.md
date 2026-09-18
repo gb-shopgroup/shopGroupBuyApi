@@ -135,7 +135,7 @@ Maven 依赖仓库使用阿里云镜像（`https://maven.aliyun.com/repository/p
 
 ### 4.5 gb-group-order — 订单 / 支付 / 分账服务
 
-覆盖：下单、订单查询、核销（整单 / 部分核销）、退款（申请 / 审批 / 回调）、微信发货、易宝支付发起与回调、团长数据汇总、报表查询，以及团长端「我的团员」（含团购查看埋点，数据表 `gb_group_view_log`）、团长端「对账单」（按时间范围 + 按商品 / 按订单维度统计）等。**45 个接口**。
+覆盖：下单、订单查询、核销（整单 / 部分核销）、退款（申请 / 审批 / 回调）、微信发货、易宝支付发起与回调、团长数据汇总、报表查询，以及团长端「我的团员」（含团购查看埋点，数据表 `gb_group_view_log`）、团长端「对账单」（按时间范围 + 按商品 / 按订单维度统计）等。**47 个接口**。
 
 ### 4.6 gb-group-admin — 平台管理后台服务
 
@@ -288,7 +288,7 @@ mvn -pl gb-group-task spring-boot:run
 | `page` / `pageSize` | 页码（从 1 开始）/ 每页条数 |
 | `start` / `end` | 开始时间 / 结束时间（如 yyyy-MM-dd） |
 
-- **接口数量统计**：user 46 个、order 45 个、goods 22 个、admin 29 个、task 8 个，合计 **150 个**。
+- **接口数量统计**：user 46 个、order 47 个、goods 22 个、admin 29 个、task 8 个，合计 **152 个**。
 - **详细版接口文档**（含每个接口的完整入参 / 出参字段说明，参数含义、必填、嵌套字段均已细化）见根目录 **`API接口文档.md`**，可通过 `python3 generate_api_doc.py` 扫描各模块 `*Controller.java` 重新生成。下方为接口总览清单。
 
 ### 8.2 接口清单
@@ -403,7 +403,7 @@ mvn -pl gb-group-task spring-boot:run
 | 1 | GET | `/user/member/info` | *查询会员详情* | 无 |
 | 2 | GET | `/user/member/isleader` | *查询会员是否为团长* | 无 |
 
-#### 8.2.2 gb-group-order（订单/退款/分账）— 45 个接口
+#### 8.2.2 gb-group-order（订单/退款/分账）— 47 个接口
 
 **OrderBusinessController**（`cn.com.shopgroup.order.controller`）
 
@@ -441,12 +441,13 @@ mvn -pl gb-group-task spring-boot:run
 | 4 | GET | `/order/group/order/info` | *查询团购订单详情* | **orderNo** (String) |
 | 5 | GET | `/order/group/order/makeErcode` | *生成二维码（团购订单）* | **orderNo** (String) |
 | 6 | GET | `/order/group/order/receipt` | *提货（团购订单）* | **orderNo** (String); **point** (Long) |
-| 7 | POST | `/order/group/order/apply/refund` | *退款（团购订单）* | Body: **refundApplyRequest** (OrderRefundApplyRequest, JSON) |
-| 8 | GET | `/order/group/order/refund/reasonList` | *查询团购订单退款原因列表* | 无 |
-| 9 | GET | `/order/group/order/refund/recodes` | *查询团购订单退款记录* | **orderNo** (String) |
-| 10 | GET | `/order/group/order/notAllReceiptList` | *查询团购订单未全部提货列表* | **shopId** (Long) |
-| 11 | POST | `/order/group/order/confirmShipping` | *确认发货（团购订单）* | **orderNo** (String) |
-| 12 | POST | `/order/group/order/applyRefund/orderInfo` | *查询团购订单退款申请订单详情* | Body: **request** (MemberOrderRefundRequest, JSON) |
+| 7 | POST | `/order/group/order/part/receipt` | *提货（团购订单）* | Body: **request** (MemberOrderReceiptRequest, JSON) |
+| 8 | POST | `/order/group/order/apply/refund` | *退款（团购订单）* | Body: **refundApplyRequest** (OrderRefundApplyRequest, JSON) |
+| 9 | GET | `/order/group/order/refund/reasonList` | *查询团购订单退款原因列表* | 无 |
+| 10 | GET | `/order/group/order/refund/recodes` | *查询团购订单退款记录* | **orderNo** (String) |
+| 11 | GET | `/order/group/order/notAllReceiptList` | *查询团购订单未全部提货列表* | **shopId** (Long) |
+| 12 | POST | `/order/group/order/confirmShipping` | *确认发货（团购订单）* | **orderNo** (String) |
+| 13 | POST | `/order/group/order/applyRefund/orderInfo` | *查询团购订单退款申请订单详情* | Body: **request** (MemberOrderRefundRequest, JSON) |
 
 **WxOrderController**（`cn.com.shopgroup.order.controller.group`）
 
@@ -464,7 +465,7 @@ mvn -pl gb-group-task spring-boot:run
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/order/leader/activity/list` | 查询团长 id 下的所有团购活动(不过滤状态/时间, 按添加时间倒序)。  leaderId 优先取自 Query 参数(便于后台/管理端查询指定团长); 未传或非法时回退到请求头 lid; 两者均缺失则抛 lid不存在 业务异常。 | 无 |
+| 1 | GET | `/order/leader/activity/list` | 团长端-团购活动查询  提供团长端活动下拉/选择所需的接口；活动主数据在商品域(goods), 本控制器通过 goods 模块的 {@link GbGroupActivityInfoService} 跨模块调用，避免在 order 模块重复建表/写 SQL。 | 无 |
 
 **LeaderMemberController**（`cn.com.shopgroup.order.controller.leader`）
 
@@ -495,7 +496,8 @@ mvn -pl gb-group-task spring-boot:run
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
 | 1 | GET | `/order/leader/refund/count` | *查询团长退款总数* | **gid** (Long); **pid** (Long) |
-| 2 | POST | `/order/leader/refund/approve` | *审核（团长退款）* | Body: **approveRequest** (OrderApproveRequest, JSON) |
+| 2 | POST | `/order/leader/refund/applyList` | *查询团长退款列表* | Body: **request** (LeaderRefundApplyListRequest, JSON) |
+| 3 | POST | `/order/leader/refund/approve` | *审核（团长退款）* | Body: **approveRequest** (OrderApproveRequest, JSON) |
 
 **OrderRefundNotifyController**（`cn.com.shopgroup.order.controller.leader`）
 

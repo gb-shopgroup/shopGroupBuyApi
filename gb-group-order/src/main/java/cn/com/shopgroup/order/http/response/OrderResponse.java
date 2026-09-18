@@ -59,6 +59,9 @@ public class OrderResponse {
     // 确认收货操作标记:0=未操作,1=已操作
     private Integer clickConfirmFlag;
 
+    // 核销记录(仅订单详情接口返回, 支持一单多次部分核销产生多条记录, 按核销时间正序; 列表接口不填充)
+    private List<OrderVerifyRecordResponse> verifyRecords;
+
     public OrderResponse() {
 
     }

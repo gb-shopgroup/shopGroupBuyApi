@@ -17,5 +17,7 @@ public class SummaryOrderGoodsResponse {
     private Long num2;
     // 商品单位（如 斤/份/件）
     private String unit;
+    // 商品规格(订单商品行 sku_names 去重拼接, 如 "500g,1斤装"; 无规格商品为 null)
+    private String skuNames;
 
 }

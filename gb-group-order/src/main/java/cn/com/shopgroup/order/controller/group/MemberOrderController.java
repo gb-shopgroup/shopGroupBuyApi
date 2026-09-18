@@ -13,18 +13,23 @@ import cn.com.shopgroup.order.exception.OrderErrorCodeEnum;
 import cn.com.shopgroup.order.http.request.MemberOrderListRequest;
 import cn.com.shopgroup.order.http.request.MemberOrderRefundListRequest;
 import cn.com.shopgroup.order.http.request.MemberOrderRefundRequest;
+import cn.com.shopgroup.order.http.request.MemberOrderReceiptRequest;
 import cn.com.shopgroup.order.http.request.OrderRefundApplyRequest;
 import cn.com.shopgroup.order.http.request.OrderRefundGoodsRequest;
+import cn.com.shopgroup.order.http.request.OrderVerifyGoodsRequest;
 import cn.com.shopgroup.order.http.response.OrderMainRefundResponse;
 import cn.com.shopgroup.order.http.response.OrderRefundRecordResponse;
 import cn.com.shopgroup.order.http.response.OrderResponse;
+import cn.com.shopgroup.order.http.response.OrderVerifyRecordResponse;
 import cn.com.shopgroup.order.http.response.RefundOrderInfoResponse;
 import cn.com.shopgroup.order.model.GbOrderGoodsInfo;
 import cn.com.shopgroup.order.model.GbOrderGoodsRefundRecord;
 import cn.com.shopgroup.order.model.GbOrderInfo;
+import cn.com.shopgroup.order.model.GbOrderVerifyRecord;
 import cn.com.shopgroup.order.model.GbRefundReason;
 import cn.com.shopgroup.order.service.GbOrderGoodsRefundRecordService;
 import cn.com.shopgroup.order.service.GbOrderInfoService;
+import cn.com.shopgroup.order.service.GbOrderVerifyRecordService;
 import cn.com.shopgroup.order.service.GbRefundReasonService;
 import cn.com.shopgroup.user.model.GbMemberInfo;
 import cn.com.shopgroup.user.model.GbOrgPointInfo;
@@ -54,6 +59,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -78,6 +84,8 @@ public class MemberOrderController {
     private GbMemberInfoService memberInfoService;
     @Resource
     private GbOrderGoodsRefundRecordService refundRecordService;
+    @Resource
+    private GbOrderVerifyRecordService verifyRecordService;
 
     @Resource
     private GbRefundReasonService refundReasonService;
@@ -228,6 +236,9 @@ public class MemberOrderController {
             return JsonResult.success();
         }
         OrderResponse data = new OrderResponse(result);
+        // 核销记录(支持一单多次部分核销, 按核销时间正序; 未核销过的订单返回空列表)
+        List<GbOrderVerifyRecord> verifyRecordList = verifyRecordService.getVerifyRecordListByOrderNo(orderNo);
+        data.setVerifyRecords(OrderVerifyRecordResponse.getOrderVerifyRecordResponseList(verifyRecordList));
         return JsonResult.success(data);
     }
 
@@ -302,29 +313,49 @@ public class MemberOrderController {
     }
 
 
-    // 用户订单收货
+    // 用户扫码核销-整单核销(GET): 核销订单全部剩余可核销商品(购买数-已核销-已退)
     @GetMapping("/group/order/receipt")
     public JsonResult orderReceipt(@RequestParam("orderNo") String orderNo, @RequestParam("point") Long pointId) {
-
         // 查询用户信息
-        String token = TokenUtils.getToken();
-        if (token == null || token.length() == 0) {
-            throw new BusinessException(OrderErrorCodeEnum.TOKEN_NOT_EXIST);
-        }
-        String userId = TokenUtils.parseToken(token);
-        if (StringUtils.isEmpty(userId) || userId.matches("^[0-9]+$") == false) {
-            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
-        }
-        Long memberId = 0L;
-        try {
-            memberId = Long.parseLong(userId);
-        } catch (NumberFormatException e) {
-            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
-        }
-        if (memberId == 0) {
-            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
-        }
+        Long memberId = getLoginMemberId();
+        // 整单核销(goodsMap传null): 核销全部剩余可核销商品
+        return doMemberOrderReceipt(memberId, orderNo, pointId, null);
+    }
 
+    // 用户扫码核销-整单/部分核销(POST):
+    // goodsList 为空 = 整单核销(等同 GET /group/order/receipt, 核销全部剩余可核销商品);
+    // goodsList 非空 = 部分核销(仅核销所选商品行, 一单可多次部分核销, 每行核销数量不超过"剩余可核销数(购买数-已核销-已退)");
+    // 核销成功后统一落核销记录表(核销类型:2=用户扫码核销, 核销人=下单用户, 核销商品明细记录本次核销数量)
+    @PostMapping("/group/order/part/receipt")
+    public JsonResult orderPartReceiptVerify(@RequestBody MemberOrderReceiptRequest request) {
+        log.info("[用户扫码核销(整单/部分核销)] params request:{}", JSON.toJSONString(request));
+        if (StringUtils.isEmpty(request.getOrderNo())) {
+            throw new BusinessException("订单号不能为空");
+        }
+        if (request.getPointId() == null || request.getPointId() <= 0) {
+            throw new BusinessException("核销自提点不能为空");
+        }
+        // 查询用户信息
+        Long memberId = getLoginMemberId();
+        // 部分核销入参: key=订单商品表id, value=本次核销数量请求
+        Map<Long, OrderVerifyGoodsRequest> goodsMap = new HashMap<>();
+        if (!CollectionUtils.isEmpty(request.getGoodsList())) {
+            for (OrderVerifyGoodsRequest temp : request.getGoodsList()) {
+                if (temp.getId() == null || temp.getNum() == null || temp.getNum() <= 0) {
+                    throw new BusinessException("核销商品id和核销数量必须大于0，请核对后再提交");
+                }
+                goodsMap.put(temp.getId(), temp);
+            }
+        }
+        // 非空映射=部分核销, 空映射=整单核销
+        return doMemberOrderReceipt(memberId, request.getOrderNo(), request.getPointId(),
+                goodsMap.isEmpty() ? null : goodsMap);
+    }
+
+    // 用户扫码核销统一处理: goodsMap=null 整单核销(核销全部剩余可核销商品), 非空 部分核销(仅核销所选商品行)
+    private JsonResult doMemberOrderReceipt(Long memberId, String orderNo, Long pointId, Map<Long, OrderVerifyGoodsRequest> goodsMap) {
+
+        boolean partVerify = goodsMap != null && !goodsMap.isEmpty();
         // 先查询订单信息
         GbOrderInfo orderInfo = orderInfoService.getMiniOrderInfo(memberId, orderNo);
         if (ObjectUtils.isEmpty(orderInfo)) {
@@ -342,29 +373,103 @@ public class MemberOrderController {
             throw new BusinessException(OrderErrorCodeEnum.ORDER_REFUNDED_NOT_RECEIPT);
         }
 
-        // 收货状态, 不能重复收货
-        int receiptTime = orderInfo.getReceiptTime();
-        if (status == 2 && receiptTime > 0) {
+        // 整单核销不能重复收货(部分核销不校验收货时间, 由商品行"剩余可核销数"约束, 可多次核销)
+        if (!partVerify && status == 2 && orderInfo.getReceiptTime() != null && orderInfo.getReceiptTime() > 0) {
             throw new BusinessException(OrderErrorCodeEnum.DUPLICATE_RECEIPT);
         }
 
-        // 实际收货点(自提点)
+        // 核销(实际领取)自提点
         String pointName = "";
         GbOrgPointInfo pointInfo = pointService.getPointInfo(pointId);
         if (pointInfo != null) pointName = pointInfo.getPointName();
-        // 收货操作
-        Boolean flag = orderInfoService.miniReceiptOrder(memberId, orderNo, pointId, pointName);
+
+        // 商品行核销数量计算与校验
+        List<GbOrderGoodsInfo> goodsList = orderInfoService.getOrderGoodsList(orderNo);
+        if (CollectionUtils.isEmpty(goodsList)) {
+            throw new BusinessException(OrderErrorCodeEnum.ORDER_GOODS_NOT_FOUND);
+        }
+        // 本次核销的商品行数量映射(核销记录用): key=订单商品id, value=本次核销数量
+        Map<Long, Integer> verifyNumMap = new HashMap<>();
+        for (GbOrderGoodsInfo goods : goodsList) {
+            int goodsNum = goods.getGoodsNum() == null ? 0 : goods.getGoodsNum();
+            int receiptNum = goods.getReceiptNum() == null ? 0 : goods.getReceiptNum();
+            int refundNum = goods.getRefundNum() == null ? 0 : goods.getRefundNum();
+            // 剩余可核销数量 = 购买数 - 已核销(收货)数 - 已退(退待收货)数
+            int remainNum = goodsNum - receiptNum - refundNum;
+            if (remainNum < 0) {
+                throw new BusinessException(OrderErrorCodeEnum.VERIFY_NUM_EXCEED);
+            }
+            // 本次核销数量: 部分核销取入参, 整单核销取剩余全部
+            int verifyNum;
+            if (partVerify) {
+                if (!goodsMap.containsKey(goods.getId())) {
+                    // 未选择的商品行不核销
+                    continue;
+                }
+                verifyNum = goodsMap.get(goods.getId()).getNum();
+                if (verifyNum > remainNum) {
+                    throw new BusinessException(OrderErrorCodeEnum.VERIFY_NUM_EXCEED);
+                }
+            } else {
+                verifyNum = remainNum;
+            }
+            if (verifyNum > 0) {
+                // 记录本次核销数量, 并在内存中累加商品行核销(收货)数量, 供落库同步
+                verifyNumMap.put(goods.getId(), verifyNum);
+                goods.setReceiptNum(receiptNum + verifyNum);
+            }
+        }
+        if (partVerify && verifyNumMap.isEmpty()) {
+            // 部分核销时所选商品行均已无可核销数量
+            throw new BusinessException("订单没有可核销的商品数量，请核对后再提交");
+        }
+        if (!partVerify && verifyNumMap.isEmpty()) {
+            // 整单核销时全部商品行均已核销完(如已多次部分核销完)
+            throw new BusinessException(OrderErrorCodeEnum.DUPLICATE_RECEIPT);
+        }
+
+        // 核销操作: 订单置部分收货(2)+核销时间+实际领取自提点, 整单核销同时记录收货时间, 并同步商品行核销数量
+        Boolean flag = orderInfoService.miniVerifyOrder(memberId, orderNo, pointId, pointName, goodsList, !partVerify);
         // 收货消息类型: 1=系统消息2=内部消息3=业务消息
         // 员工-提货点绑定表 gb_org_point_staff 已下线, 不再通知店员, 直接通知团长
-        String content = orderInfo.getNickname() + "(" + orderInfo.getMobile() + ")主动核销了编号 " + orderInfo.getReceiptCode() + " 的订单。";
+        String action = partVerify ? "部分核销" : "主动核销";
+        String content = orderInfo.getNickname() + "(" + orderInfo.getMobile() + ")" + action + "了编号 " + orderInfo.getReceiptCode() + " 的订单。";
         messageService.addMiniLeaderMessageInfo(orderInfo.getLeaderId(), 0L, (byte) 3, content);
 
         // 返回结果
         if (flag) {
-            return JsonResult.success("收货成功");
+            // 核销成功: 落核销记录表(核销类型:2=用户扫码核销, 核销人=下单用户);
+            // 此时商品行收货数量已含本次核销, 明细按本次核销数量(verifyNumMap)记录
+            verifyRecordService.addVerifyRecord(verifyRecordService.buildVerifyRecord(orderInfo, goodsList, verifyNumMap,
+                    GbOrderVerifyRecordService.VERIFY_TYPE_MEMBER,
+                    memberId, orderInfo.getNickname(), pointId, pointName));
+            return JsonResult.success(partVerify ? "部分核销成功" : "收货成功");
         } else {
             throw new BusinessException(OrderErrorCodeEnum.RECEIPT_FAILED);
         }
+    }
+
+    // 从请求头token中解析当前登录用户id
+    private Long getLoginMemberId() {
+
+        String token = TokenUtils.getToken();
+        if (token == null || token.length() == 0) {
+            throw new BusinessException(OrderErrorCodeEnum.TOKEN_NOT_EXIST);
+        }
+        String userId = TokenUtils.parseToken(token);
+        if (StringUtils.isEmpty(userId) || userId.matches("^[0-9]+$") == false) {
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
+        }
+        Long memberId = 0L;
+        try {
+            memberId = Long.parseLong(userId);
+        } catch (NumberFormatException e) {
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
+        }
+        if (memberId == 0) {
+            throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
+        }
+        return memberId;
     }
 
     // 用户申请订单退款。refundFlag: 1=退款(退"待收货"部分, 可退量=购买数-收货数-已申请退款数), 2=退货退款(退"已收货"部分, 可退量=收货数-已申请退货退款数); 申请成功后: 订单状态置售后(5), 对应商品行退款/退货退款数量先占坑累计(可退量会相应扣减), 商品维度退款金额由 退款数量×商品单价 推算, 不单独落库; 订单主表refund_fee在申请/审核阶段都不维护, 待团长审核: 同意仅按本次申请金额发起退款(主表金额改由退款回调成功后按实际退款金额累加), 不同意=主表金额不变(天然回到申请前), 仅回退商品行本次申请的数量并把售后状态置不同意; 出参data为本次申请退款总金额(单位:元)
@@ -440,6 +545,7 @@ public class MemberOrderController {
             }
             Long tempId = orderGoods.getId();
             String tempGoodsName = orderGoods.getGoodsName();
+            String spuNames = orderGoods.getSkuNames();
             // 总购买数
             int goodsNum = orderGoods.getGoodsNum() == null ? 0 : orderGoods.getGoodsNum();
             // 已收货数
@@ -479,7 +585,7 @@ public class MemberOrderController {
             handledCount++;
             // 加入本次申请商品行集合(后续仅这些行累加退款/退货退款数量)
             applyGoodsList.add(orderGoods);
-            String decMsg = tempGoodsName + ",申请退数量:" + applyNum + ",退款金额:" + temp.getRefundAmount() + ";";
+            String decMsg = tempGoodsName + "-" + spuNames + ",申请退数量:" + applyNum + ",退款金额:" + temp.getRefundAmount() + ";";
             sb.append(decMsg);
             // 累加各商品退款金额, 计算本次申请退款的总金额
             allRefundAmount += temp.getRefundAmount();

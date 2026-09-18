@@ -49,6 +49,7 @@ public class GbOrderGoodsRefundRecordServiceImpl implements GbOrderGoodsRefundRe
         queryWrapper.select("IFNULL(SUM(refund_amount), 0) AS total");
         queryWrapper.eq("order_no", orderNo);
         queryWrapper.eq("is_agree", 1);
+        queryWrapper.ne("operate_id", 0);
         List<Object> objs = mapper.selectObjs(queryWrapper);
         if (objs == null || objs.isEmpty() || objs.get(0) == null) {
             return 0;
