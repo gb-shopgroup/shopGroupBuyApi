@@ -23,7 +23,6 @@ import cn.com.shopgroup.order.model.GbOrderInfo;
 import cn.com.shopgroup.order.service.GbGroupViewLogService;
 import cn.com.shopgroup.order.service.GbOrderInfoService;
 import cn.com.shopgroup.user.service.GbOrgMessageInfoService;
-import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -1765,7 +1764,9 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
             //已收货数
             int receiptNum = goods.getReceiptNum() == null ? 0 : goods.getReceiptNum();
             //退货退款数（退已收货数）
-            int refundedGoodNum = goods.getRefundGoodsNum() == null ? 0 : goods.getRefundGoodsNum();
+            int refundedGoodNum = goods.getRefundGoodsNum() == null ? 0 : goods.getRefundGoodsNum().intValue();
+            //退款数
+            int refundedNum = goods.getRefundNum() == null ? 0 : goods.getRefundNum().intValue();
             int canRefundNum = 0;
             if (isReturnGoods == 2) {
                 // 退货退款: 只查询"已经收货"的商品(收货数量>0), 已收货但未退部分可退
@@ -1775,7 +1776,7 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
             }
             if (isReturnGoods == 1) {
                 // 退款: 只查询"待收货(尚未收货)"的商品(收货数量<购买数量), 待收货未退部分可退
-                int m = goodsNum - receiptNum;
+                int m = goodsNum - receiptNum - refundedNum;
                 if (m > 0) {
                     canRefundNum = m;
                 }

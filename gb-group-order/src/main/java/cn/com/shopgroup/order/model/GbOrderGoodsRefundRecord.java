@@ -25,6 +25,9 @@ public class GbOrderGoodsRefundRecord {
     // 本次申请退款金额(单位:分); 团长端审核未回传金额时, 审核发起退款(按本次申请金额)与回调累加主表refund_fee据此兜底
     @TableField("refund_amount")
     private Integer refundAmount;
+    // 易宝退款单号(uniqueRefundNo): 审核同意发起退款时记录, 用于与易宝退款单逐笔对账及退款回调幂等判重(支持一单多次部分退款)
+    @TableField("refund_no")
+    private String refundNo;
     // 操作人id
     @TableField("operate_id")
     private Long operateId;

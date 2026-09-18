@@ -15,6 +15,8 @@ public class OrderRefundRecordResponse {
     private String orderNo;
     //退款商品描述
     private String refundGoodsMsg;
+    // 易宝退款单号(审核同意发起退款时记录, 供与易宝对账)
+    private String refundNo;
     // 操作人id
     private Long operateId;
     // 操作人姓名
@@ -32,6 +34,7 @@ public class OrderRefundRecordResponse {
         this.id = data.getId();
         this.orderNo = data.getOrderNo();
         this.refundGoodsMsg = data.getRefundGoodsMsg();
+        this.refundNo = data.getRefundNo();
         this.operateId = data.getOperateId();
         this.operateName = data.getOperateName();
         this.isAgree = data.getIsAgree();

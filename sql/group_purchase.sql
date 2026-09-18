@@ -370,6 +370,7 @@ CREATE TABLE `gb_order_goods_refund_record` (
   `refund_goods_msg` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '退款商品描述',
   `refund_flag` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '退款类型:1=退款(退待收货部分) 2=退货退款(退已收货部分)',
   `refund_amount` int unsigned NOT NULL DEFAULT '0' COMMENT '本次申请退款金额(单位:分)',
+  `refund_no` varchar(64) NOT NULL DEFAULT '' COMMENT '易宝退款单号(uniqueRefundNo):审核同意发起退款时记录,用于与易宝对账及回调幂等判重',
   `operate_id` int unsigned NOT NULL DEFAULT '0' COMMENT '操作人id',
   `operate_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '操作人姓名',
   `is_agree` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '状态 0 待审核 1 同意 2 不同意',
@@ -377,7 +378,8 @@ CREATE TABLE `gb_order_goods_refund_record` (
   `extra_reason` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '补充原因',
   `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '添加时间',
   PRIMARY KEY (`id`),
-  KEY `idx_order_no` (`order_no`)
+  KEY `idx_order_no` (`order_no`),
+  KEY `idx_refund_no` (`refund_no`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='订单退款记录信息表';
 
 -- group_purchase.gb_refund_reason definition
@@ -656,3 +658,9 @@ ALTER TABLE `gb_group_activity_info`
   ADD COLUMN `tag_id` int unsigned NOT NULL DEFAULT '0' COMMENT '团购标签id,0=未选择',
   ADD COLUMN `tag_name` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '团购标签名称,冗余展示';
 
+
+-- 退款记录表新增易宝退款单号字段: 审核同意发起退款时记录易宝返回的 uniqueRefundNo,
+-- 用于与易宝退款单逐笔对账, 并作为退款回调幂等判重基准(支持一单多次部分退款)
+ALTER TABLE `gb_order_goods_refund_record`
+  ADD COLUMN `refund_no` varchar(64) NOT NULL DEFAULT '' COMMENT '易宝退款单号(uniqueRefundNo),审核同意发起退款时记录,用于对账与回调幂等' AFTER `refund_amount`,
+  ADD KEY `idx_refund_no` (`refund_no`);

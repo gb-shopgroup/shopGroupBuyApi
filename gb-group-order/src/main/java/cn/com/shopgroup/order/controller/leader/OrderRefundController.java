@@ -1,5 +1,7 @@
 package cn.com.shopgroup.order.controller.leader;
 
+import cn.com.shopgroup.common.cache.RedisConstant;
+import cn.com.shopgroup.common.cache.RedisHelper;
 import cn.com.shopgroup.common.exception.BusinessException;
 import cn.com.shopgroup.common.utils.CustomIdGenerator;
 import cn.com.shopgroup.common.utils.JsonResult;
@@ -74,6 +76,9 @@ public class OrderRefundController {
 
     @Resource
     private GbGoodsSkuInfoService skuService;
+
+    @Resource
+    private RedisHelper redisHelper;
 
     // 退款订单数量: 订单中存在商品发生过退款(部分退/整单全退, 审核同意)即计入
     @GetMapping("/leader/refund/count")
@@ -203,18 +208,7 @@ public class OrderRefundController {
         orderInfoService.updateOrderGoodsApplyStatus(orderNo, orderGoodsIds, 3);
         // ---------- 恢复商品行申请前状态(商品行退款/退货退款数量申请时已占坑; 主表refund_fee不在申请时累加, 拒绝后金额天然回到申请前, 无需扣回) ----------
         // 本次申请退款类型优先取审核请求回传值; 旧版本团长端可能未回传, 则按该订单最近一笔售后申请记录兜底
-        int isReturnGoods = request.getRefundFlag() == null ? 0 : request.getRefundFlag();
-        if (isReturnGoods != 1 && isReturnGoods != 2) {
-            List<GbOrderGoodsRefundRecord> recordList = refundRecordService.getRefundRecordListByOrderNo(orderNo);
-            for (int i = recordList.size() - 1; i >= 0; i--) {
-                GbOrderGoodsRefundRecord record = recordList.get(i);
-                if (record.getRefundFlag() != null
-                        && (record.getRefundFlag() == 1 || record.getRefundFlag() == 2)) {
-                    isReturnGoods = record.getRefundFlag();
-                    break;
-                }
-            }
-        }
+        int isReturnGoods = resolveRefundFlag(orderNo, request);
         // 恢复商品数量: 回退商品行本次申请累计的退款/退货退款数量, 否则占坑导致无法再次申请/数量虚高
         if (isReturnGoods == 1 || isReturnGoods == 2) {
             Map<Long, Integer> refundNumMap = new HashMap<>();
@@ -254,91 +248,157 @@ public class OrderRefundController {
     }
 
     //同意退款处理: 按本次申请金额发起退款, 主表refund_fee留待退款回调成功后累加
+    //防多退三道防线: 1)订单维度分布式锁拦截重复/并发提交 2)商品行须仍处于待审核(已审核过的重复请求拒绝) 3)累计退款金额不超过订单实付
     public int handleAgree(Long leaderId, Long opId, String opName, GbOrderInfo orderInfo, OrderRefundInfoRequest request, String reason) {
         // 申请退款账户
         String merchantNo = orderInfo.getMerchantNo();
         String orderNo = orderInfo.getOrderNo();
-        // 本次审核同意的退款金额(单位:分): 优先取审核请求回传的本次申请金额, 团长端旧版本未回传时按最近一笔申请记录兜底
-        int agreeRefundCent = getApplyRefundCent(orderNo, request);
-        // 按本次申请金额发起退款(支持部分退款); 申请金额缺失时退化为整单实付金额, 避免向易宝发起0元退款
-        int requestRefundCent = agreeRefundCent > 0 ? agreeRefundCent
-                : (orderInfo.getPayFee() == null ? 0 : orderInfo.getPayFee());
-        if (requestRefundCent <= 0) {
-            log.warn("退款发起终止: 订单{}本次可退金额为0", orderNo);
+        // 防线1: 订单维度分布式锁, 拦截团长端重复点击/网络重试/并发提交, 防止向易宝重复发起退款(每次refundRequestId均为随机值, 易宝侧视为不同退款单, 会真实多退)
+        String lockKey = RedisConstant.RedisRefundApproveKey + orderNo;
+        if (!redisHelper.getLock(lockKey, RedisConstant.RedisRefundApproveExpired)) {
+            log.warn("退款审核防重: 订单{}存在处理中的退款审核, 本次请求忽略, 操作人:{}", orderNo, opName);
             return 0;
         }
-        // 退款金额, 分转元
-        double amount = MoneyUtil.centToYuan(requestRefundCent);
-        Map<String, String> res = YeePayUtils.refund(merchantNo, orderNo, String.valueOf(amount));
-        //插入交易流水表
-        OrderTransactionLog transactionLog = new OrderTransactionLog();
-        transactionLog.setOrderNo(orderNo);
-        transactionLog.setTransactionNo("tr" + CustomIdGenerator.generateUUID());
-        transactionLog.setPayAmount(amount);
-        transactionLog.setPayMethod("yeePay");
-        transactionLog.setOperatorId(opId);
-        transactionLog.setOperatorName(opName);
-        transactionLog.setAddTime(TimeUtils.getTimeStamp());
-        transactionLog.setPayStatus(PaymentStatusEnum.REFUNDED.getCode());
-        // 查看是否成功
-        if (Integer.parseInt(res.get("success")) == 0) {
-            log.error("退款失败：" + res.get("data"));
-            transactionLog.setRemark("退款失败");
-            handleInsertTransaction(transactionLog);
-            return 0;
-        } else {
-            // 同步原始订单表和商户订单表的退款状态
-            orderBusinessInfoService.editMiniLeaderOrderBusinessRefundStatus(orderNo);
-            // 注: 主表退款金额refund_fee不在此维护, 申请/审核阶段都不累加;
-            //     统一由退款回调成功后按易宝回传的实际退款金额累加(见 OrderRefundNotifyController#handleRefundResult)
-            // 退款成功, 按实际退款数量回补库存(商品总库存 + SKU库存), 支持部分退款
-            // 注: 商品行的退款/退货退款数量已在用户申请时累计占坑, 审核同意后保留不再重复累加
+        try {
+            // 本次审核同意的退款金额(单位:分): 优先取审核请求回传的本次申请金额, 团长端旧版本未回传时按最近一笔申请记录兜底
+            int agreeRefundCent = getApplyRefundCent(orderNo, request);
+            // 按本次申请金额发起退款(支持部分退款); 申请金额缺失时退化为整单实付金额, 避免向易宝发起0元退款
+            int requestRefundCent = agreeRefundCent > 0 ? agreeRefundCent
+                    : (orderInfo.getPayFee() == null ? 0 : orderInfo.getPayFee());
+            if (requestRefundCent <= 0) {
+                log.warn("退款发起终止: 订单{}本次可退金额为0", orderNo);
+                return 0;
+            }
+            // 查询订单商品(供待审核校验与库存回补共用)
             List<GbOrderGoodsInfo> goodsList = orderInfoService.getOrderGoodsList(orderNo);
-            for (GbOrderGoodsInfo goods : goodsList) {
-                OrderRefundGoodsRequest refundGoods = request.getRefundGoodsMap().get(goods.getId());
-                int refundNum = refundGoods != null && refundGoods.getRefundNum() != null ? refundGoods.getRefundNum() : 0;
-                if (refundNum > 0) {
-                    int packNum = goods.getPackNum() == null || goods.getPackNum() == 0 ? 1 : goods.getPackNum();
-                    int stockNum = refundNum * packNum;
-                    goodsService.increaseGoodsStock(goods.getGoodsId(), stockNum);
-                    if (goods.getSkuId() != null && goods.getSkuId() > 0) {
-                        skuService.increaseGoodsStock(goods.getSkuId(), stockNum);
+            // 防线2: 本次审核的商品行中须仍有待审核(apply_refund=1)的行; 全部已处理过视为重复审核请求, 直接拒绝(防重复发起退款)
+            if (!hasPendingRefundGoods(goodsList, request.getRefundGoodsMap())) {
+                log.warn("退款审核防重: 订单{}本次审核的商品行均已处理过(apply_refund!=1), 视为重复审核请求, 拒绝再次发起退款, 操作人:{}", orderNo, opName);
+                return 0;
+            }
+            // 防线3: 累计金额防超退: 已同意(已向易宝发起)累计金额 + 本次金额 <= 订单实付金额
+            int payFee = orderInfo.getPayFee() == null ? 0 : orderInfo.getPayFee();
+            int agreedCent = refundRecordService.getAgreedRefundCentByOrderNo(orderNo);
+            if (agreedCent + requestRefundCent > payFee) {
+                log.error("退款防超退: 订单{}累计退款金额({}分+本次{}分)超过实付金额{}分, 终止发起退款, 操作人:{}", orderNo, agreedCent, requestRefundCent, payFee, opName);
+                return 0;
+            }
+            // 退款金额, 分转元
+            double amount = MoneyUtil.centToYuan(requestRefundCent);
+            Map<String, String> res = YeePayUtils.refund(merchantNo, orderNo, String.valueOf(amount));
+            // 易宝退款单号(受理成功时返回): 落退款记录供与易宝对账, 并作为退款回调幂等键
+            String uniqueRefundNo = res == null || res.get("data") == null ? "" : res.get("data");
+            log.info("退款发起: 订单{}, 本次退款{}分, 易宝退款单号:{}, 操作人:{}", orderNo, requestRefundCent, uniqueRefundNo, opName);
+            //插入交易流水表
+            OrderTransactionLog transactionLog = new OrderTransactionLog();
+            transactionLog.setOrderNo(orderNo);
+            transactionLog.setTransactionNo("tr" + CustomIdGenerator.generateUUID());
+            transactionLog.setPayAmount(amount);
+            transactionLog.setRefundAmount(amount);
+            transactionLog.setPayMethod("yeePay");
+            transactionLog.setOperatorId(opId);
+            transactionLog.setOperatorName(opName);
+            transactionLog.setAddTime(TimeUtils.getTimeStamp());
+            transactionLog.setPayStatus(PaymentStatusEnum.REFUNDED.getCode());
+            // 查看是否成功
+            if (Integer.parseInt(res.get("success")) == 0) {
+                log.error("退款发起失败: 订单{}, 易宝返回:{}", orderNo, res.get("data"));
+                transactionLog.setRemark("退款发起失败");
+                handleInsertTransaction(transactionLog);
+                return 0;
+            } else {
+                // 同步原始订单表和商户订单表的退款状态
+                orderBusinessInfoService.editMiniLeaderOrderBusinessRefundStatus(orderNo);
+                // 注: 主表退款金额refund_fee不在此维护, 申请/审核阶段都不累加;
+                //     统一由退款回调成功后按易宝回传的实际退款金额累加(见 RefundConfirmServiceImpl#confirmRefundSuccess)
+                // 退款受理成功, 按实际退款数量回补库存(商品总库存 + SKU库存), 支持部分退款
+                // 注: 商品行的退款/退货退款数量已在用户申请时累计占坑, 审核同意后保留不再重复累加
+                for (GbOrderGoodsInfo goods : goodsList) {
+                    OrderRefundGoodsRequest refundGoods = request.getRefundGoodsMap().get(goods.getId());
+                    int refundNum = refundGoods != null && refundGoods.getRefundNum() != null ? refundGoods.getRefundNum() : 0;
+                    if (refundNum > 0) {
+                        int packNum = goods.getPackNum() == null || goods.getPackNum() == 0 ? 1 : goods.getPackNum();
+                        int stockNum = refundNum * packNum;
+                        goodsService.increaseGoodsStock(goods.getGoodsId(), stockNum);
+                        if (goods.getSkuId() != null && goods.getSkuId() > 0) {
+                            skuService.increaseGoodsStock(goods.getSkuId(), stockNum);
+                        }
                     }
                 }
-            }
-            //查询该订单下是否有没有退款商品。如果没有，就改订单状态：退货，否则不改
-            List<Long> orderGoodsIds = new ArrayList<>();
-            for (Map.Entry<Long, OrderRefundGoodsRequest> entry : request.getRefundGoodsMap().entrySet()) {
-                Long orderGoodsId = entry.getKey();
-                orderGoodsIds.add(orderGoodsId);
-            }
-            //标识订单商品售后状态同意
-            orderInfoService.updateOrderGoodsApplyStatus(orderNo, orderGoodsIds, 2);
-            //插入退货记录售后日志
-            GbOrderGoodsRefundRecord refundRecord = new GbOrderGoodsRefundRecord();
-            refundRecord.setOperateId(opId);
-            refundRecord.setOperateName(opName);
-            refundRecord.setIsAgree(1);//同意退款
-            refundRecord.setOrderNo(orderNo);
-            refundRecord.setActionReason(reason);
-            refundRecord.setAddTime(TimeUtils.getTimeStamp());
-            refundRecordService.addRefundRecord(refundRecord);
-            // 审核同意且退款成功后维护订单主状态: 订单商品全部退完 -> 已退款(4), 否则只要有未退完的 -> 售后(5)
-            orderInfoService.updateOrderStatusAfterRefundAgree(orderNo);
-            // 同步分账订单表, 核销之后的订单才能分账, 这样只要不核销订单, 就可以随时退款
-            businessService.updateBusinessOrderCheckStatus(request.getOrderNo());
+                //本次审核同意的商品行id集合
+                List<Long> orderGoodsIds = new ArrayList<>();
+                for (Map.Entry<Long, OrderRefundGoodsRequest> entry : request.getRefundGoodsMap().entrySet()) {
+                    Long orderGoodsId = entry.getKey();
+                    orderGoodsIds.add(orderGoodsId);
+                }
+                //标识订单商品售后状态同意
+                orderInfoService.updateOrderGoodsApplyStatus(orderNo, orderGoodsIds, 2);
+                //插入退货记录售后日志: 补齐本次退款金额/类型/易宝退款单号(旧逻辑未落这些字段, 导致无法与易宝对账、无法防超退校验)
+                GbOrderGoodsRefundRecord refundRecord = new GbOrderGoodsRefundRecord();
+                refundRecord.setOperateId(opId);
+                refundRecord.setOperateName(opName);
+                refundRecord.setIsAgree(1);//同意退款
+                refundRecord.setOrderNo(orderNo);
+                int refundFlag = resolveRefundFlag(orderNo, request);
+                if (refundFlag == 1 || refundFlag == 2) {
+                    refundRecord.setRefundFlag(refundFlag);
+                }
+                refundRecord.setRefundAmount(requestRefundCent);
+                refundRecord.setRefundNo(uniqueRefundNo);
+                refundRecord.setActionReason(reason);
+                refundRecord.setAddTime(TimeUtils.getTimeStamp());
+                refundRecordService.addRefundRecord(refundRecord);
+                // 审核同意且退款受理成功后维护订单主状态: 订单商品全部退完 -> 已退款(4), 否则只要有未退完的 -> 售后(5)
+                orderInfoService.updateOrderStatusAfterRefundAgree(orderNo);
+                // 同步分账订单表, 核销之后的订单才能分账, 这样只要不核销订单, 就可以随时退款
+                businessService.updateBusinessOrderCheckStatus(orderNo);
 
-            // 添加日志, 消息类型: 1=系统消息2=内部消息3=业务消息
-            byte type = 2;
-            String opString = "通过了";
-            String content = opName + " " + opString + " 订单号(" + orderNo + ") 的退款订单。";
-            messageService.addMiniLeaderMessageInfo(leaderId, opId, type, content);
-            // 返回 成功标识
-            transactionLog.setRemark("退款成功");
-            handleInsertTransaction(transactionLog);
-            return 1;
+                // 添加日志, 消息类型: 1=系统消息2=内部消息3=业务消息
+                byte type = 2;
+                String opString = "通过了";
+                String content = opName + " " + opString + " 订单号(" + orderNo + ") 的退款订单。";
+                messageService.addMiniLeaderMessageInfo(leaderId, opId, type, content);
+                // 返回 成功标识
+                transactionLog.setRemark("退款已受理,易宝退款单号:" + uniqueRefundNo);
+                handleInsertTransaction(transactionLog);
+                log.info("退款审核同意处理完成: 订单{}, 本次退款{}分, 易宝退款单号:{}, 操作人:{}", orderNo, requestRefundCent, uniqueRefundNo, opName);
+                return 1;
+            }
+        } finally {
+            // 处理完成释放锁(60秒兜底过期), 不影响该订单后续正常的部分退款审核
+            redisHelper.releaseLock(lockKey);
         }
+    }
 
+    // 本次审核的商品行中是否仍有待审核(apply_refund=1)的行(防重复审核: 全部已处理过说明是重复请求)
+    private boolean hasPendingRefundGoods(List<GbOrderGoodsInfo> goodsList, Map<Long, OrderRefundGoodsRequest> refundGoodsMap) {
+        if (CollectionUtils.isEmpty(goodsList) || CollectionUtils.isEmpty(refundGoodsMap)) {
+            return false;
+        }
+        for (GbOrderGoodsInfo goods : goodsList) {
+            if (refundGoodsMap.containsKey(goods.getId())
+                    && goods.getApplyRefund() != null
+                    && goods.getApplyRefund().intValue() == 1) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // 解析本次退款类型: 优先取审核请求回传值(refundFlag), 旧版本团长端未回传时按该订单最近一笔带类型的售后记录兜底; 仍未知返回0
+    private int resolveRefundFlag(String orderNo, OrderRefundInfoRequest request) {
+        int flag = request.getRefundFlag() == null ? 0 : request.getRefundFlag();
+        if (flag != 1 && flag != 2) {
+            List<GbOrderGoodsRefundRecord> recordList = refundRecordService.getRefundRecordListByOrderNo(orderNo);
+            for (int i = recordList.size() - 1; i >= 0; i--) {
+                GbOrderGoodsRefundRecord record = recordList.get(i);
+                if (record.getRefundFlag() != null
+                        && (record.getRefundFlag() == 1 || record.getRefundFlag() == 2)) {
+                    return record.getRefundFlag();
+                }
+            }
+        }
+        return flag;
     }
 
     // 计算本次审核(同意)对应的申请退款金额(单位:分): 优先取审核请求回传的本次申请金额;

@@ -100,9 +100,10 @@ public class LeaderGroupSummaryServiceImpl implements LeaderGroupSummaryService 
     }
 
     /**
-     * 查询单个团购活动的跟团统计(团员人数及其下单数)
+     * 查询单个团购活动的跟团统计(团员人数、订单数、订单总支付金额)
      *
      * 统计口径(与用户端跟团人数一致): 已支付(pay_time>0)、未取消(status!=6)的有效订单; 团员人数按 member_id 去重, 下单数为有效订单条数
+     * 订单总支付金额(totalAmount): 支付流水总金额 SUM(pay_fee), 单位分转元, 不扣除退款(与字段注释"不管退的, 支付总金额"保持一致)
      */
     @Override
     public LeaderGroupGenTuanResponse getGenTuanByGroupId(Long groupId) {
@@ -110,13 +111,15 @@ public class LeaderGroupSummaryServiceImpl implements LeaderGroupSummaryService 
         LeaderGroupGenTuanResponse result = new LeaderGroupGenTuanResponse();
         result.setMemberNum(0);
         result.setOrderNum(0);
+        result.setTotalAmount(0D);
         if (groupId == null || groupId <= 0) {
             return result;
         }
 
-        // 一次查询同时得出: 去重团员人数 + 有效订单数(下单数)
+        // 一次查询同时得出: 去重团员人数 + 有效订单数 + 订单总支付金额(分)
         String sql = "SELECT COUNT(DISTINCT member_id) AS member_num, " +
-                "       COUNT(*) AS order_num " +
+                "       COUNT(*) AS order_num, " +
+                "       COALESCE(SUM(pay_fee), 0) AS total_fee_cent " +
                 "FROM gb_order_info " +
                 "WHERE group_id = ? " +
                 "  AND pay_time > 0 " +
@@ -129,6 +132,8 @@ public class LeaderGroupSummaryServiceImpl implements LeaderGroupSummaryService 
             Map<String, Object> row = rows.get(0);
             result.setMemberNum((int) toLong(row.get("member_num")));
             result.setOrderNum((int) toLong(row.get("order_num")));
+            // 分 -> 元, 保留两位小数
+            result.setTotalAmount(MoneyUtil.centToYuan((int) toLong(row.get("total_fee_cent"))));
         }
         return result;
     }

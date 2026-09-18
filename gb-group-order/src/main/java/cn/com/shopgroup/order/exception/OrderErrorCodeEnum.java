@@ -236,6 +236,8 @@ public enum OrderErrorCodeEnum implements IErrorCode {
     ORDER_GOODS_NEED_APPROVE(300345, "当前订单还有待审核数据，请联系团长处理后再申请"),
     //取消订单
     ORDER_CANCELED_NOT_REFUND(300346, "已经取消订单, 不能申请退款"),
+    //未支付或取消状态的订单不允许生成核销码
+    ORDER_CANCELED_UNPAID_NOT_CODE(300347, "未支付或取消状态的订单不允许生成核销码"),
     ;
 
     /**

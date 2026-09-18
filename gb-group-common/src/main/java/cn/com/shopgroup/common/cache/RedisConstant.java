@@ -47,6 +47,10 @@ public class RedisConstant {
     public final static long RedisRefundNotifyExpired = 7*24*60*60;
     public final static String RedisRefundNotifyKey = "RefundNotify:";
 
+    // 退款审核防重锁(按订单号): 防止团长端重复提交/并发审核同一订单, 向易宝重复发起退款导致多退
+    public final static long RedisRefundApproveExpired = 60;
+    public final static String RedisRefundApproveKey = "RefundApprove:";
+
 
 
     public final static long RedisOrderCodeExpired = 1*24*60*60;

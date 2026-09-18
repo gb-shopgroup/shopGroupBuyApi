@@ -57,6 +57,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 //用户端订单
 @RestController
@@ -233,7 +234,7 @@ public class MemberOrderController {
     // 用户订单小程序码(微信小程序码, 扫码进入C端小程序对应订单页面)
     @GetMapping("/group/order/makeErcode")
     public JsonResult orderMakeErcode(@RequestParam("orderNo") String orderNo) {
-        log.info("生成订单二维码,orderNo:{}",orderNo);
+        log.info("生成订单二维码,orderNo:{}", orderNo);
         // 查询用户信息
         String token = TokenUtils.getToken();
         if (token == null || token.length() == 0) {
@@ -252,7 +253,16 @@ public class MemberOrderController {
         if (memberId == 0) {
             throw new BusinessException(OrderErrorCodeEnum.USER_NOT_EXIST);
         }
-
+        //查询订单是否存在，订未支付/取消 状态，不让生成
+        GbOrderInfo orderInfo = orderInfoService.getMiniOrderInfo(memberId, orderNo);
+        log.info("生成订单二维码,orderNo:{},info:{}", orderNo, JSON.toJSONString(orderInfo));
+        if (ObjectUtils.isEmpty(orderInfo)) {
+            throw new BusinessException(OrderErrorCodeEnum.ORDER_NOT_EXIST);
+        }
+        int orderStatus = orderInfo.getStatus().intValue();
+        if (orderStatus == 0 || orderStatus == 6) {
+            throw new BusinessException(OrderErrorCodeEnum.ORDER_CANCELED_UNPAID_NOT_CODE);
+        }
         // 小程序码永久有效: 优先读缓存, 生成一次后永久复用, 不再依赖access_token与微信接口
         String cacheKey = RedisConstant.WxMiniOrderErCodeKey + orderNo;
         String cached = redisHelper.getCacheObject(cacheKey);
@@ -284,8 +294,8 @@ public class MemberOrderController {
             throw new BusinessException(OrderErrorCodeEnum.ERCODE_GEN_FAILED);
         }
 
-        // 生成成功后永久缓存, 之后直接返回缓存(小程序码内容不变)
-        redisHelper.setCacheObject(cacheKey, base64);
+        // 生成成功后-24小时-缓存, 之后直接返回缓存(小程序码内容不变)
+        redisHelper.setCacheObject(cacheKey, base64, 24L, TimeUnit.HOURS);
 
         // 返回
         return JsonResult.success("二维码生成成功", base64);
