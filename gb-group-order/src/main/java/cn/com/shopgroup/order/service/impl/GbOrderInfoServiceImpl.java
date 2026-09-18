@@ -631,7 +631,7 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
         int flag = mapper.update(updateWrapper);
         byte type = 2;
         String oper = "核销了";
-        String content = staffName + " " + oper + " " + receiptCode + " 的订单。";
+        String content = staffName + " " + oper + "订单号:" + orderNo + " 的订单。";
         if (flag > 0) {
             orgMessageInfoService.addMiniLeaderMessageInfo(leaderId, staffId, type, content);
         }
@@ -682,7 +682,7 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
 
         byte type = 2;
         String oper = "核销了";
-        String content = staffName + " " + oper + " " + receiptCode + " 的订单。";
+        String content = staffName + " " + oper + "订单号:" + orderNo + " 的订单。";
         orgMessageInfoService.addMiniLeaderMessageInfo(leaderId, staffId, type, content);
 
 

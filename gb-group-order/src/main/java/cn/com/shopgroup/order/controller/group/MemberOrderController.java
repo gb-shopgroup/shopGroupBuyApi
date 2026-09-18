@@ -8,12 +8,13 @@ import cn.com.shopgroup.common.utils.MoneyUtil;
 import cn.com.shopgroup.common.utils.TimeUtils;
 import cn.com.shopgroup.common.utils.TokenUtils;
 import cn.com.shopgroup.common.wxmini.WxMiniAccessTokenHelper;
+import cn.com.shopgroup.common.wxmini.WxMiniProgramHelper;
 import cn.com.shopgroup.order.constants.OrderStatusEnum;
 import cn.com.shopgroup.order.exception.OrderErrorCodeEnum;
 import cn.com.shopgroup.order.http.request.MemberOrderListRequest;
+import cn.com.shopgroup.order.http.request.MemberOrderReceiptRequest;
 import cn.com.shopgroup.order.http.request.MemberOrderRefundListRequest;
 import cn.com.shopgroup.order.http.request.MemberOrderRefundRequest;
-import cn.com.shopgroup.order.http.request.MemberOrderReceiptRequest;
 import cn.com.shopgroup.order.http.request.OrderRefundApplyRequest;
 import cn.com.shopgroup.order.http.request.OrderRefundGoodsRequest;
 import cn.com.shopgroup.order.http.request.OrderVerifyGoodsRequest;
@@ -22,19 +23,23 @@ import cn.com.shopgroup.order.http.response.OrderRefundRecordResponse;
 import cn.com.shopgroup.order.http.response.OrderResponse;
 import cn.com.shopgroup.order.http.response.OrderVerifyRecordResponse;
 import cn.com.shopgroup.order.http.response.RefundOrderInfoResponse;
+import cn.com.shopgroup.order.model.GbOrderBusinessInfo;
 import cn.com.shopgroup.order.model.GbOrderGoodsInfo;
 import cn.com.shopgroup.order.model.GbOrderGoodsRefundRecord;
 import cn.com.shopgroup.order.model.GbOrderInfo;
 import cn.com.shopgroup.order.model.GbOrderVerifyRecord;
 import cn.com.shopgroup.order.model.GbRefundReason;
+import cn.com.shopgroup.order.service.GbOrderBusinessInfoService;
 import cn.com.shopgroup.order.service.GbOrderGoodsRefundRecordService;
 import cn.com.shopgroup.order.service.GbOrderInfoService;
 import cn.com.shopgroup.order.service.GbOrderVerifyRecordService;
 import cn.com.shopgroup.order.service.GbRefundReasonService;
 import cn.com.shopgroup.user.model.GbMemberInfo;
+import cn.com.shopgroup.user.model.GbOrgLeaderInfo;
 import cn.com.shopgroup.user.model.GbOrgPointInfo;
 import cn.com.shopgroup.user.model.GbOrgShopInfo;
 import cn.com.shopgroup.user.service.GbMemberInfoService;
+import cn.com.shopgroup.user.service.GbOrgLeaderInfoService;
 import cn.com.shopgroup.user.service.GbOrgMessageInfoService;
 import cn.com.shopgroup.user.service.GbOrgPointInfoService;
 import cn.com.shopgroup.user.service.GbOrgShopInfoService;
@@ -97,6 +102,14 @@ public class MemberOrderController {
     private RedisHelper redisHelper;
     @Resource
     private GbOrgShopInfoService shopInfoService;
+
+    @Resource
+    private GbOrderBusinessInfoService businessService;
+
+    @Resource
+    private GbOrgLeaderInfoService leaderInfoService;
+    @Resource
+    private WxMiniAccessTokenHelper wxAccessTokenHelper;
 
     // 用户订单列表（按订单状态/商品名称筛选, 分页查询）
     @PostMapping("/group/order/list")
@@ -362,6 +375,11 @@ public class MemberOrderController {
             throw new BusinessException(OrderErrorCodeEnum.ORDER_NOT_EXIST);
         }
 
+        GbOrgLeaderInfo leaderInfo = leaderInfoService.getLeaderInfo(orderInfo.getLeaderId());
+        if (ObjectUtils.isEmpty(leaderInfo)) {
+            throw new BusinessException(OrderErrorCodeEnum.LEADER_INFO_ERROR);
+        }
+
         int status = orderInfo.getStatus().intValue();
         // 支付状态, 未支付不能收货
         if (status == 0) {
@@ -433,9 +451,10 @@ public class MemberOrderController {
         // 收货消息类型: 1=系统消息2=内部消息3=业务消息
         // 员工-提货点绑定表 gb_org_point_staff 已下线, 不再通知店员, 直接通知团长
         String action = partVerify ? "部分核销" : "主动核销";
-        String content = orderInfo.getNickname() + "(" + orderInfo.getMobile() + ")" + action + "了编号 " + orderInfo.getReceiptCode() + " 的订单。";
+        String content = orderInfo.getNickname() + "(" + orderInfo.getMobile() + ")" + action + "了订单号 " + orderInfo.getOrderNo() + " 的订单。";
         messageService.addMiniLeaderMessageInfo(orderInfo.getLeaderId(), 0L, (byte) 3, content);
-
+        // 同步分账订单表, 核销之后的订单才能分账, 这样只要不核销订单, 就可以随时退款
+        businessService.updateBusinessOrderCheckStatus(orderNo);
         // 返回结果
         if (flag) {
             // 核销成功: 落核销记录表(核销类型:2=用户扫码核销, 核销人=下单用户);
@@ -443,10 +462,70 @@ public class MemberOrderController {
             verifyRecordService.addVerifyRecord(verifyRecordService.buildVerifyRecord(orderInfo, goodsList, verifyNumMap,
                     GbOrderVerifyRecordService.VERIFY_TYPE_MEMBER,
                     memberId, orderInfo.getNickname(), pointId, pointName));
+            //订单对应的团长的cashType[结算到账方式,0=支付时延迟到账型,1=核销时延迟到账型]
+            int type = leaderInfo.getCashType().intValue();
+            // 核销时延迟到账型(1) 且未调用过微信发货的订单, 核销后补调用微信发货(同步发货状态)
+            if (type == 1 && !isWxShipmentCalled(orderInfo)) {
+                handleCalledWxUploadShippingInfo(orderInfo);
+            }
             return JsonResult.success(partVerify ? "部分核销成功" : "收货成功");
         } else {
             throw new BusinessException(OrderErrorCodeEnum.RECEIPT_FAILED);
         }
+    }
+
+    // 是否已调用过微信发货(wx_shipment:0=未调用,1=已调用)
+    private boolean isWxShipmentCalled(GbOrderInfo orderInfo) {
+        Integer wxShipment = orderInfo.getWxShipment();
+        return wxShipment != null && wxShipment.intValue() == 1;
+    }
+
+    private void handleCalledWxUploadShippingInfo(GbOrderInfo orderInfo) {
+        String orderNo = orderInfo.getOrderNo();
+        // 微信单号优先取收款账户表, 兜底取支付流水号
+        GbOrderBusinessInfo orderBusinessInfo = businessService.getOrderBusinessInfo(orderNo);
+        String transactionId = ObjectUtils.isEmpty(orderBusinessInfo) ? null : orderBusinessInfo.getTransactionId();
+        if (StringUtils.isEmpty(transactionId)) {
+            transactionId = orderInfo.getPayNo();
+        }
+        if (StringUtils.isEmpty(transactionId)) {
+            log.warn("[核销微信发货]未获取到微信单号, orderNo:{}", orderNo);
+            return;
+        }
+        // 微信发货失败不影响核销主流程(核销已完成), 仅记录日志, 由后续自动发货任务兜底重试
+        try {
+            // 首次调用(使用缓存access_token)
+            int wxFlag = callWxUploadShippingInfo(orderNo, transactionId, orderInfo.getGroupName(), orderInfo.getOpenid(), false);
+            // access_token失效(微信返回40001/42001, 对应-1)时, 清除缓存并强制刷新后重试一次
+            if (wxFlag == -1) {
+                wxAccessTokenHelper.removeAccessToken();
+                log.warn("[核销微信发货]access_token失效, 清除缓存并强制刷新后重试, orderNo:{}", orderNo);
+                wxFlag = callWxUploadShippingInfo(orderNo, transactionId, orderInfo.getGroupName(), orderInfo.getOpenid(), true);
+            }
+            // 1=微信发货成功
+            if (wxFlag == 1) {
+                // 标记订单已调用微信发货(wx_shipment:0=未调用,1=已调用)
+                orderInfoService.updateWxShipment(orderNo);
+                // 同步收款账户订单发货状态(is_send=1, send_time, comm_status=1 已发货), 避免自动发货任务重复发货
+                businessService.updateBusinessOrderSendStatus(orderNo);
+                log.info("[核销微信发货]核销调用微信发货成功, orderNo:{}", orderNo);
+            } else {
+                log.error("[核销微信发货]核销调用微信发货失败, orderNo:{}, wxFlag:{}", orderNo, wxFlag);
+            }
+        } catch (Exception e) {
+            log.error("[核销微信发货]核销调用微信发货异常, orderNo:{}", orderNo, e);
+        }
+    }
+
+    // 调用微信发货信息录入(可强制刷新access_token), 返回: 1=成功, 0=业务失败, -1=access_token失效(40001/42001)
+    private int callWxUploadShippingInfo(String orderNo, String transactionId, String groupName, String openid, boolean forceRefreshToken) {
+        // forceRefreshToken=true 时忽略Redis缓存, 强制向微信重新获取access_token
+        String accessToken = wxAccessTokenHelper.getAccessToken(forceRefreshToken);
+        if (StringUtils.isEmpty(accessToken)) {
+            log.warn("[核销微信发货]获取access_token失败, orderNo:{}", orderNo);
+            return -1;
+        }
+        return WxMiniProgramHelper.uploadShippingInfo(accessToken, transactionId, groupName, openid);
     }
 
     // 从请求头token中解析当前登录用户id
