@@ -167,7 +167,8 @@ public interface GbOrderInfoService {
 
     List<GbOrderInfo> getPaidOrderInfoBy(Long memberId, Long shopId);
 
-    // 用户端-查询还有商品未全部收货的订单列表(条件: 用户id, 团长id; 状态1/2/5且存在未核销商品, 状态5时未核销商品须无退款), 并回填订单商品列表
+    // 用户端-查询还有商品未全部收货的订单列表(条件: 用户id, 团长id; 状态1待收货/2部分收货/5售后,
+    // 存在未核销商品(收货数<购买数); 状态5时还须购买数>(已核销数+退款数)), 并回填订单商品列表
     List<GbOrderInfo> getNotAllReceiptOrderList(Long memberId, Long leaderId);
 
     // 标记订单已调用微信发货(wx_shipment:0=未调用,1=已调用)

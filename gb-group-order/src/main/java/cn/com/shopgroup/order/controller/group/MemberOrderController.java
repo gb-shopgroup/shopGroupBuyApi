@@ -748,7 +748,7 @@ public class MemberOrderController {
 
 
     //用户端-查询还有商品未全部收货的订单列表(用户id+团长id查询, 状态1待收货/2部分收货/5售后;
-    //5售后时须存在未核销且无退款(apply_refund=0)的商品行; 订单须存在未核销商品, 返回订单及商品信息)
+    //5售后时商品行还须满足 购买数>(已核销数+退款数); 订单下还存在未核销商品, 返回订单及商品信息)
     @GetMapping("/group/order/notAllReceiptList")
     public JsonResult notAllReceiptOrderList(@RequestParam(value = "shopId") Long shopId) {
         log.info("用户扫码查询所有待核销订单:shopId:{}",shopId);

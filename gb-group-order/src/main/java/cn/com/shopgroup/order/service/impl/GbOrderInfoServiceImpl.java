@@ -956,7 +956,8 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
         return mapper.getPaidOrderInfoBy(memberId, shopId);
     }
 
-    // 用户端-查询还有商品未全部收货的订单列表(条件: 用户id, 团长id; 状态1/2/5且存在未核销商品, 状态5时未核销商品须无退款)
+    // 用户端-查询还有商品未全部收货的订单列表(条件: 用户id, 团长id; 状态1待收货/2部分收货/5售后,
+    // 存在未核销商品(收货数<购买数); 状态5时还须购买数>(已核销数+退款数), 并回填订单商品列表)
     @Override
     public List<GbOrderInfo> getNotAllReceiptOrderList(Long memberId, Long leaderId) {
         List<GbOrderInfo> orderList = mapper.getNotAllReceiptOrderList(memberId, leaderId);
