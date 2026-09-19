@@ -305,20 +305,37 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
         return flag > 0 ? true : false;
     }
 
-    // 用户扫码核销(整单/部分): 订单置部分收货(2)+核销时间+实际领取自提点, setReceiptTime=true(整单核销)时同时记录收货时间;
+    // 用户扫码核销(整单/部分): 核销成功后判断是否完全核销(所有商品行 剩余可核销数=购买数-已核销-已退待收货数<=0, 入参收货数量为含本次核销的内存累加值):
+    // 完全核销 => 订单置已收货(3)并记录收货时间; 未完全核销 => 保持原订单状态(不更新status), 仅记录核销时间+实际领取自提点;
     // 并按调用方内存累加后的收货数量同步商品行核销数量(整单核销=剩余全部, 部分核销=所选数量)
     @Override
     public Boolean miniVerifyOrder(Long memberId, String orderNo, Long pointId, String pointName,
-                                   List<GbOrderGoodsInfo> goodsList, boolean setReceiptTime) {
+                                   List<GbOrderGoodsInfo> goodsList) {
+
+        // 判断是否完全核销: 商品行收货数量为调用方内存累加后的值(已含本次核销)
+        boolean allVerified = true;
+        if (!CollectionUtils.isEmpty(goodsList)) {
+            for (GbOrderGoodsInfo item : goodsList) {
+                int goodsNum = item.getGoodsNum() == null ? 0 : item.getGoodsNum();
+                int receiptNum = item.getReceiptNum() == null ? 0 : item.getReceiptNum();
+                int refundNum = item.getRefundNum() == null ? 0 : item.getRefundNum();
+                if (goodsNum - receiptNum - refundNum > 0) {
+                    allVerified = false;
+                    break;
+                }
+            }
+        }
 
         LambdaUpdateWrapper<GbOrderInfo> updateWrapper = Wrappers.lambdaUpdate();
         updateWrapper.eq(GbOrderInfo::getOrderNo, orderNo);
         updateWrapper.eq(GbOrderInfo::getMemberId, memberId);
-        updateWrapper.set(GbOrderInfo::getStatus, OrderStatusEnum.PART_RECEIVED.getCode());
-        updateWrapper.set(GbOrderInfo::getVerifyTime, TimeUtils.getTimeStamp());
-        if (setReceiptTime) {
+        if (allVerified) {
+            // 完全核销: 订单置已收货(3)并记录收货时间
+            updateWrapper.set(GbOrderInfo::getStatus, OrderStatusEnum.RECEIVED.getCode());
             updateWrapper.set(GbOrderInfo::getReceiptTime, TimeUtils.getTimeStamp());
         }
+        // 未完全核销: 保持原订单状态, 不更新status
+        updateWrapper.set(GbOrderInfo::getVerifyTime, TimeUtils.getTimeStamp());
         updateWrapper.set(GbOrderInfo::getPointId2, pointId);
         updateWrapper.set(GbOrderInfo::getPointName2, pointName);
         updateWrapper.set(GbOrderInfo::getUpdateTime, TimeUtils.getTimeStamp());
@@ -930,10 +947,34 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
         return mapper.getPaidOrderInfoBy(memberId, shopId);
     }
 
-    // 用户端-查询还有商品未全部收货的订单列表(条件: 用户id, 团长id, 店铺id)
+    // 用户端-查询还有商品未全部收货的订单列表(条件: 用户id, 团长id; 状态1/2/5且存在未核销商品, 状态5时未核销商品须无退款)
     @Override
-    public List<GbOrderInfo> getNotAllReceiptOrderList(Long memberId, Long leaderId, Long shopId) {
-        return mapper.getNotAllReceiptOrderList(memberId, leaderId, shopId);
+    public List<GbOrderInfo> getNotAllReceiptOrderList(Long memberId, Long leaderId) {
+        List<GbOrderInfo> orderList = mapper.getNotAllReceiptOrderList(memberId, leaderId);
+        if (CollectionUtils.isEmpty(orderList)) {
+            return orderList;
+        }
+        // 批量查询订单的商品信息, 按 orderNo 关联回填
+        List<String> orderNos = orderList.stream()
+                .map(GbOrderInfo::getOrderNo)
+                .collect(Collectors.toList());
+        LambdaQueryWrapper<GbOrderGoodsInfo> queryWrapper = Wrappers.lambdaQuery();
+        queryWrapper.in(GbOrderGoodsInfo::getOrderNo, orderNos);
+        queryWrapper.orderByAsc(GbOrderGoodsInfo::getId);
+        List<GbOrderGoodsInfo> goodsList = goodsMapper.selectList(queryWrapper);
+        // 回填历史订单缺失的规格名称
+        fillOrderGoodsSkuNames(goodsList);
+
+        Map<String, List<GbOrderGoodsInfo>> goodsMap = new HashMap<>();
+        if (!CollectionUtils.isEmpty(goodsList)) {
+            for (GbOrderGoodsInfo item : goodsList) {
+                goodsMap.computeIfAbsent(item.getOrderNo(), k -> new ArrayList<>()).add(item);
+            }
+        }
+        for (GbOrderInfo item : orderList) {
+            item.setGoodsInfoList(goodsMap.getOrDefault(item.getOrderNo(), new ArrayList<>()));
+        }
+        return orderList;
     }
 
     // 标记订单已调用微信发货(wx_shipment:0=未调用,1=已调用)

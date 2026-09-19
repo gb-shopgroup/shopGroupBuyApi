@@ -145,19 +145,23 @@
         ORDER BY add_time DESC
     </select>
 
-    <!-- 用户端-查询还有商品未全部收货的订单列表(条件: 用户id, 团长id, 店铺id)
-         判定: 已支付(pay_time>0)且存在商品行 收货数量(receipt_num) < 购买数量(goods_num) -->
+    <!-- 用户端-查询还有商品未全部收货的订单列表(条件: 用户id, 团长id)
+         判定: 已支付(pay_time>0), 订单状态为 1待收货/2部分收货/5售后,
+         且存在商品行 收货数量(receipt_num) < 购买数量(goods_num) 即还有未核销数据;
+         状态5(售后)时, 未核销的商品行必须没有退款(apply_refund=0, 无售后/退款记录) -->
     <select id="getNotAllReceiptOrderList" resultMap="BaseResultMap">
         SELECT
         <include refid="Base_Column_List"/>
         FROM gb_order_info
-        WHERE member_id = #{memberId} AND leader_id = #{leaderId} AND shop_id = #{shopId}
+        WHERE member_id = #{memberId} AND leader_id = #{leaderId}
         AND pay_time &gt; 0
+        AND status IN (1, 2, 5)
         AND EXISTS (
             SELECT 1
             FROM gb_order_goods_info
             WHERE gb_order_goods_info.order_no = gb_order_info.order_no
               AND gb_order_goods_info.goods_num &gt; gb_order_goods_info.receipt_num
+              AND (gb_order_info.status &lt;&gt; 5 OR IFNULL(gb_order_goods_info.apply_refund, 0) = 0)
         )
         ORDER BY add_time DESC
     </select>

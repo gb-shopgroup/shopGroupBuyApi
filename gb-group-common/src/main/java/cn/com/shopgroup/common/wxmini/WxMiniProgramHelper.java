@@ -243,6 +243,9 @@ public class WxMiniProgramHelper {
         params.put("auto_color", false);
         params.put("is_hyaline", false);
         // 扫码目标版本: 由 WxMiniConfig 按 wx-mini.env-version 覆盖(默认 release)
+        if (!ENV_VERSION.equals("release")) {
+            params.put("check_path", false);
+        }
         params.put("env_version", ENV_VERSION);
         log.info("调用微信生成小程序码参数parars:{}", JSON.toJSONString(params));
         HttpURLConnection connection = null;

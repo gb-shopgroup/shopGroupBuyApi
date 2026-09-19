@@ -43,10 +43,11 @@ public interface GbOrderInfoService {
 
     Boolean miniReceiptOrder(Long memberId, String orderNo, Long pointId, String pointName);
 
-    // 用户扫码核销(整单/部分): 订单置部分收货(2)+核销时间+实际领取自提点, setReceiptTime=true(整单核销)时同时记录收货时间;
+    // 用户扫码核销(整单/部分): 核销后判断是否完全核销(所有商品行 剩余可核销数=购买数-已核销-已退待收货数<=0):
+    // 完全核销 => 订单置已收货(3)并记录收货时间; 未完全核销 => 保持原订单状态(不更新status), 仅记录核销时间+实际领取自提点;
     // 并按调用方内存累加后的收货数量同步商品行核销数量(整单核销=剩余全部, 部分核销=所选数量)
     Boolean miniVerifyOrder(Long memberId, String orderNo, Long pointId, String pointName,
-                            List<GbOrderGoodsInfo> goodsList, boolean setReceiptTime);
+                            List<GbOrderGoodsInfo> goodsList);
 
     // 用户申请退款: 仅把订单置为售后(5)待团长审核并记录申请时间; 主表退费金额refund_fee在申请/审核阶段都不维护(占坑),
     // 待退款回调成功后才由 addMiniOrderRefundFee 按实际退款金额累加到订单主表; 拒绝/退款失败时金额无需回退即回到申请前
@@ -164,8 +165,8 @@ public interface GbOrderInfoService {
 
     List<GbOrderInfo> getPaidOrderInfoBy(Long memberId, Long shopId);
 
-    // 用户端-查询还有商品未全部收货的订单列表(条件: 用户id, 团长id, 店铺id)
-    List<GbOrderInfo> getNotAllReceiptOrderList(Long memberId, Long leaderId, Long shopId);
+    // 用户端-查询还有商品未全部收货的订单列表(条件: 用户id, 团长id; 状态1/2/5且存在未核销商品, 状态5时未核销商品须无退款), 并回填订单商品列表
+    List<GbOrderInfo> getNotAllReceiptOrderList(Long memberId, Long leaderId);
 
     // 标记订单已调用微信发货(wx_shipment:0=未调用,1=已调用)
     Boolean updateWxShipment(String orderNo);
