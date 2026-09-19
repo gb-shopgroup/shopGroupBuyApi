@@ -3,6 +3,7 @@ package cn.com.shopgroup.order.controller.leader;
 import cn.com.shopgroup.common.exception.BusinessException;
 import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.MoneyUtil;
+import cn.com.shopgroup.common.utils.TimeUtils;
 import cn.com.shopgroup.common.wxmini.WxMiniAccessTokenHelper;
 import cn.com.shopgroup.common.wxmini.WxMiniProgramHelper;
 import cn.com.shopgroup.order.constants.OrderStatusEnum;
@@ -112,8 +113,17 @@ public class OrderController {
         Long groupId = request.getGroupId();
         String keyword = request.getKeyword();
         Integer applyStatus = request.getApplyStatus();
+        // 时间范围过滤: startDate/endDate 为 yyyy-MM-dd, 开始日期取当天00:00:00, 结束日期取当天23:59:59; 未传则不过滤
+        int startTime = 0;
+        int endTime = 0;
+        if (!StringUtils.isEmpty(request.getStartDate())) {
+            startTime = TimeUtils.toFormatTimeStamp(request.getStartDate() + " 00:00:00");
+        }
+        if (!StringUtils.isEmpty(request.getEndDate())) {
+            endTime = TimeUtils.toFormatTimeStamp(request.getEndDate() + " 23:59:59");
+        }
         // 查询订单列表
-        List<GbOrderInfo> result = orderInfoService.getLeaderApplyRefundOrderList(leaderId, groupId, request.getPointId(), keyword, applyStatus, page, pageSize);
+        List<GbOrderInfo> result = orderInfoService.getLeaderApplyRefundOrderList(leaderId, groupId, request.getPointId(), keyword, applyStatus, startTime, endTime, page, pageSize);
         List<OrderResponse> data = OrderResponse.getOrderResponseList(result);
         return JsonResult.success(data);
     }

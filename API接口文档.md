@@ -1,6 +1,6 @@
 # ShopGroupBuyApi 接口文档（详细版）
 
-> 自动生成时间：2026-09-19 05:05:14
+> 自动生成时间：2026-09-19 15:20:28
 
 > 生成方式：扫描各模块 `*Controller.java` 源码（`python3 generate_api_doc.py` 可重新生成）
 
@@ -36,6 +36,8 @@
 
 | 日期 | 提交 | 摘要 | 涉及文件 |
 | --- | --- | --- | --- |
+| 2026-09-19 | `20da595` | 核销记录 | MemberOrderController.java |
+| 2026-09-19 | `523da65` | 核销记录 | LeaderRefundApplyGoodsResponse.java, LeaderRefundApplyListRequest.java, LeaderRefundApplyListResponse.java, LeaderRefundApplyResponse.java, LeaderShopController.java 等 |
 | 2026-09-18 | `e803c05` | 退款 | LeaderGroupGenTuanResponse.java, MemberOrderController.java, OrderRefundController.java, OrderRefundNotifyController.java, OrderRefundRecordResponse.java |
 | 2026-09-18 | `c385c3d` | 处理小程序码 | MemberOrderController.java |
 | 2026-09-17 | `560d13f` | 商品/团购活动 | LeaderGoodsManageController.java, LeaderGroupManageController.java, MemberGroupController.java, MemberOrderController.java, OrderGoodsReponse.java 等 |
@@ -49,8 +51,6 @@
 | 2026-09-14 | `ddebc5e` | 限购逻辑 | LeaderGoodsManageController.java, OrderRefundController.java, OrderRefundNotifyController.java |
 | 2026-09-13 | `013cbf8` | 限购逻辑 | GroupOrderController.java, LeaderGoodsManageController.java, LeaderGroupManageController.java, MemberGroupController.java, MemberOrderController.java 等 |
 | 2026-09-13 | `6e944a0` | 优化 | GroupActGoodsResponse.java, GroupGoodsController.java, GroupOrderController.java, LeaderBillListRequest.java, LeaderGoodsManageController.java 等 |
-| 2026-09-11 | `b00ef1b` | 对账接口 | AdminBusinessController.java, AdminGoodsController.java, AdminGroupController.java, AdminGroupTagController.java, AdminOrderBusinessController.java 等 |
-| 2026-09-10 | `ea0af72` | 店铺erweima | LeaderShopController.java |
 
 ## 目录
 
@@ -3057,6 +3057,8 @@ data 类型：`List<OrderResponse>`（数组，元素类型 `OrderResponse`，�
 | applyStatus | `Integer` | 否 | 审核状态[不传 查询全部 1 待审核 2 同意 3 不同意] |
 | groupId | `Long` | 否 | 团活动Id |
 | pointId | `Long` | 否 | 先不考虑 |
+| startDate | `String` | 否 | 开始日期 yyyy-MM-dd(按订单下单时间过滤, 取当天00:00:00), 未传则不限制开始时间 |
+| endDate | `String` | 否 | 结束日期 yyyy-MM-dd(按订单下单时间过滤, 取当天23:59:59), 未传则不限制结束时间 |
 | page | `Integer` | 否 | — |
 | pageSize | `Integer` | 否 | — |
 

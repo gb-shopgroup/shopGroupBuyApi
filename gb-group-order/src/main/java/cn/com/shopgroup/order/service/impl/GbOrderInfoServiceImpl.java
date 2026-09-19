@@ -1402,7 +1402,7 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
 
     @Override
     public List<GbOrderInfo> getLeaderApplyRefundOrderList(Long leaderId, Long groupId, Long pointId, String keyword,
-                                                           Integer applyStatus, int page, int pageSize) {
+                                                           Integer applyStatus, int startTime, int endTime, int page, int pageSize) {
         // 1. 查询售后订单(分页)
         LambdaQueryWrapper<GbOrderInfo> queryWrapper = Wrappers.lambdaQuery();
         queryWrapper.eq(GbOrderInfo::getLeaderId, leaderId);
@@ -1413,6 +1413,13 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
         }
         if (pointId != null && pointId > 0) {
             queryWrapper.eq(GbOrderInfo::getPointId, pointId);
+        }
+        // 下单时间范围过滤: 开始日期取当天00:00:00, 结束日期取当天23:59:59, <=0 表示不过滤
+        if (startTime > 0) {
+            queryWrapper.ge(GbOrderInfo::getAddTime, startTime);
+        }
+        if (endTime > 0) {
+            queryWrapper.le(GbOrderInfo::getAddTime, endTime);
         }
         // keyword 为纯数字(手机号)时, 按手机号过滤订单
         if (!StringUtils.isEmpty(keyword) && isMobileKeyword(keyword)) {

@@ -120,7 +120,7 @@ public class OrderRefundController {
         Long total = orderInfoService.getLeaderApplyRefundOrderCount(leaderId, request.getKeyword());
         // 待审核申请订单分页列表(每单带待审核商品行, applyStatus=1)
         List<GbOrderInfo> orderList = orderInfoService.getLeaderApplyRefundOrderList(leaderId, 0L, 0L,
-                request.getKeyword(), 1, page, pageSize);
+                request.getKeyword(), 1, 0, 0, page, pageSize);
         // 组装: 订单 + 最近一笔申请记录(类型/原因/金额)
         List<LeaderRefundApplyResponse> list = new ArrayList<>();
         if (!CollectionUtils.isEmpty(orderList)) {

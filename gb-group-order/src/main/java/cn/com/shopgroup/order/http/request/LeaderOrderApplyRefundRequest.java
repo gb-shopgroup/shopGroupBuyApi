@@ -15,6 +15,12 @@ public class LeaderOrderApplyRefundRequest {
     //先不考虑
     private Long pointId;
 
+    // 开始日期 yyyy-MM-dd(按订单下单时间过滤, 取当天00:00:00), 未传则不限制开始时间
+    private String startDate;
+
+    // 结束日期 yyyy-MM-dd(按订单下单时间过滤, 取当天23:59:59), 未传则不限制结束时间
+    private String endDate;
+
     private Integer page;
 
     private Integer pageSize;

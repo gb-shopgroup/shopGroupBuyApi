@@ -216,8 +216,9 @@ public interface GbOrderInfoService {
     List<GbOrderInfo> getLeaderOrderList(Long leaderId, Long groupId, Long pointId, String keyword,
                                          Integer status, int page, int pageSize);
 
+    // startTime/endTime: 订单下单时间范围(秒级时间戳, 开始日期取当天00:00:00, 结束日期取当天23:59:59), <=0 表示不过滤
     List<GbOrderInfo> getLeaderApplyRefundOrderList(Long leaderId, Long groupId, Long pointId, String keyword,
-                                                    Integer applyStatus, int page, int pageSize);
+                                                    Integer applyStatus, int startTime, int endTime, int page, int pageSize);
 
     Integer getSumOfGroupActivityOrder(Long groupId);
 
