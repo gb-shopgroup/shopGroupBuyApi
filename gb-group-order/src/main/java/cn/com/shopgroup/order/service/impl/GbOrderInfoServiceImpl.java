@@ -305,15 +305,18 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
         return flag > 0 ? true : false;
     }
 
-    // 用户扫码核销(整单/部分): 核销成功后判断是否完全核销(所有商品行 剩余可核销数=购买数-已核销-已退待收货数<=0, 入参收货数量为含本次核销的内存累加值):
-    // 完全核销 => 订单置已收货(3)并记录收货时间; 未完全核销 => 保持原订单状态(不更新status), 仅记录核销时间+实际领取自提点;
-    // 并按调用方内存累加后的收货数量同步商品行核销数量(整单核销=剩余全部, 部分核销=所选数量)
+    // 用户扫码核销(整单/部分): 核销成功后按商品行情况决定订单状态(入参收货数量为含本次核销的内存累加值):
+    // 1) 完全核销(所有商品行 剩余可核销数=购买数-已核销-已退待收货数<=0) => 订单置已收货(3)并记录收货时间;
+    // 2) 未完全核销 且 订单下商品无售后情况(无待审核售后商品行) => 订单置部分核销/部分收货(2);
+    // 3) 未完全核销 且 存在售后中的商品行 => 保持原订单状态(不更新status, 不打断售后流程);
+    // 均记录核销时间+实际领取自提点, 并按调用方内存累加后的收货数量同步商品行核销数量(整单核销=剩余全部, 部分核销=所选数量)
     @Override
     public Boolean miniVerifyOrder(Long memberId, String orderNo, Long pointId, String pointName,
                                    List<GbOrderGoodsInfo> goodsList) {
 
-        // 判断是否完全核销: 商品行收货数量为调用方内存累加后的值(已含本次核销)
+        // 判断是否完全核销 与 是否存在售后中的商品行: 商品行收货数量为调用方内存累加后的值(已含本次核销)
         boolean allVerified = true;
+        boolean hasAfterSale = false;
         if (!CollectionUtils.isEmpty(goodsList)) {
             for (GbOrderGoodsInfo item : goodsList) {
                 int goodsNum = item.getGoodsNum() == null ? 0 : item.getGoodsNum();
@@ -321,7 +324,10 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
                 int refundNum = item.getRefundNum() == null ? 0 : item.getRefundNum();
                 if (goodsNum - receiptNum - refundNum > 0) {
                     allVerified = false;
-                    break;
+                }
+                // 售后(待审核)中的商品行: 订单通常处于售后(5)状态
+                if (item.getApplyRefund() != null && item.getApplyRefund() == 1) {
+                    hasAfterSale = true;
                 }
             }
         }
@@ -333,8 +339,11 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
             // 完全核销: 订单置已收货(3)并记录收货时间
             updateWrapper.set(GbOrderInfo::getStatus, OrderStatusEnum.RECEIVED.getCode());
             updateWrapper.set(GbOrderInfo::getReceiptTime, TimeUtils.getTimeStamp());
+        } else if (!hasAfterSale) {
+            // 未完全核销且商品无售后情况: 订单置部分核销/部分收货(2)
+            updateWrapper.set(GbOrderInfo::getStatus, OrderStatusEnum.PART_RECEIVED.getCode());
         }
-        // 未完全核销: 保持原订单状态, 不更新status
+        // 未完全核销且存在售后中的商品行: 保持原订单状态, 不更新status
         updateWrapper.set(GbOrderInfo::getVerifyTime, TimeUtils.getTimeStamp());
         updateWrapper.set(GbOrderInfo::getPointId2, pointId);
         updateWrapper.set(GbOrderInfo::getPointName2, pointName);

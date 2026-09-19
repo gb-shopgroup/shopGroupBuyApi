@@ -446,8 +446,8 @@ public class MemberOrderController {
             throw new BusinessException(OrderErrorCodeEnum.DUPLICATE_RECEIPT);
         }
 
-        // 核销操作: 核销成功后判断是否完全核销——完全核销则订单置已收货(3)并记录收货时间, 未完全核销保持原订单状态;
-        // 均记录核销时间+实际领取自提点, 并同步商品行核销数量
+        // 核销操作: 完全核销则订单置已收货(3)+收货时间; 未完全核销且商品无售后情况则置部分核销(2);
+        // 存在售后中的商品行则保持原订单状态; 均记录核销时间+实际领取自提点, 并同步商品行核销数量
         Boolean flag = orderInfoService.miniVerifyOrder(memberId, orderNo, pointId, pointName, goodsList);
         // 收货消息类型: 1=系统消息2=内部消息3=业务消息
         // 员工-提货点绑定表 gb_org_point_staff 已下线, 不再通知店员, 直接通知团长
