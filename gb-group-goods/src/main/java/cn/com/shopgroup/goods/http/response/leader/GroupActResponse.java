@@ -61,6 +61,9 @@ public class GroupActResponse {
 
     private LeaderGroupGenTuanResponse genTuanResponse;
 
+    // 跟团记录(真实订单数据: 手机号/姓名/头像/购买时间/购买商品/数量, 按购买时间倒序)
+    private List<LeaderGroupFollowRecordResponse> followRecords;
+
     public GroupActResponse() {
 
     }

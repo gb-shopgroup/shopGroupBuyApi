@@ -550,6 +550,8 @@ public class LeaderGroupManageController {
         fillGoodsSpecList(goodsResponses);
         // 跟团统计: 团员人数及其下单数
         response.setGenTuanResponse(leaderGroupSummaryService.getGenTuanByGroupId(groupId));
+        // 跟团记录: 真实订单数据(手机号/姓名/头像/购买时间/购买商品/数量), 按购买时间倒序取最新50条
+        response.setFollowRecords(leaderGroupSummaryService.getFollowRecordListByGroupId(groupId, 50));
         log.info("团长端-团购详情，groupId:{},data{}", groupId, JSON.toJSONString(response));
         return JsonResult.success(response);
     }

@@ -43,10 +43,10 @@ public interface GbOrderInfoService {
 
     Boolean miniReceiptOrder(Long memberId, String orderNo, Long pointId, String pointName);
 
-    // 用户扫码核销(整单/部分): 核销后按商品行情况决定订单状态:
-    // 1) 完全核销(所有商品行 剩余可核销数=购买数-已核销-已退待收货数<=0) => 订单置已收货(3)并记录收货时间;
-    // 2) 未完全核销 且 商品无售后情况 => 订单置部分核销/部分收货(2);
-    // 3) 未完全核销 且 存在售后中的商品行 => 保持原订单状态(不更新status);
+    // 用户扫码核销(整单/部分): 核销后按售后情况与核销完整度决定订单状态:
+    // 1) 已有售后状态(存在待审核售后商品行) => 核销完成后保持原订单状态(售后5);
+    // 2) 无售后 且 完全核销(所有商品行 剩余可核销数=购买数-已核销-已退待收货数<=0) => 订单置已收货(3)并记录收货时间;
+    // 3) 无售后 且 未完全核销 => 订单置部分收货(2);
     // 均记录核销时间+实际领取自提点, 并按调用方内存累加后的收货数量同步商品行核销数量(整单核销=剩余全部, 部分核销=所选数量)
     Boolean miniVerifyOrder(Long memberId, String orderNo, Long pointId, String pointName,
                             List<GbOrderGoodsInfo> goodsList);

@@ -1,8 +1,10 @@
 package cn.com.shopgroup.goods.service;
 
+import cn.com.shopgroup.goods.http.response.leader.LeaderGroupFollowRecordResponse;
 import cn.com.shopgroup.goods.http.response.leader.LeaderGroupGenTuanResponse;
 import cn.com.shopgroup.goods.http.response.leader.LeaderGroupSummaryResponse;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -36,5 +38,17 @@ public interface LeaderGroupSummaryService {
      * @return 跟团统计(团购无有效订单时人数/单数均为0, 不返回null)
      */
     LeaderGroupGenTuanResponse getGenTuanByGroupId(Long groupId);
+
+    /**
+     * 查询单个团购活动的跟团记录(真实订单数据, 按购买时间倒序)
+     *
+     * 统计口径(与跟团统计一致): 已支付(pay_time>0)、未取消(status!=6)的有效订单;
+     * 每条记录包含: 手机号、姓名(昵称)、头像、购买时间(支付时间)、购买商品(商品名/规格拼接)、购买数量(商品数量合计)
+     *
+     * @param groupId 团购id
+     * @param limit   返回条数上限
+     * @return 跟团记录列表(无有效订单时返回空列表)
+     */
+    List<LeaderGroupFollowRecordResponse> getFollowRecordListByGroupId(Long groupId, int limit);
 
 }

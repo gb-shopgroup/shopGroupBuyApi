@@ -130,12 +130,12 @@
 | [60](#60-get-ordergroupordercount) | order | GET | `/order/group/order/count` | *查询团购订单总数* |
 | [61](#61-get-ordergrouporderinfo) | order | GET | `/order/group/order/info` | *查询团购订单详情* |
 | [62](#62-get-ordergroupordermakeercode) | order | GET | `/order/group/order/makeErcode` | *生成二维码（团购订单）* |
-| [63](#63-get-ordergrouporderreceipt) | order | GET | `/order/group/order/receipt` | *提货（团购订单）* |
-| [64](#64-post-ordergrouporderpartreceipt) | order | POST | `/order/group/order/part/receipt` | *提货（团购订单）* |
+| [63](#63-get-ordergrouporderreceipt) | order | GET | `/order/group/order/receipt` | 用户扫码核销-整单核销（核销订单下全部剩余可核销商品）<br>核销后订单状态：已有售后(5)保持不变；无售后则置已收货(3)并记录收货时间 |
+| [64](#64-post-ordergrouporderpartreceipt) | order | POST | `/order/group/order/part/receipt` | 用户扫码核销-部分核销（仅核销所选商品行, 可多次核销）<br>核销后订单状态：已有售后(5)保持不变；无售后且完全核销置已收货(3)+收货时间, 未完全核销置部分收货(2) |
 | [65](#65-post-ordergrouporderapplyrefund) | order | POST | `/order/group/order/apply/refund` | *退款（团购订单）* |
 | [66](#66-get-ordergrouporderrefundreasonlist) | order | GET | `/order/group/order/refund/reasonList` | *查询团购订单退款原因列表* |
 | [67](#67-get-ordergrouporderrefundrecodes) | order | GET | `/order/group/order/refund/recodes` | *查询团购订单退款记录* |
-| [68](#68-get-ordergroupordernotallreceiptlist) | order | GET | `/order/group/order/notAllReceiptList` | *查询团购订单未全部提货列表* |
+| [68](#68-get-ordergroupordernotallreceiptlist) | order | GET | `/order/group/order/notAllReceiptList` | 查询团购订单未全部提货列表<br>用户id+团长id查询(shopId仅用于解析团长id并校验店铺), 已支付且状态1待收货/2部分收货/5售后, 须存在未核销商品(购买数>已核销数); 状态5时商品行还须 购买数>(已核销数+退款数); 返回订单并回填商品信息 |
 | [69](#69-post-ordergrouporderconfirmshipping) | order | POST | `/order/group/order/confirmShipping` | *确认发货（团购订单）* |
 | [70](#70-post-ordergrouporderapplyrefundorderinfo) | order | POST | `/order/group/order/applyRefund/orderInfo` | *查询团购订单退款申请订单详情* |
 | [71](#71-get-ordergroupwxorder) | order | GET | `/order/group/wx/order` | *查询团购微信订单* |
@@ -177,7 +177,7 @@
 | [107](#107-get-goodsleadergetgroupactivitycount) | goods | GET | `/goods/Leader/get/groupActivity/count` | *查询团长团购活动总数* |
 | [108](#108-get-goodsleadergroupactivitytaglist) | goods | GET | `/goods/Leader/groupActivity/tag/list` | *查询团长团购活动标签列表* |
 | [109](#109-post-goodsleadergroupactivityadd) | goods | POST | `/goods/Leader/groupActivity/add` | *新增团长团购活动* |
-| [110](#110-get-goodsleadergetgroupactivityinfo) | goods | GET | `/goods/Leader/get/groupActivity/info` | *查询团长团购活动详情* |
+| [110](#110-get-goodsleadergetgroupactivityinfo) | goods | GET | `/goods/Leader/get/groupActivity/info` | 查询团长团购活动详情<br>返回跟团统计 `genTuanResponse` 与跟团记录 `followRecords`（真实订单数据: 手机号/姓名/头像/购买时间/购买商品/数量, 已支付未取消, 按购买时间倒序取最新50条） |
 | [111](#111-post-goodsleadergroupactivityedit) | goods | POST | `/goods/Leader/groupActivity/edit` | *修改团长团购活动* |
 | [112](#112-post-goodsleadergroupactivityclose) | goods | POST | `/goods/Leader/groupActivity/close` | *启用/关闭团长团购活动* |
 | [113](#113-get-goodsleadergetgroupactivitycat) | goods | GET | `/goods/Leader/get/groupActivity/cat` | *查询团长团购活动分类* |
@@ -2340,7 +2340,11 @@ data 类型：`String`（基本类型，无子字段）
 
 #### 6. GET `/order/group/order/receipt`
 
-**功能说明**：*提货（团购订单）*（自动推断）
+**功能说明**：用户扫码核销-整单核销（核销订单下全部剩余可核销商品, 不含已退待收货部分）
+
+核销成功后订单状态处理：
+- 订单已有售后状态（存在待审核售后商品行）：核销完成后保持售后状态(5)不变
+- 无售后：订单置已收货(3)，并记录收货时间(receiptTime)、核销时间(verifyTime)、实际领取自提点
 
 **入参**
 
@@ -2361,7 +2365,13 @@ data 类型：`Object`（未能静态推断，以接口实际返回为准）
 
 #### 7. POST `/order/group/order/part/receipt`
 
-**功能说明**：*提货（团购订单）*（自动推断）
+**功能说明**：用户扫码核销-部分核销（仅核销所选商品行, 由商品行"剩余可核销数"约束, 可多次核销）
+
+核销成功后订单状态处理：
+- 订单已有售后状态（存在待审核售后商品行）：核销完成后保持售后状态(5)不变
+- 无售后 且 完全核销（所有商品行 购买数 ≤ 已核销数+已退待收货数）：订单置已收货(3)，并记录收货时间(receiptTime)
+- 无售后 且 未完全核销：订单置部分收货(2)
+- 均记录核销时间(verifyTime)、实际领取自提点，并同步商品行已核销数量
 
 **入参**
 
@@ -2526,7 +2536,14 @@ data 类型：`OrderMainRefundResponse`（字段说明见下）
 
 #### 11. GET `/order/group/order/notAllReceiptList`
 
-**功能说明**：*查询团购订单未全部提货列表*（自动推断）
+**功能说明**：用户扫码核销-查询还有商品未全部收货（待核销）的订单列表
+
+查询口径：
+- 按用户id+团长id查询（入参 shopId 仅用于解析团长id并校验店铺，不参与订单查询条件）
+- 已支付（pay_time>0）且订单状态为 1待收货/2部分收货/5售后
+- 订单下存在未核销商品行：购买数(goods_num) > 已核销数(receipt_num)
+- 状态为 5售后 时，商品行还须满足 购买数 > 已核销数 + 退款数(refund_num)，即确有未核销且未被退款占用的数量
+- 返回订单列表并回填商品信息（goods 字段，含购买数/已核销数/退款数/售后状态等）
 
 **入参**
 
@@ -4550,7 +4567,9 @@ data 类型：`Long`（基本类型，无子字段）
 
 #### 5. GET `/goods/Leader/get/groupActivity/info`
 
-**功能说明**：*查询团长团购活动详情*（自动推断）
+**功能说明**：查询团长团购活动详情（含商品列表、跟团统计、跟团记录）
+
+跟团记录 followRecords 为真实订单数据（已支付、未取消的有效订单），按购买时间倒序取最新50条。
 
 **入参**
 
@@ -4595,7 +4614,8 @@ data 类型：`GroupActResponse`（字段说明见下）
 | checkRemark | `String` | 否 | 审核备注 |
 | goods | `List<GroupActGoodsResponse>` | 否 | 团购商品列表 |
 | groupSummaryResponse | `LeaderGroupSummaryResponse` | 否 | 团长团购活动订单汇总数据 |
-| genTuanResponse | `LeaderGroupGenTuanResponse` | 否 | — |
+| genTuanResponse | `LeaderGroupGenTuanResponse` | 否 | 跟团统计(团员人数/跟团人次/订单总金额) |
+| followRecords | `List<LeaderGroupFollowRecordResponse>` | 否 | 跟团记录(真实订单数据: 手机号/姓名/头像/购买时间/购买商品/数量, 按购买时间倒序取最新50条) |
 
 
 **→GroupActGoodsResponse 字段**（字段 `goods`（List<GroupActGoodsResponse>））
@@ -4645,6 +4665,18 @@ data 类型：`GroupActResponse`（字段说明见下）
 | memberNum | `Integer` | 否 | 成员 |
 | orderNum | `Integer` | 否 | 跟团人次（订单数） |
 | totalAmount | `Double` | 否 | 订单总金额（不管退的，支付总金额） |
+
+
+**→LeaderGroupFollowRecordResponse 字段**（字段 `followRecords`（List<LeaderGroupFollowRecordResponse>））
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| mobile | `String` | 否 | 下单用户手机号 |
+| name | `String` | 否 | 下单用户姓名(昵称) |
+| avatar | `String` | 否 | 下单用户头像 |
+| buyTime | `String` | 否 | 购买时间(支付时间, 兜底下单时间, 格式化 yyyy-MM-dd HH:mm:ss) |
+| goodsDesc | `String` | 否 | 购买商品描述(多件商品按 商品名/规格 拼接, 逗号分隔) |
+| buyNum | `Integer` | 否 | 购买数量(订单商品数量合计) |
 
 
 #### 6. POST `/goods/Leader/groupActivity/edit`

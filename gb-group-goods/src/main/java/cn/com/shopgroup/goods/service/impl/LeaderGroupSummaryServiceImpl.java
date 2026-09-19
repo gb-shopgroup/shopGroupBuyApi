@@ -1,11 +1,14 @@
 package cn.com.shopgroup.goods.service.impl;
 
 import cn.com.shopgroup.common.utils.MoneyUtil;
+import cn.com.shopgroup.common.utils.TimeUtils;
+import cn.com.shopgroup.goods.http.response.leader.LeaderGroupFollowRecordResponse;
 import cn.com.shopgroup.goods.http.response.leader.LeaderGroupGenTuanResponse;
 import cn.com.shopgroup.goods.http.response.leader.LeaderGroupSummaryResponse;
 import cn.com.shopgroup.goods.service.LeaderGroupSummaryService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
@@ -136,6 +139,115 @@ public class LeaderGroupSummaryServiceImpl implements LeaderGroupSummaryService 
             result.setTotalAmount(MoneyUtil.centToYuan((int) toLong(row.get("total_fee_cent"))));
         }
         return result;
+    }
+
+    /**
+     * 查询单个团购活动的跟团记录(真实订单数据, 按购买时间倒序)
+     *
+     * 统计口径(与跟团统计一致): 已支付(pay_time>0)、未取消(status!=6)的有效订单;
+     * 1) 查订单表取 手机号/姓名(昵称)/头像/购买时间(支付时间);
+     * 2) 按订单号批量查订单商品表, 拼接购买商品描述(商品名/规格)与购买数量(商品数量合计)
+     */
+    @Override
+    public List<LeaderGroupFollowRecordResponse> getFollowRecordListByGroupId(Long groupId, int limit) {
+
+        List<LeaderGroupFollowRecordResponse> result = new ArrayList<>();
+        if (groupId == null || groupId <= 0 || limit <= 0) {
+            return result;
+        }
+
+        // 1. 查询该团购的有效订单(已支付、未取消), 按支付时间倒序
+        String orderSql = "SELECT order_no, mobile, nickname, avatar, pay_time, add_time " +
+                "FROM gb_order_info " +
+                "WHERE group_id = ? " +
+                "  AND pay_time > 0 " +
+                "  AND status <> ? " +
+                "  AND member_id > 0 " +
+                "ORDER BY pay_time DESC, id DESC " +
+                "LIMIT ?";
+        List<Map<String, Object>> orderRows =
+                jdbcTemplate.queryForList(orderSql, groupId, ORDER_STATUS_CANCELED, limit);
+        if (CollectionUtils.isEmpty(orderRows)) {
+            return result;
+        }
+
+        // 2. 批量查询订单商品, 按 order_no 关联
+        List<String> orderNos = new ArrayList<>(orderRows.size());
+        for (Map<String, Object> row : orderRows) {
+            Object orderNo = row.get("order_no");
+            if (orderNo != null) {
+                orderNos.add(orderNo.toString());
+            }
+        }
+        Map<String, List<Map<String, Object>>> goodsMap = new HashMap<>();
+        if (!orderNos.isEmpty()) {
+            StringBuilder placeholders = new StringBuilder("(");
+            List<Object> params = new ArrayList<>(orderNos.size());
+            for (int i = 0; i < orderNos.size(); i++) {
+                if (i > 0) {
+                    placeholders.append(",");
+                }
+                placeholders.append("?");
+                params.add(orderNos.get(i));
+            }
+            placeholders.append(")");
+            String goodsSql = "SELECT order_no, goods_name, sku_names, goods_num " +
+                    "FROM gb_order_goods_info " +
+                    "WHERE order_no IN " + placeholders;
+            List<Map<String, Object>> goodsRows = jdbcTemplate.queryForList(goodsSql, params.toArray());
+            if (!CollectionUtils.isEmpty(goodsRows)) {
+                for (Map<String, Object> row : goodsRows) {
+                    Object orderNo = row.get("order_no");
+                    if (orderNo == null) {
+                        continue;
+                    }
+                    goodsMap.computeIfAbsent(orderNo.toString(), k -> new ArrayList<>()).add(row);
+                }
+            }
+        }
+
+        // 3. 组装跟团记录
+        for (Map<String, Object> row : orderRows) {
+            Object orderNoObj = row.get("order_no");
+            String orderNo = orderNoObj == null ? "" : orderNoObj.toString();
+
+            LeaderGroupFollowRecordResponse record = new LeaderGroupFollowRecordResponse();
+            record.setMobile(toStr(row.get("mobile")));
+            record.setName(toStr(row.get("nickname")));
+            record.setAvatar(toStr(row.get("avatar")));
+            // 购买时间: 取支付时间, 兜底下单时间
+            int payTime = (int) toLong(row.get("pay_time"));
+            int addTime = (int) toLong(row.get("add_time"));
+            record.setBuyTime(TimeUtils.getFormatTimeStamp(payTime > 0 ? payTime : addTime));
+
+            // 购买商品描述: 多件商品按 商品名/规格 拼接; 购买数量: 商品数量合计
+            List<Map<String, Object>> goodsRows = goodsMap.get(orderNo);
+            int buyNum = 0;
+            StringBuilder goodsDesc = new StringBuilder();
+            if (!CollectionUtils.isEmpty(goodsRows)) {
+                for (Map<String, Object> goodsRow : goodsRows) {
+                    String goodsName = toStr(goodsRow.get("goods_name"));
+                    String skuNames = toStr(goodsRow.get("sku_names"));
+                    if (goodsDesc.length() > 0) {
+                        goodsDesc.append("，");
+                    }
+                    goodsDesc.append(goodsName);
+                    if (!skuNames.isEmpty()) {
+                        goodsDesc.append("/").append(skuNames);
+                    }
+                    buyNum += (int) toLong(goodsRow.get("goods_num"));
+                }
+            }
+            record.setGoodsDesc(goodsDesc.toString());
+            record.setBuyNum(buyNum);
+            result.add(record);
+        }
+        return result;
+    }
+
+    private static String toStr(Object value) {
+
+        return value == null ? "" : value.toString();
     }
 
     private static long toLong(Object value) {
