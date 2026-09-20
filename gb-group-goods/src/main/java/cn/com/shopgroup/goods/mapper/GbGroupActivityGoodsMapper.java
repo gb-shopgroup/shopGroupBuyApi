@@ -20,6 +20,12 @@ public interface GbGroupActivityGoodsMapper extends BaseMapper<GbGroupActivityGo
     List<GbGoodsInfo> getGroupGoodsList(Long groupId);
 
 
+    // 团购商品列表(团购商品表冗余字段): 仅返回在线(is_close=0)商品, 已下线商品不展示
+    // 用于团购详情/跟团记录/分享海报等展示场景, 保留团购价/市场价/商品名/主图等冗余字段
+    @Select("SELECT a.* FROM `gb_group_activity_goods` AS a JOIN `gb_goods_info` AS g ON g.`goods_id` = a.`goods_id` WHERE a.`group_id` = #{groupId} AND g.`is_close` = 0 ORDER BY a.`goods_id` ASC")
+    List<GbGroupActivityGoods> getGroupActivityGoodsListOnline(Long groupId);
+
+
     @Delete("DELETE FROM `gb_group_activity_goods` WHERE `group_id` = #{groupId}")
     int deleteGroupGoodsList(Long groupId);
 

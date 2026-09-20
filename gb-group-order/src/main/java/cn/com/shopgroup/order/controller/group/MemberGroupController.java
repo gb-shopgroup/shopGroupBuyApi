@@ -434,9 +434,13 @@ public class MemberGroupController {
         // 要返回的数据
         List<GroupLogs> data = new ArrayList<>();
 
-        // 查询团购商品列表
-        List<GbGroupActivityGoods> goodsList = groupActivityInfoService.getGroupActivityGoodsList(groupId);
+        // 查询团购商品列表(仅在线is_close=0商品, 已关闭商品不出现在跟团记录中)
+        List<GbGroupActivityGoods> goodsList = groupActivityInfoService.getGroupActivityOnlineGoodsList(groupId);
         int size = goodsList.size();
+        // 无在线商品时不生成跟团记录, 避免随机取商品下标越界
+        if (size < 1) {
+            return data;
+        }
 
         // 生成 total 个脱敏手机号
         List<String> phoneList = PhoneGeneratorUtils.generateDesensitizePhone(total);
@@ -468,9 +472,13 @@ public class MemberGroupController {
         // 要返回的数据
         List<GroupLogs> data = new ArrayList<>();
 
-        // 查询团购商品列表
-        List<GbGroupActivityGoods> goodsList = groupActivityInfoService.getGroupActivityGoodsList(groupId);
+        // 查询团购商品列表(仅在线is_close=0商品, 已关闭商品不出现在跟团记录中)
+        List<GbGroupActivityGoods> goodsList = groupActivityInfoService.getGroupActivityOnlineGoodsList(groupId);
         int size = goodsList.size();
+        // 无在线商品时不生成跟团记录, 避免随机取商品下标越界
+        if (size < 1) {
+            return data;
+        }
 
         // 生成 total 个脱敏手机号
         List<String> phoneList = PhoneGeneratorUtils.generateDesensitizePhone(total);
@@ -501,8 +509,8 @@ public class MemberGroupController {
         // 要返回的数据
         List<GroupLogs> data = new ArrayList<>();
 
-        // 查询团购商品列表
-        List<GbGroupActivityGoods> goodsList = groupActivityInfoService.getGroupActivityGoodsList(groupId);
+        // 查询团购商品列表(仅在线is_close=0商品, 已关闭商品不出现在跟团记录中)
+        List<GbGroupActivityGoods> goodsList = groupActivityInfoService.getGroupActivityOnlineGoodsList(groupId);
         int size = goodsList.size();
 
         // 生成 total 个脱敏手机号

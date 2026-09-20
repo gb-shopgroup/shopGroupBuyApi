@@ -85,6 +85,15 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
     }
 
 
+    // 团购的在线商品列表(is_close=0): 已关闭商品不展示, 保留团购商品表冗余字段(团购价/市场价/商品名/主图)
+    @Override
+    public List<GbGroupActivityGoods> getGroupActivityOnlineGoodsList(Long groupId) {
+
+        List<GbGroupActivityGoods> results = goodsMapper.getGroupActivityGoodsListOnline(groupId);
+        return results == null ? new ArrayList<>() : results;
+    }
+
+
     @Override
     public Map<Long, List<GroupActGoodsResponse>> getGroupGoodsResponseMap(List<Long> groupIds, boolean onlineGoodsOnly) {
 

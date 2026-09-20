@@ -219,7 +219,7 @@ public class LeaderGroupManageController {
             return;
         }
         // 批量查询商品并按团购id回填(团长端展示全部状态商品, 含已下线)
-        Map<Long, List<GroupActGoodsResponse>> goodsMap = activityInfoService.getGroupGoodsResponseMap(groupIds, false);
+        Map<Long, List<GroupActGoodsResponse>> goodsMap = activityInfoService.getGroupGoodsResponseMap(groupIds, true);
         for (GroupActResponse item : data) {
             List<GroupActGoodsResponse> goodsList = goodsMap.get(item.getId());
             item.setGoods(goodsList == null ? new ArrayList<>() : goodsList);
@@ -524,17 +524,17 @@ public class LeaderGroupManageController {
         if (ObjectUtils.isEmpty(groupInfo)) {
             throw new BusinessException(GoodsErrorCodeEnum.GROUP_NOT_EXIST);
         }
-        // 团购商品列表(冗余表, 含团购价/市场价/商品名称/主图)
-        List<GbGroupActivityGoods> activityGoodsList = activityInfoService.getGroupActivityGoodsList(groupId);
+        // 团购商品列表(冗余表, 含团购价/市场价/商品名称/主图): 仅在线(is_close=0)商品, 已关闭商品不展示
+        List<GbGroupActivityGoods> activityGoodsList = activityInfoService.getGroupActivityOnlineGoodsList(groupId);
         if (CollectionUtils.isEmpty(activityGoodsList)) {
             throw new BusinessException(GoodsErrorCodeEnum.GROUP_GOODS_NOT_EXIST);
         }
-        // 商品表数据(补充单位/库存), 一次批量查询(团长端展示全部状态商品, 不过滤上下架)
+        // 商品表数据(补充单位/库存), 一次批量查询(仅在线商品, 与上面的商品列表口径一致)
         List<Long> goodsIds = new ArrayList<>();
         for (GbGroupActivityGoods item : activityGoodsList) {
             goodsIds.add(item.getGoodsId());
         }
-        List<GbGoodsInfo> goodsList = goodsService.getGoodsInfoListWithAllStatus(goodsIds);
+        List<GbGoodsInfo> goodsList = goodsService.getGoodsInfoList(goodsIds);
         Map<Long, GbGoodsInfo> goodsMap = new HashMap<>();
         for (GbGoodsInfo item : goodsList) {
             goodsMap.put(item.getGoodsId(), item);
@@ -543,6 +543,10 @@ public class LeaderGroupManageController {
         GroupActResponse response = new GroupActResponse(groupInfo);
         List<GroupActGoodsResponse> goodsResponses = new ArrayList<>();
         for (GbGroupActivityGoods item : activityGoodsList) {
+            // 防御: 商品表已查不到(已删除等)的行跳过, 不展示
+            if (goodsMap.get(item.getGoodsId()) == null) {
+                continue;
+            }
             goodsResponses.add(new GroupActGoodsResponse(item, goodsMap.get(item.getGoodsId())));
         }
         response.setGoods(goodsResponses);
@@ -844,8 +848,8 @@ public class LeaderGroupManageController {
             throw new BusinessException(GoodsErrorCodeEnum.GROUP_NOT_EXIST);
         }
 
-        // 第一个团购商品
-        List<GbGroupActivityGoods> goodsList = activityInfoService.getGroupActivityGoodsList(groupId);
+        // 第一个团购商品(仅在线is_close=0商品, 已关闭商品不用于海报展示)
+        List<GbGroupActivityGoods> goodsList = activityInfoService.getGroupActivityOnlineGoodsList(groupId);
         if (CollectionUtils.isEmpty(goodsList)) {
             throw new BusinessException(GoodsErrorCodeEnum.GROUP_GOODS_NOT_EXIST);
         }
@@ -921,8 +925,8 @@ public class LeaderGroupManageController {
             throw new BusinessException(GoodsErrorCodeEnum.GROUP_NOT_EXIST);
         }
 
-        // 第一个团购商品
-        List<GbGroupActivityGoods> goodsList = activityInfoService.getGroupActivityGoodsList(groupId);
+        // 第一个团购商品(仅在线is_close=0商品, 已关闭商品不用于海报展示)
+        List<GbGroupActivityGoods> goodsList = activityInfoService.getGroupActivityOnlineGoodsList(groupId);
         if (CollectionUtils.isEmpty(goodsList)) {
             throw new BusinessException(GoodsErrorCodeEnum.GROUP_GOODS_NOT_EXIST);
         }

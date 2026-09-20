@@ -168,7 +168,7 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
             queryWrapper.like(GbGoodsInfo::getGoodsName, keyword.trim());
         }
         queryWrapper.eq(GbGoodsInfo::getLeaderId, leaderId);
-        //queryWrapper.eq(GbGoodsInfo::getIsClose, (byte) 0);
+        queryWrapper.orderByAsc(GbGoodsInfo::getIsClose);
         queryWrapper.orderByDesc(GbGoodsInfo::getGoodsId);
         queryWrapper.last("limit " + (page - 1) * pageSize + "," + pageSize);
         List<GbGoodsInfo> result = mapper.selectList(queryWrapper);

@@ -292,7 +292,7 @@ public interface GbOrderInfoMapper extends BaseMapper<GbOrderInfo> {
             "FROM `gb_order_goods_info` AS g",
             "JOIN `gb_order_info` AS o ON g.`order_no` = o.`order_no`",
             "WHERE o.`member_id` = #{memberId}",
-            "  AND o.`group_id` = #{groupId}",
+            "  AND o.`group_id` = #{groupId} AND o.status < 6",
             "  AND g.`goods_id` = #{goodsId}"
     })
     Integer getGroupOrderGoodsNum(Long memberId, Long groupId, Long goodsId);

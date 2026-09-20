@@ -20,6 +20,12 @@ public interface GbGroupActivityInfoService {
 
     List<GbGroupActivityGoods> getGroupActivityGoodsList(Long groupId);
 
+    /**
+     * 查询团购的在线商品列表(is_close=0, 保留团购商品表冗余的团购价/市场价/商品名/主图)。
+     * 已关闭(is_close=1)的商品不展示, 用于团购详情/跟团记录/分享海报等展示场景。
+     */
+    List<GbGroupActivityGoods> getGroupActivityOnlineGoodsList(Long groupId);
+
     List<GbGroupActivityInfo> getMiniGroupActivityList(Long leaderId, Long catId, int page, int pageSize);
 
     Long getMiniGroupActivityCount(Long leaderId, Long catId);
