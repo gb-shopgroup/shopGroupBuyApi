@@ -496,7 +496,7 @@ mvn -pl gb-group-task spring-boot:run
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
 | 1 | GET | `/order/leader/refund/count` | *查询团长退款总数* | **gid** (Long); **pid** (Long) |
-| 2 | POST | `/order/leader/refund/applyList` | *查询团长退款列表* | Body: **request** (LeaderRefundApplyListRequest, JSON) |
+| 2 | POST | `/order/leader/refund/applyList` | 查询团长退款列表（待审核申请）<br>口径：订单状态5售后 + 存在待审核(apply_refund=1)商品行，"先筛选再分页"，total 与列表一致；每单回填该笔申请的整笔待审核商品行；商品行数量以"申请退中数量"(gb_order_goods_info.apply_refund_num)为准 | Body: **request** (LeaderRefundApplyListRequest, JSON) |
 | 3 | POST | `/order/leader/refund/approve` | *审核（团长退款）* | Body: **approveRequest** (OrderApproveRequest, JSON) |
 
 **OrderRefundNotifyController**（`cn.com.shopgroup.order.controller.leader`）

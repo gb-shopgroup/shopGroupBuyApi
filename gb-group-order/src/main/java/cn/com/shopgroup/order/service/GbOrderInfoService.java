@@ -182,7 +182,8 @@ public interface GbOrderInfoService {
     /**
      * 用户申请退款/退货成功后维护商品行的退款占用:
      * 1) 售后状态置待审核(apply_refund=1)
-     * 2) 按退款类型累加退款数量(refund_num, 退待收货部分)或退货退款数量(refund_goods_num, 退已收货部分)
+     * 2) 申请退中数量(apply_refund_num)置为本次申请数量(供团长端待审核列表按"本次申请数量"展示/组装审核请求)
+     * 3) 按退款类型累加退款数量(refund_num, 退待收货部分)或退货退款数量(refund_goods_num, 退已收货部分)
      * 注意: 入参 goodsList 中的 refundNum/refundGoodsNum 存放的是"本次申请值", 由调用方在内存中赋值;
      * 商品维度退款金额不落库, 由 退款数量×商品单价 推算
      *
@@ -191,10 +192,14 @@ public interface GbOrderInfoService {
      */
     int updateOrderGoodsRefundByOrderNo(List<GbOrderGoodsInfo> goodsList, int isReturnGoods);
 
+    /**
+     * 审核(同意2/不同意3)处理完成后置商品行售后状态;
+     * 同时清空申请退中数量(apply_refund_num=0), 该行已不处于"申请中"
+     */
     void updateOrderGoodsApplyStatus(String orderNo, List<Long> orderGoodsIds, int status);
 
     /**
-     * 审核拒绝时回退商品行本次申请累计的退款/退货退款数量
+     * 审核拒绝时回退商品行本次申请累计的退款/退货退款数量, 并清空申请退中数量
      * 申请时商品行数量占坑(主表refund_fee金额改为退款回调成功后才累加, 不在申请时占坑),
      * 拒绝则按本次申请量回退, 否则占坑导致无法再次申请/数量虚高
      *
@@ -266,7 +271,15 @@ public interface GbOrderInfoService {
      */
     LeaderBillListResponse getLeaderBillList(Long leaderId, LeaderBillListRequest request);
 
-    // (团长端-退款申请列表)待审核售后订单总数: 口径与 getLeaderApplyRefundOrderCount 的 mapper SQL 一致
-    // (订单状态5售后, 存在待审核(apply_refund=1)商品行, keyword 匹配手机号/商品名)
+    // (团长端-退款申请列表)待审核申请订单总数: 订单状态5售后 且 存在待审核(apply_refund=1)商品行, keyword 匹配手机号/商品名
     Long getLeaderApplyRefundOrderCount(Long leaderId, String keyword);
+
+    /**
+     * (团长端-退款申请列表)待审核申请订单分页列表:
+     * 口径与 getLeaderApplyRefundOrderCount 完全一致(订单状态5售后 + 存在待审核(apply_refund=1)商品行 + keyword),
+     * 由 SQL 先筛选再分页, 再批量回填订单与"整笔待审核商品行"(apply_refund=1, 不受 keyword 影响, 避免团长审核时遗漏商品行)
+     *
+     * @param keyword 手机号(纯数字)或商品名称, 空则不过滤
+     */
+    List<GbOrderInfo> getLeaderApplyRefundOrderPage(Long leaderId, String keyword, int page, int pageSize);
 }

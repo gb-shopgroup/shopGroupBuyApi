@@ -64,6 +64,7 @@ public class LeaderGroupActivityController {
                 data.add(resp);
             }
         }
+        log.info("【查询团长所有活动返回】leaderId:{},size:{}", leaderId, data == null ? 0 : data.size());
         return JsonResult.success(data);
     }
 }

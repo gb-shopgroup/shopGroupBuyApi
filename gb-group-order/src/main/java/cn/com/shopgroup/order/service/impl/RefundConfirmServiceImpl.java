@@ -39,6 +39,8 @@ public class RefundConfirmServiceImpl implements RefundConfirmService {
     public boolean confirmRefundSuccess(GbOrderInfo orderInfo, String refundNo, int refundCent, double amountYuan) {
 
         String orderNo = orderInfo.getOrderNo();
+        log.info("【退款回调确认入参】orderNo:{},refundNo:{},refundCent:{},amountYuan:{}",
+                orderNo, refundNo, refundCent, amountYuan);
         // 1. 幂等判重: 该易宝退款单号已落过"系统退款成功"记录则跳过
         //    (按退款单号判重, 支持一单多次部分退款各自独立确认, 兼容Redis幂等键过期后易宝重发旧通知)
         if (refundRecordService.existsSuccessRefundRecord(refundNo)) {

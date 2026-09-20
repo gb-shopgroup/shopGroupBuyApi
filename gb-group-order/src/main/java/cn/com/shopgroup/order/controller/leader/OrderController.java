@@ -93,6 +93,7 @@ public class OrderController {
         // 查询订单列表
         List<GbOrderInfo> result = orderInfoService.getLeaderOrderList(leaderId, groupId, request.getPointId(), keyword, status, page, pageSize);
         List<OrderResponse> data = OrderResponse.getOrderResponseList(result);
+        log.info("【团长端查询订单列表返回】leaderId:{},groupId:{},size:{}", leaderId, groupId, data == null ? 0 : data.size());
         return JsonResult.success(data);
     }
 
@@ -125,12 +126,14 @@ public class OrderController {
         // 查询订单列表
         List<GbOrderInfo> result = orderInfoService.getLeaderApplyRefundOrderList(leaderId, groupId, request.getPointId(), keyword, applyStatus, startTime, endTime, page, pageSize);
         List<OrderResponse> data = OrderResponse.getOrderResponseList(result);
+        log.info("【团长售后订单列表返回】leaderId:{},groupId:{},size:{}", leaderId, groupId, data == null ? 0 : data.size());
         return JsonResult.success(data);
     }
 
     // 查询订单总数(待核销), 考虑提货点
     @GetMapping("/leader/order/count")
     public JsonResult orderCount(@RequestParam("gid") Long groupId, @RequestParam("pid") Long pointId) {
+        log.info("【团长端-查询待核销订单总数:/order/leader/order/count】params->groupId:{},pointId:{}", groupId, pointId);
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
@@ -138,12 +141,14 @@ public class OrderController {
         }
         // 查询总数
         Long total = orderInfoService.getMiniLeaderOrderCount(leaderId, groupId, pointId, 2);
+        log.info("【团长端-查询待核销订单总数返回】leaderId:{},groupId:{},pointId:{},total:{}", leaderId, groupId, pointId, total);
         return JsonResult.success(total);
     }
 
     // 查询订单状态数量
     @GetMapping("/leader/order/status")
     public JsonResult orderStatus(@RequestParam("gid") Long groupId, @RequestParam("pid") Long pointId) {
+        log.info("【团长端-查询订单状态数量:/order/leader/order/status】params->groupId:{},pointId:{}", groupId, pointId);
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
@@ -155,12 +160,14 @@ public class OrderController {
             return JsonResult.success();
         }
         OrderStatusResponse response = new OrderStatusResponse(result);
+        log.info("【团长端-查询订单状态数量返回】leaderId:{},groupId:{},pointId:{},response:{}", leaderId, groupId, pointId, JSON.toJSONString(response));
         return JsonResult.success(response);
     }
 
     // 团长扫用户订单码接口
     @PostMapping("/leader/order/scanQRCode")
     public JsonResult scanQRCode(@Validated @RequestBody ScanQRCodeRequest request) {
+        log.info("【团长扫用户订单码:/order/leader/order/scanQRCode】params->request:{}", JSON.toJSONString(request));
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
@@ -175,6 +182,7 @@ public class OrderController {
             // 核销记录(支持一单多次部分核销, 按核销时间正序; 未核销过的订单返回空列表)
             List<GbOrderVerifyRecord> verifyRecordList = verifyRecordService.getVerifyRecordListByOrderNo(request.getOrderNo());
             data.setVerifyRecords(OrderVerifyRecordResponse.getOrderVerifyRecordResponseList(verifyRecordList));
+            log.info("【团长扫用户订单码返回】leaderId:{},orderNo:{},data:{}", leaderId, request.getOrderNo(), JSON.toJSONString(data));
             return JsonResult.success(data);
         }
     }
@@ -182,6 +190,7 @@ public class OrderController {
     // 根据订单号查询订单
     @GetMapping("/leader/order/query")
     public JsonResult queryOrder(@RequestParam("orderNo") String orderNo) {
+        log.info("【团长端-根据订单号查询订单:/order/leader/order/query】params->orderNo:{}", orderNo);
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) throw new BusinessException(OrderErrorCodeEnum.LEADER_NOT_EXIST);
@@ -194,6 +203,7 @@ public class OrderController {
             // 核销记录(支持一单多次部分核销, 按核销时间正序; 未核销过的订单返回空列表)
             List<GbOrderVerifyRecord> verifyRecordList = verifyRecordService.getVerifyRecordListByOrderNo(orderNo);
             data.setVerifyRecords(OrderVerifyRecordResponse.getOrderVerifyRecordResponseList(verifyRecordList));
+            log.info("【团长端-根据订单号查询订单返回】leaderId:{},orderNo:{},data:{}", leaderId, orderNo, JSON.toJSONString(data));
             return JsonResult.success(data);
         }
     }
@@ -453,6 +463,7 @@ public class OrderController {
         String openid = orderInfo.getOpenid();
         // 请求发货
         int isSendOK = WxMiniProgramHelper.uploadShippingInfo(accessToken, transactionId, goodsName, openid);
+        log.info("【团长端-查询微信发货:/order/leader/order/send】orderNo:{},isSendOK:{}", orderNo, isSendOK);
         if (isSendOK == 1) {
             // 更新发货标识
             businessService.updateBusinessOrderSendStatus(orderNo);
@@ -555,6 +566,8 @@ public class OrderController {
         response.setPage(currentPage);
         response.setPageSize(size);
         response.setList(itemList);
+        log.info("【团长端订单-商品统计返回】leaderId:{},groupId:{},pointId:{},goodsTotal:{},unVerifyTotal:{},size:{}",
+                leaderId, groupId, pointId, goodsTotal, unVerifyTotal, itemList == null ? 0 : itemList.size());
         // 返回
         return JsonResult.success(response);
     }
@@ -562,11 +575,13 @@ public class OrderController {
     // 根据团购活动id统计订单数（实时统计，团长端有需求时使用）
     @PostMapping("/get/groupActivity/totalOrder")
     public JsonResult getSumOfGroupActivityOrder(@RequestParam("groupId") Long groupId) {
+        log.info("【根据团购活动id统计订单数:/order/get/groupActivity/totalOrder】params->groupId:{}", groupId);
         Integer total = 0;
         if (groupId == null || groupId.intValue() == 0) {
             return JsonResult.success(total);
         }
         total = orderInfoService.getSumOfGroupActivityOrder(groupId);
+        log.info("【根据团购活动id统计订单数返回】groupId:{},total:{}", groupId, total);
         return JsonResult.success(total);
     }
 

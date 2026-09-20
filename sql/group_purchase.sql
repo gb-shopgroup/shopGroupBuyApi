@@ -345,6 +345,7 @@ CREATE TABLE `gb_order_goods_info` (
   `goods_num` int unsigned NOT NULL DEFAULT '0' COMMENT '商品数量',
   `receipt_num` int unsigned NOT NULL DEFAULT '0' COMMENT '收货数量',
   `apply_refund` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '售后（退款）状态 0 无 1 待审核 2 同意 3 不同意',
+  `apply_refund_num` int unsigned NOT NULL DEFAULT '0' COMMENT '申请退中数量(仅记录用户本次申请退款/退货退款的数量, 审核处理完成(同意/拒绝)后置0)',
   `refund_goods_num` int unsigned NOT NULL DEFAULT '0' COMMENT '退货退款数量(退已收货部分, 申请累计, 含待审核/已同意/不同意)',
   `refund_num` int unsigned NOT NULL DEFAULT '0' COMMENT '退款数量(退待收货部分, 申请累计, 含待审核/已同意/不同意)',
   `goods_unit` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '商品单位',

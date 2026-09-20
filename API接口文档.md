@@ -156,7 +156,7 @@
 | [86](#86-get-orderleaderhomeordergoodssummary) | order | GET | `/order/leader/home/order/goodsSummary` | *查询团长首页订单商品* |
 | [87](#87-post-ordergetgroupactivitytotalorder) | order | POST | `/order/get/groupActivity/totalOrder` | *提交（团购活动汇总订单）* |
 | [88](#88-get-orderleaderrefundcount) | order | GET | `/order/leader/refund/count` | *查询团长退款总数* |
-| [89](#89-post-orderleaderrefundapplylist) | order | POST | `/order/leader/refund/applyList` | *查询团长退款列表* |
+| [89](#89-post-orderleaderrefundapplylist) | order | POST | `/order/leader/refund/applyList` | 查询团长退款列表（待审核申请）<br>口径: 订单状态5售后+存在待审核(apply_refund=1)商品行, keyword匹配手机号/商品名; 先筛选再分页, total与列表一致, 每单回填该笔申请的整笔待审核商品行 |
 | [90](#90-post-orderleaderrefundapprove) | order | POST | `/order/leader/refund/approve` | *审核（团长退款）* |
 | [91](#91-post-orderleaderrefundnotify) | order | POST | `/order/leader/refund/notify` | *回调（团长退款）* |
 | [92](#92-get-orderpaymentorderpay) | order | GET | `/order/payment/order/pay` | *支付（支付订单）* |
@@ -3593,7 +3593,14 @@ data 类型：`Long`（基本类型，无子字段）
 
 #### 2. POST `/order/leader/refund/applyList`
 
-**功能说明**：*查询团长退款列表*（自动推断）
+**功能说明**：团长端-批量查询用户退款申请（待审核）列表
+
+查询口径（总数与列表完全一致，SQL 内先筛选再分页）：
+- 订单状态为 5 售后，且订单下存在待审核售后商品行（apply_refund=1）
+- keyword 同时匹配会员手机号与商品名称（模糊），为空则不过滤
+- 分页取订单号后再批量回填订单与该笔申请的待审核商品行（不受 keyword 影响商品行，保证团长审核不遗漏商品）
+- 同一订单同一时间只会有一笔待审核申请（用户端存在待审核商品行时不允许再次申请）
+- 商品行的申请数量口径以"申请退中数量"(gb_order_goods_info.apply_refund_num)为准，不再使用申请累计值（累计值含历史已同意/被拒部分，会导致数量与金额虚高）
 
 **入参**
 
@@ -3606,9 +3613,9 @@ data 类型：`Long`（基本类型，无子字段）
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| keyword | `String` | 否 | — |
-| page | `Integer` | 否 | — |
-| pageSize | `Integer` | 否 | — |
+| keyword | `String` | 否 | 关键字：手机号或商品名称（模糊匹配） |
+| page | `Integer` | 否 | 页码，默认 1 |
+| pageSize | `Integer` | 否 | 每页条数，默认 10，最大 20 |
 
 **出参（JsonResult 统一返回体）**
 
@@ -3624,10 +3631,10 @@ data 类型：`LeaderRefundApplyListResponse`（字段说明见下）
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| total | `Long` | 否 | 申请记录总数(不受分页影响) |
+| total | `Long` | 否 | 待审核申请订单总数(订单状态5售后 + 存在待审核(apply_refund=1)商品行, 不受分页影响, 与 list 同一口径) |
 | page | `Integer` | 否 | 当前页码 |
 | pageSize | `Integer` | 否 | 每页数量 |
-| list | `List<LeaderRefundApplyResponse>` | 否 | 申请记录列表 |
+| list | `List<LeaderRefundApplyResponse>` | 否 | 待审核申请订单列表(订单维度, 每单带该笔申请的待审核商品行) |
 
 
 **→LeaderRefundApplyResponse 字段**（字段 `list`（List<LeaderRefundApplyResponse>））
@@ -3649,7 +3656,7 @@ data 类型：`LeaderRefundApplyListResponse`（字段说明见下）
 | applyTime | `Integer` | 否 | 申请时间(时间戳秒) |
 | applyRefundAmount | `Double` | 否 | 本次申请退款总金额(单位:元, 申请记录落库值; 审核端发起退款优先按此金额) |
 | refundGoodsMsg | `String` | 否 | 申请商品描述原文(如 "商品名-规格,申请退数量:2,退款金额:10.0;") |
-| goods | `List<LeaderRefundApplyGoodsResponse>` | 否 | ---------- 申请商品行(仅匹配查询状态的商品行, 与审核 refundGoodsMap 对齐) ---------- |
+| goods | `List<LeaderRefundApplyGoodsResponse>` | 否 | ---------- 申请商品行(该笔申请的整笔待审核行 apply_refund=1, 与审核 refundGoodsMap 对齐) ---------- |
 
 
 **→→LeaderRefundApplyGoodsResponse 字段**（字段 `goods`（List<LeaderRefundApplyGoodsResponse>））
@@ -3666,9 +3673,10 @@ data 类型：`LeaderRefundApplyListResponse`（字段说明见下）
 | goodsNum | `Integer` | 否 | 购买数量 |
 | receiptNum | `Integer` | 否 | 收货数量 |
 | applyRefund | `Integer` | 否 | 行售后(审核)状态: 0=无 1=待审核 2=同意 3=不同意 |
-| refundNum | `Integer` | 否 | 累计退款数量(退待收货部分, 申请占坑累计; 待审核行含本次申请, 历史已同意部分保留) |
-| refundGoodsNum | `Integer` | 否 | 累计退货退款数量(退已收货部分, 申请占坑累计; 待审核行含本次申请, 历史已同意部分保留) |
-| refundAmount | `Double` | 否 | 行退款金额(单位:元): 按 refundFlag 取对应占坑数量 x 商品单价推算 (商品维度退款金额不落库, 与审核端口径一致) |
+| applyRefundNum | `Integer` | 否 | 申请退中数量(gb_order_goods_info.apply_refund_num): 本次申请的待审核数量, 用户申请时写入, 审核处理完成(同意/拒绝)后置0 |
+| refundNum | `Integer` | 否 | 本次申请退款数量(退待收货部分): refundFlag=1 时 = applyRefundNum, 否则 0(与审核入参 refundNum 对齐; 历史数据无申请退中数量或退款类型未知时按申请累计口径兜底) |
+| refundGoodsNum | `Integer` | 否 | 本次申请退货退款数量(退已收货部分): refundFlag=2 时 = applyRefundNum, 否则 0(与审核入参 refundNum 对齐; 历史数据无申请退中数量或退款类型未知时按申请累计口径兜底) |
+| refundAmount | `Double` | 否 | 行退款金额(单位:元) = 本次申请数量 x 商品单价 (商品维度退款金额不落库, 与审核端口径一致) |
 
 
 #### 3. POST `/order/leader/refund/approve`

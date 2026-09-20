@@ -80,6 +80,7 @@ public class GroupOrderController {
         String groupOrderKey = RedisConstant.RedisOrderTotalKey + request.getGroupId();
         redisHelper.releaseLock(groupOrderKey);
         String msg = res.get("msg"); // 订单号
+        log.info("【订单系统-下单接口返回】memberId:{},groupId:{},success:{},msg:{}", memberId, request.getGroupId(), success, msg);
         if (success == 1) {
             return JsonResult.success("下单成功", msg);
         } else {

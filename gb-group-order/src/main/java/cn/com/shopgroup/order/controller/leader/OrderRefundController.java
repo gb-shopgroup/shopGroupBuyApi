@@ -96,12 +96,15 @@ public class OrderRefundController {
 
         // 查询总数
         Long total = orderInfoService.getMiniLeaderRefundOrderCount(leaderId, groupId, pointId);
+        log.info("退款订单数量返回 leaderId:{},groupId:{},pointId:{},total:{}", leaderId, groupId, pointId, total);
         return JsonResult.success(total);
     }
 
     // 批量查询用户退款申请数据(团长端): 把用户申请退的数据按订单+商品行结构化展示,
     // 只查"待审核"申请(售后订单 status=5 + 商品行 apply_refund=1),
     // 关键字 keyword(商品名称/手机号) 过滤, 分页返回;
+    // 分页与总数共用同一口径(先由 SQL 过滤出"存在待审核商品行"的订单再分页, status 固定为售后5),
+    // 每单回填该笔申请的整笔待审核商品行(apply_refund=1, 不按 keyword 过滤商品行, 保证审核不遗漏商品)
     @PostMapping("/leader/refund/applyList")
     public JsonResult refundApplyList(@RequestBody LeaderRefundApplyListRequest request) {
         log.info("团长端-批量查询退款申请数据 /leader/refund/applyList, 参数request:{}", JSON.toJSONString(request));
@@ -116,11 +119,11 @@ public class OrderRefundController {
                 .map(size -> Math.min(size, 20))
                 .orElse(10);
 
-        // 待审核申请订单总数(不受分页影响, 口径与列表一致: 售后订单+商品行apply_refund=1)
+        // 待审核申请订单总数(不受分页影响, 口径与列表一致: 售后订单(5)+商品行apply_refund=1)
         Long total = orderInfoService.getLeaderApplyRefundOrderCount(leaderId, request.getKeyword());
-        // 待审核申请订单分页列表(每单带待审核商品行, applyStatus=1)
-        List<GbOrderInfo> orderList = orderInfoService.getLeaderApplyRefundOrderList(leaderId, 0L, 0L,
-                request.getKeyword(), 1, 0, 0, page, pageSize);
+        // 待审核申请订单分页列表: 与总数同一口径(先由 SQL 筛选"存在待审核商品行"的订单再分页), 每单带该笔申请的待审核商品行
+        List<GbOrderInfo> orderList = orderInfoService.getLeaderApplyRefundOrderPage(leaderId,
+                request.getKeyword(), page, pageSize);
         // 组装: 订单 + 最近一笔申请记录(类型/原因/金额)
         List<LeaderRefundApplyResponse> list = new ArrayList<>();
         if (!CollectionUtils.isEmpty(orderList)) {
@@ -135,7 +138,7 @@ public class OrderRefundController {
         response.setPage(page);
         response.setPageSize(pageSize);
         response.setList(list);
-        log.info("团长端-批量查询退款申请数据完成, leaderId:{}, total:{}", leaderId, total);
+        log.info("团长端-批量查询退款申请数据, leaderId:{}, resp:{}", JSON.toJSONString(response));
         return JsonResult.success(response);
     }
 
@@ -160,6 +163,7 @@ public class OrderRefundController {
                 fallback = record;
             }
         }
+        log.info("取该订单最近一笔-用户申请-记录data:{}", JSON.toJSONString(fallback));
         return fallback;
     }
 
@@ -258,11 +262,13 @@ public class OrderRefundController {
             }
         }
         // 返回
+        log.info("团长管理-退款审核处理完成 /order/refund/approve, leaderId:{}, 共处理{}笔订单", leaderId, refundMap.size());
         return JsonResult.success("审核成功");
     }
 
     //拒绝（不同意）处理: 主表退款金额申请阶段未累加, 拒绝后金额天然回到申请前, 只需回退商品行退款/退货退款数量
     public void handleRefuse(Long leaderId, Long opId, String opName, OrderRefundInfoRequest request, String reason) {
+        log.info("【团长端-审核拒绝处理】leaderId:{},opName:{},orderNo:{},reason:{}", leaderId, opName, request == null ? null : request.getOrderNo(), reason);
         String orderNo = request.getOrderNo();
         // 拒绝退款(记录操作人/拒绝原因)
         orderInfoService.editMiniLeaderRefundOrder(orderNo, opName, reason);

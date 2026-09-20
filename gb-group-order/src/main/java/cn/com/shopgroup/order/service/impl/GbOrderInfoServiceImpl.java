@@ -673,10 +673,24 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
     public Boolean receiptMiniLeaderOrder(Long leaderId, String orderNo, String receiptCode, Long staffId, String staffName,
                                           Long pointId, String pointName, List<GbOrderGoodsInfo> goodsList) {
 
+        // 部分核销时若订单当前已是售后状态(5), 不再覆盖状态, 保留售后标识;
+        // 避免把"售后中"的订单被核销动作改成"部分收货"(覆盖后团长端看不到售后状态, 无法继续按售后流程审核剩余商品)
+        Integer currentStatus = null;
+        GbOrderInfo existOrder = mapper.selectOne(
+                Wrappers.<GbOrderInfo>lambdaQuery()
+                        .eq(GbOrderInfo::getOrderNo, orderNo)
+                        .eq(GbOrderInfo::getLeaderId, leaderId)
+                        .select(GbOrderInfo::getStatus));
+        if (existOrder != null) {
+            currentStatus = existOrder.getStatus();
+        }
+
         LambdaUpdateWrapper<GbOrderInfo> updateWrapper = Wrappers.lambdaUpdate();
 
 
-        updateWrapper.set(GbOrderInfo::getStatus, OrderStatusEnum.PART_RECEIVED.getCode());
+        if (currentStatus == null || currentStatus != OrderStatusEnum.APPLY_REFUND.getCode()) {
+            updateWrapper.set(GbOrderInfo::getStatus, OrderStatusEnum.PART_RECEIVED.getCode());
+        }
 
 
         updateWrapper.set(GbOrderInfo::getVerifyTime, TimeUtils.getTimeStamp());
@@ -1058,6 +1072,8 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
             updateGoodsWrapper.eq(GbOrderGoodsInfo::getId, item.getId());
             // 售后状态置待审核, 退款数量按本次申请值累加(占坑: 审核同意保留, 审核拒绝时回退)
             updateGoodsWrapper.set(GbOrderGoodsInfo::getApplyRefund, 1);
+            // 申请退中数量: 覆盖为本次申请数量(同一商品行同一时间只有一笔待审核申请, 审核处理后置0)
+            updateGoodsWrapper.set(GbOrderGoodsInfo::getApplyRefundNum, applyNum);
             if (isReturnGoods == 1) {
                 updateGoodsWrapper.setSql("refund_num = refund_num + {0}", applyNum);
             } else {
@@ -1068,6 +1084,8 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
         return updated;
     }
 
+    // 审核(同意2/不同意3)处理完成后把商品行售后状态置为审核结果;
+    // 同时把"申请退中数量"置0: 该行已不再处于"申请中", 避免团长端待审核列表/再次申请时数量残留
     @Override
     public void updateOrderGoodsApplyStatus(String orderNo, List<Long> orderGoodsIds, int status) {
         if (!CollectionUtils.isEmpty(orderGoodsIds)) {
@@ -1076,6 +1094,10 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
                 updateGoodsWrapper.eq(GbOrderGoodsInfo::getId, id);
                 updateGoodsWrapper.eq(GbOrderGoodsInfo::getOrderNo, orderNo);
                 updateGoodsWrapper.set(GbOrderGoodsInfo::getApplyRefund, status);
+                // 待审核(1)保持不变, 审核处理完成(同意/不同意)时清空申请退中数量
+                if (status != 1) {
+                    updateGoodsWrapper.set(GbOrderGoodsInfo::getApplyRefundNum, 0);
+                }
                 goodsMapper.update(updateGoodsWrapper);
             }
         }
@@ -1107,6 +1129,8 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
             } else {
                 updateGoodsWrapper.setSql("refund_goods_num = IF(refund_goods_num >= " + refundNum + ", refund_goods_num - " + refundNum + ", 0)");
             }
+            // 审核拒绝: 本次申请被驳回, 申请退中数量清零(回退占坑后该行已无"申请中"数量, 可再次申请)
+            updateGoodsWrapper.set(GbOrderGoodsInfo::getApplyRefundNum, 0);
             goodsMapper.update(updateGoodsWrapper);
         }
         return 1;
@@ -1527,12 +1551,62 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
         return result;
     }
 
-    // (团长端-退款申请列表)待审核售后订单总数: 口径与列表一致(订单状态5售后, 存在待审核(apply_refund=1)商品行)
+    // (团长端-退款申请列表)待审核申请订单总数: 口径与 getLeaderApplyRefundOrderPage 一致(订单状态5售后, 存在待审核(apply_refund=1)商品行)
     @Override
     public Long getLeaderApplyRefundOrderCount(Long leaderId, String keyword) {
 
         Long count = mapper.getLeaderApplyRefundOrderCount(leaderId, keyword);
         return count == null ? 0L : count;
+    }
+
+    // (团长端-退款申请列表)待审核申请订单分页列表: 先按与总数一致的口径分页取订单号, 再批量回填订单与整笔待审核商品行
+    @Override
+    public List<GbOrderInfo> getLeaderApplyRefundOrderPage(Long leaderId, String keyword, int page, int pageSize) {
+
+        // 1. 按与总数统计完全一致的口径分页取订单号(SQL 内完成"存在待审核商品行"筛选, 保证每页条数与总数匹配)
+        int offset = (page - 1) * pageSize;
+        List<String> orderNos = mapper.getLeaderApplyRefundOrderNoList(leaderId, keyword, offset, pageSize);
+        if (CollectionUtils.isEmpty(orderNos)) {
+            return new ArrayList<>();
+        }
+
+        // 2. 批量查询本页订单
+        LambdaQueryWrapper<GbOrderInfo> orderWrapper = Wrappers.lambdaQuery();
+        orderWrapper.in(GbOrderInfo::getOrderNo, orderNos);
+        List<GbOrderInfo> orderList = mapper.selectList(orderWrapper);
+        if (CollectionUtils.isEmpty(orderList)) {
+            return new ArrayList<>();
+        }
+
+        // 3. 批量查询待审核商品行(整笔申请的待审核行全部返回, 不按 keyword 过滤商品名, 避免团长审核时只处理部分商品行)
+        LambdaQueryWrapper<GbOrderGoodsInfo> goodsWrapper = Wrappers.lambdaQuery();
+        goodsWrapper.in(GbOrderGoodsInfo::getOrderNo, orderNos);
+        goodsWrapper.eq(GbOrderGoodsInfo::getApplyRefund, 1);
+        goodsWrapper.orderByDesc(GbOrderGoodsInfo::getId);
+        List<GbOrderGoodsInfo> goodsList = goodsMapper.selectList(goodsWrapper);
+
+        Map<String, List<GbOrderGoodsInfo>> goodsMap = new HashMap<>();
+        if (!CollectionUtils.isEmpty(goodsList)) {
+            for (GbOrderGoodsInfo item : goodsList) {
+                goodsMap.computeIfAbsent(item.getOrderNo(), k -> new ArrayList<>()).add(item);
+            }
+        }
+
+        // 4. 按分页顺序(order id desc)组装返回
+        Map<String, GbOrderInfo> orderMap = new HashMap<>();
+        for (GbOrderInfo item : orderList) {
+            orderMap.put(item.getOrderNo(), item);
+        }
+        List<GbOrderInfo> result = new ArrayList<>();
+        for (String orderNo : orderNos) {
+            GbOrderInfo order = orderMap.get(orderNo);
+            if (order == null) {
+                continue;
+            }
+            order.setGoodsInfoList(goodsMap.getOrDefault(orderNo, new ArrayList<>()));
+            result.add(order);
+        }
+        return result;
     }
 
     // 判断 keyword 是否为手机号(纯数字)

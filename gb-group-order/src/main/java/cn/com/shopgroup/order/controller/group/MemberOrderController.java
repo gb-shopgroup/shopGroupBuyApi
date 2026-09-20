@@ -189,7 +189,7 @@ public class MemberOrderController {
     // 用户订单数量
     @GetMapping("/group/order/count")
     public JsonResult orderList(@RequestParam("pid") Long pointId) {
-
+        log.info("【用户订单数量:/order/group/order/count】params->pointId:{}", pointId);
         // 查询用户信息
         String token = TokenUtils.getToken();
         if (token == null || token.length() == 0) {
@@ -217,13 +217,14 @@ public class MemberOrderController {
 
         // 查询订单数量
         long total = orderInfoService.getMiniOrderCount(memberId, leaderId);
+        log.info("【用户订单数量返回】memberId:{},leaderId:{},total:{}", memberId, leaderId, total);
         return JsonResult.success(total);
     }
 
     // 用户订单详情
     @GetMapping("/group/order/info")
     public JsonResult orderInfo(@RequestParam("orderNo") String orderNo) {
-
+        log.info("【用户订单详情:/order/group/order/info】params->orderNo:{}", orderNo);
         // 查询用户信息
         String token = TokenUtils.getToken();
         if (token == null || token.length() == 0) {
@@ -252,6 +253,7 @@ public class MemberOrderController {
         // 核销记录(支持一单多次部分核销, 按核销时间正序; 未核销过的订单返回空列表)
         List<GbOrderVerifyRecord> verifyRecordList = verifyRecordService.getVerifyRecordListByOrderNo(orderNo);
         data.setVerifyRecords(OrderVerifyRecordResponse.getOrderVerifyRecordResponseList(verifyRecordList));
+        log.info("【用户订单详情返回】orderNo:{},data:{}", orderNo, JSON.toJSONString(data));
         return JsonResult.success(data);
     }
 
@@ -329,6 +331,7 @@ public class MemberOrderController {
     // 用户扫码核销-整单核销(GET): 核销订单全部剩余可核销商品(购买数-已核销-已退)
     @GetMapping("/group/order/receipt")
     public JsonResult orderReceipt(@RequestParam("orderNo") String orderNo, @RequestParam("point") Long pointId) {
+        log.info("【用户扫码整单核销:/order/group/order/receipt】params->orderNo:{},pointId:{}", orderNo, pointId);
         // 查询用户信息
         Long memberId = getLoginMemberId();
         // 整单核销(goodsMap传null): 核销全部剩余可核销商品
@@ -672,6 +675,7 @@ public class MemberOrderController {
             allRefundAmount += temp.getRefundAmount();
             // 同时标记订单商品售后状态待审核(内存值, 供下方累加使用)
             orderGoods.setApplyRefund(1);
+            orderGoods.setApplyRefundNum(applyNum);
             if (isReturnGoods == 1) {
                 orderGoods.setRefundNum(applyNum);
             } else {
@@ -789,6 +793,7 @@ public class MemberOrderController {
     // 用户点击确认收货组件后调用接口，更新订单已经操作按钮
     @PostMapping("/group/order/confirmShipping")
     public JsonResult orderReceipt(@RequestParam("orderNo") String orderNo) {
+        log.info("【用户点击确认收货:/order/group/order/confirmShipping】params->orderNo:{}", orderNo);
         // 查询用户信息
         String token = TokenUtils.getToken();
         if (token == null || token.length() == 0) {

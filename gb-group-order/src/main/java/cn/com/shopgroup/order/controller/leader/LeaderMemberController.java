@@ -48,6 +48,8 @@ public class LeaderMemberController {
                 .orElse(10);
         List<LeaderMemberListResponse> data = orderInfoService.getLeaderMemberList(
                 leaderId, request.getKeyword(), page, pageSize);
+        log.info("【团长端-我的团员列表返回】leaderId:{},keyword:{},size:{}", leaderId, request.getKeyword(),
+                data == null ? 0 : data.size());
         return JsonResult.success(data);
     }
 
@@ -65,6 +67,7 @@ public class LeaderMemberController {
             throw new BusinessException(OrderErrorCodeEnum.MEMBER_ID_PARAM_ERROR);
         }
         LeaderMemberDetailResponse data = orderInfoService.getLeaderMemberDetail(leaderId, memberId);
+        log.info("【团长端-团员详情返回】leaderId:{},memberId:{},data:{}", leaderId, memberId, JSON.toJSONString(data));
         return JsonResult.success(data);
     }
 }

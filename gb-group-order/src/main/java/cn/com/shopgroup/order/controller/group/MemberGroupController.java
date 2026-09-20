@@ -87,9 +87,10 @@ public class MemberGroupController {
     // 团购分类列表（首页）
     @GetMapping("/group/groupActivity/cat")
     public JsonResult groupCat() {
-
+        log.info("【团购分类列表:/order/group/groupActivity/cat】");
         List<GbGroupCategoryInfo> lists = categoryService.getMiniGroupCategoryList();
         List<GroupCategoryResponse> data = GroupCategoryResponse.getGroupCategoryResponseList(lists);
+        log.info("【团购分类列表返回】size:{},data:{}", data == null ? 0 : data.size(), JSON.toJSONString(data));
         return JsonResult.success(data);
     }
 
@@ -242,7 +243,7 @@ public class MemberGroupController {
     // 团购详情(团长分享页面)---用户首页：团长更多好货也用
     @GetMapping("/group/groupActivity/info")
     public JsonResult groupInfo(@RequestParam("groupId") Long groupId) {
-
+        log.info("【团购详情:/order/group/groupActivity/info】params->groupId:{}", groupId);
         // 先查看是否存在Redis缓存
         String key = RedisConstant.RedisGroupInfoKey + groupId;
         if (redisHelper.hasKey(key) == false) {
@@ -383,7 +384,7 @@ public class MemberGroupController {
     // 团购记录(跟团记录), 滚动部分
     @GetMapping("/group/groupActivity/logs2")
     public JsonResult groupLogs2(@RequestParam("id") Long groupId) {
-
+        log.info("【团购滚动跟团记录:/order/group/groupActivity/logs2】params->groupId:{}", groupId);
         // 放入缓存
         String key = RedisConstant.RedisGroupLogsKey2 + groupId;
         if (redisHelper.hasKey(key) == false) {
@@ -400,6 +401,7 @@ public class MemberGroupController {
 
         // 读取缓存
         List<GroupLogs> data = redisHelper.getCacheObject(key);
+        log.info("【团购滚动跟团记录返回】size:{},data:{}", data == null ? 0 : data.size(), JSON.toJSONString(data));
         return JsonResult.success(data);
     }
 

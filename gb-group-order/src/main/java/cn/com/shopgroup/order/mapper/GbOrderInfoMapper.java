@@ -15,9 +15,8 @@ import java.util.Map;
 @Repository
 public interface GbOrderInfoMapper extends BaseMapper<GbOrderInfo> {
 
-    // (团长端-退款申请列表)统计存在指定售后状态商品行的售后订单总数:
-    // 口径与 getLeaderApplyRefundOrderList 一致(订单状态4已退款/5售后, 商品行 apply_refund=applyStatus(null=全部),
-    // keyword 匹配手机号或商品名), 分页总数用
+    // (团长端-退款申请列表)待审核申请订单总数: 订单状态5售后 且 存在待审核(apply_refund=1)商品行, keyword 匹配手机号或商品名
+    // 必须与 getLeaderApplyRefundOrderNoList 保持完全同一口径, 否则列表条数与总数对不上
     @Select({
             "SELECT COUNT(DISTINCT o.`order_no`)",
             "FROM `gb_order_info` AS o",
@@ -29,6 +28,24 @@ public interface GbOrderInfoMapper extends BaseMapper<GbOrderInfo> {
             "       OR g.`goods_name` LIKE CONCAT('%', #{keyword}, '%'))"
     })
     Long getLeaderApplyRefundOrderCount(@Param("leaderId") Long leaderId, @Param("keyword") String keyword);
+
+    // (团长端-退款申请列表)待审核申请订单号分页: 与 getLeaderApplyRefundOrderCount 同一 WHERE 口径,
+    // 由 SQL 先完成"是否存在待审核商品行"的筛选再分页, 避免先分页订单、后再丢弃无待审核行的订单导致每页条数不足/申请订单被漏查
+    @Select({
+            "SELECT o.`order_no`",
+            "FROM `gb_order_info` AS o",
+            "JOIN `gb_order_goods_info` AS g ON g.`order_no` = o.`order_no`",
+            "WHERE o.`leader_id` = #{leaderId}",
+            "  AND o.`status` = 5",
+            "  AND g.`apply_refund` = 1",
+            "  AND (IFNULL(#{keyword}, '') = '' OR o.`mobile` LIKE CONCAT('%', #{keyword}, '%')",
+            "       OR g.`goods_name` LIKE CONCAT('%', #{keyword}, '%'))",
+            "GROUP BY o.`order_no`",
+            "ORDER BY MAX(o.`id`) DESC",
+            "LIMIT #{offset}, #{limit}"
+    })
+    List<String> getLeaderApplyRefundOrderNoList(@Param("leaderId") Long leaderId, @Param("keyword") String keyword,
+                                                 @Param("offset") int offset, @Param("limit") int limit);
 
     // (团长)汇总订单数量, 已支付(pay_time>0), 未退款(refund_time=0), 区分已核销(verify_time>0)/未核销的数量
     @Select({
