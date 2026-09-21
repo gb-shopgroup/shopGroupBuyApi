@@ -21,6 +21,7 @@ import cn.com.shopgroup.order.model.GbGroupViewLog;
 import cn.com.shopgroup.order.model.GbOrderGoodsInfo;
 import cn.com.shopgroup.order.model.GbOrderInfo;
 import cn.com.shopgroup.order.service.GbGroupViewLogService;
+import cn.com.shopgroup.order.service.GbOrderBusinessInfoService;
 import cn.com.shopgroup.order.service.GbOrderInfoService;
 import cn.com.shopgroup.user.service.GbOrgMessageInfoService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -72,6 +73,9 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
     private GbOrgMessageInfoService orgMessageInfoService;
     @Resource
     private GbGoodsSkuInfoService goodsSkuInfoService;
+
+    @Resource
+    private GbOrderBusinessInfoService orderBusinessService;
 
 
     @Override
@@ -773,6 +777,8 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
         // 全部商品已退完 -> 已退款(4)
         if (getOrderGoodsStatus(orderNo) == 0) {
             editMiniLeaderRefundOrder(orderNo);
+            // 同步原始订单表和商户订单表的退款状态
+            orderBusinessService.editMiniLeaderOrderBusinessRefundStatus(orderNo);
             return true;
         }
         // 还有未退完的商品 -> 订单保持售后(5)

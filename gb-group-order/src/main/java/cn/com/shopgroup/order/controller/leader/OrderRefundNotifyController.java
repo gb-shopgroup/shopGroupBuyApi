@@ -7,12 +7,15 @@ import cn.com.shopgroup.common.utils.MoneyUtil;
 import cn.com.shopgroup.common.utils.TimeUtils;
 import cn.com.shopgroup.order.constants.OrderStatusEnum;
 import cn.com.shopgroup.order.constants.PaymentStatusEnum;
+import cn.com.shopgroup.order.model.GbOrderBusinessInfo;
 import cn.com.shopgroup.order.model.GbOrderInfo;
 import cn.com.shopgroup.order.model.OrderTransactionLog;
 import cn.com.shopgroup.order.service.GbOrderBusinessInfoService;
 import cn.com.shopgroup.order.service.GbOrderInfoService;
 import cn.com.shopgroup.order.service.OrderTransactionLogService;
 import cn.com.shopgroup.order.service.RefundConfirmService;
+import cn.com.shopgroup.user.model.GbOrgLeaderInfo;
+import cn.com.shopgroup.user.service.GbOrgLeaderInfoService;
 import cn.com.shopgroup.user.service.GbOrgMessageInfoService;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
@@ -46,6 +49,9 @@ public class OrderRefundNotifyController {
 
     @Resource
     private RefundConfirmService refundConfirmService;
+
+    @Resource
+    private GbOrgLeaderInfoService leaderService;
 
     @Resource
     private RedisHelper redisHelper;
@@ -135,8 +141,8 @@ public class OrderRefundNotifyController {
      * 商品行退款以"退款数量"体现(申请时按行累加, 审核同意保留, 审核拒绝按行回退), 商品维度退款金额可由 退款数量×商品单价 推算, 不单独落库.
      * 回调不再重复累计商品数量/金额, 只做与资金最终结果相关的处理:
      * 1. 退款成功: 资金相关落库(退款成功记录+累加refund_fee+订单退款流水号+交易流水)由 RefundConfirmService 在同一事务内完成,
-     *    幂等基准为"退款记录表中该易宝退款单号的系统退款成功记录"(支持一单多次部分退款; 原订单表refund_no单值比对在多笔部分退款时存在重复累加风险);
-     *    事务外再做分账表置已退款(不再参与分账)、订单主状态兜底同步(全部退完=已退款4, 否则保持售后5)、团长消息
+     * 幂等基准为"退款记录表中该易宝退款单号的系统退款成功记录"(支持一单多次部分退款; 原订单表refund_no单值比对在多笔部分退款时存在重复累加风险);
+     * 事务外再做分账表置已退款(不再参与分账)、订单主状态兜底同步(全部退完=已退款4, 否则保持售后5)、团长消息
      * 2. 退款失败: 记录失败流水与失败原因(不落退款成功记录)、订单不再停留在售后(5)、通知团长人工处理
      * (回调报文只有订单维度的信息, 不含商品明细, 商品行的申请占坑数量无法按行回退, 需团长重新发起或人工核对)
      */
@@ -160,8 +166,41 @@ public class OrderRefundNotifyController {
                 return;
             }
             // 以下非资金操作放事务外(重复执行无副作用):
-            // 分账订单表同步为已退款(comm_status=5), 已退款订单不再参与分账
-            orderBusinessInfoService.editMiniLeaderOrderBusinessRefundStatus(orderNo);
+            // 判断订单是否分账。已分账订单资金已按原额分出, 不做处理
+            GbOrderBusinessInfo orderBusinessInfo = orderBusinessInfoService.getOrderBusinessInfo(orderNo);
+            if (!ObjectUtils.isEmpty(orderBusinessInfo)) {
+                // 如订单还未分账, 需重新计算分账金额:
+                // 分账基数 = 实付金额(pay_fee, 分) - 全部退款金额(refund_fee, 分, 已含本笔退款)
+                if (orderBusinessInfo.getIsDivide().intValue() == 0) {
+                    // confirmRefundSuccess 事务内已把本笔退款累加进订单表 refund_fee,
+                    // 而内存中的 orderInfo 是事务前快照(refundFee 为旧值), 必须重新查库取最新累计值
+                    GbOrderInfo latestOrder = orderInfoService.getOrderInfoByOrderNo(orderNo);
+                    int payFee = latestOrder.getPayFee() == null ? 0 : latestOrder.getPayFee();
+                    int allRefundFee = latestOrder.getRefundFee() == null ? 0 : latestOrder.getRefundFee();
+                    // 剩余待分账基数(分) = 实付金额 - 全部退款金额, 数据异常导致为负时按 0 处理
+                    int remainPayPrice = Math.max(payFee - allRefundFee, 0);
+                    if (remainPayPrice > 0) {
+                        // 按剩余金额为基数重算各分账字段(手续费也按剩余基数重新计提)
+                        getOrderDivideMoney(orderBusinessInfo, latestOrder.getOrderPrice(), remainPayPrice);
+                    } else {
+                        // 订单金额已全部退完: 分账相关金额整体清零
+                        orderBusinessInfo.setOrderFee(0);
+                        orderBusinessInfo.setReceivedFee(0);
+                        orderBusinessInfo.setBusFee(0);
+                        orderBusinessInfo.setServiceFee(0);
+                        orderBusinessInfo.setOtherFee(0);
+                    }
+                    log.info("易宝退款回调 - 未分账订单重算分账金额, orderNo:{}, payFee:{}分, allRefundFee:{}分, remainPayPrice:{}分",
+                            orderNo, payFee, allRefundFee, remainPayPrice);
+                    // 按 orderNo 更新(非插入)分账表金额字段; update 带 is_divide=0 条件, 已分账订单不会命中
+                    orderBusinessInfoService.editOrderBusinessDivideFee(orderBusinessInfo);
+                }
+                // 分账订单表同步为已退款(comm_status=5), 已退款订单不再参与分账
+                int m = orderInfoService.getOrderGoodsStatus(orderNo);
+                if (m == 0) {
+                    orderBusinessInfoService.editMiniLeaderOrderBusinessRefundStatus(orderNo);
+                }
+            }
             // 订单主状态兜底同步: 订单仍停留在售后(5)时, 商品全部退完置已退款(4), 否则只要有未退完的保持售后(5)
             if (orderInfo.getStatus() != null && orderInfo.getStatus().intValue() == OrderStatusEnum.APPLY_REFUND.getCode()) {
                 orderInfoService.updateOrderStatusAfterRefundAgree(orderNo);
@@ -184,6 +223,40 @@ public class OrderRefundNotifyController {
                 "订单号(" + orderNo + ") 退款失败(" + reason + "), 请核对后重新发起退款。");
         log.error("易宝退款回调 - 退款失败, orderNo:{}, refundNo:{}, failCode:{}, failReason:{}",
                 orderNo, refundNo, failCode, failReason);
+    }
+
+    // 计算订单分账金额算法
+    private void getOrderDivideMoney(GbOrderBusinessInfo orderBusinessInfo, double orderPrice, int payPrice) {
+
+        // 如果用户支付9块钱的话，总计手续费是 9 * 0.006 = 5.4分，四舍五入的话，就是5分钱（对团长而言），易宝手续费 9 * 0.003 = 2.7分，四舍五入就是易宝3分，平台服务费就是5-3=2分。易宝薅平台四舍五入的1分羊毛。
+        // 如果用户支付8块钱的话，总计手续费是 8 * 0.006 = 4.8分，四舍五入的话，就是5分钱（对团长而言），易宝手续费 8 * 0.003 = 2.4分，四舍五入就是易宝2分，平台服务器就是5-2=3分。平台薅易宝四舍五入的1分羊毛。
+        // 如果用户支付7块钱的话，总计手续费是 7 * 0.006 = 4.2分，四舍五入的话，就是4分钱（对团长而言），易宝手续费 7 * 0.003 = 2.1分，四舍五入就是易宝2分，平台服务器就是4-2=2分。大家相互公平。
+        // 获取商户手续费
+        GbOrgLeaderInfo leaderInfo = leaderService.getLeaderInfo(orderBusinessInfo.getLeaderId());
+        int rate = leaderInfo.getCommission(); // 数值为：3，4，5，6，7，8，9，10
+
+        // “团长”的手续费(0.6% - 1.0%)
+        int all_shouxufei = MoneyUtil.calcRateByCent(payPrice, rate);
+        // “支付平台(易宝)”的手续费(0.3%)
+        int yibao_shouxufei = MoneyUtil.calcRateByCent(payPrice, 3);
+        // "平台"的手续费：all_shouxufei - yibao_shouxufei
+        int platform_shouxufei = all_shouxufei - yibao_shouxufei;
+        if (platform_shouxufei <= 0) platform_shouxufei = 0;
+
+        // 订单金额(单位：分)
+        int orderFee = MoneyUtil.yuanToCent(orderPrice);
+        orderBusinessInfo.setOrderFee(orderFee);
+        // 实际到账金额(单位：分) = 订单支付金额 - 易宝手续费
+        int receivedFee = payPrice - yibao_shouxufei;
+        orderBusinessInfo.setReceivedFee(receivedFee);
+        // 我们平台的服务费(单位：分)
+        orderBusinessInfo.setServiceFee(platform_shouxufei);
+        // 其他佣金(单位：分)
+        orderBusinessInfo.setOtherFee(0);
+        // 子商户分账金额(单位：分)
+        int busFee = payPrice - all_shouxufei;
+        if (busFee < 0) busFee = 0;
+        orderBusinessInfo.setBusFee(busFee);
     }
 
     // 记录退款回调交易流水(仅流水; 退款成功记录由 RefundConfirmService 事务内落库, 失败分支不落退款记录)

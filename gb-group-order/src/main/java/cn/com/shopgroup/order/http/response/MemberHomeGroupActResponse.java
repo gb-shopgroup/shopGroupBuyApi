@@ -42,11 +42,15 @@ public class MemberHomeGroupActResponse {
     private Integer startTime;
     // 结束时间
     private Integer endTime;
-
     // 平台审核
     private Byte isCheck;
     // 审核备注
     private String checkRemark;
+
+    // 团购标签id,0没有
+    private Long tagId;
+    // 团购标签名称
+    private String tagName;
 
     // 团购商品列表
     private List<GroupActGoodsResponse> goods;
@@ -91,6 +95,8 @@ public class MemberHomeGroupActResponse {
         this.endTime = data.getEndTime();
         // 审核备注
         this.checkRemark = data.getCheckRemark();
+        this.tagId = data.getTagId();
+        this.tagName = data.getTagName();
     }
 
     // 列表转换

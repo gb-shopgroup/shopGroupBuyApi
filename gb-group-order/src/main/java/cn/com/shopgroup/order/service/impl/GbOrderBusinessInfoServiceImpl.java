@@ -120,6 +120,23 @@ public class GbOrderBusinessInfoServiceImpl implements GbOrderBusinessInfoServic
     }
 
 
+    // 退款成功后按剩余金额重算分账金额: 仅更新未分账(is_divide=0)订单的分账五字段, 已分账订单不覆写;
+    // update 条件带 is_divide=0 做并发保护, 若分账定时任务与退款回调并发, 分账后到达的更新会命中 0 行而失败
+    @Override
+    public int editOrderBusinessDivideFee(GbOrderBusinessInfo info) {
+
+        LambdaUpdateWrapper<GbOrderBusinessInfo> updateWrapper = Wrappers.lambdaUpdate();
+        updateWrapper.eq(GbOrderBusinessInfo::getOrderNo, info.getOrderNo());
+        updateWrapper.eq(GbOrderBusinessInfo::getIsDivide, 0);
+        updateWrapper.set(GbOrderBusinessInfo::getOrderFee, info.getOrderFee() == null ? 0 : info.getOrderFee());
+        updateWrapper.set(GbOrderBusinessInfo::getReceivedFee, info.getReceivedFee() == null ? 0 : info.getReceivedFee());
+        updateWrapper.set(GbOrderBusinessInfo::getBusFee, info.getBusFee() == null ? 0 : info.getBusFee());
+        updateWrapper.set(GbOrderBusinessInfo::getServiceFee, info.getServiceFee() == null ? 0 : info.getServiceFee());
+        updateWrapper.set(GbOrderBusinessInfo::getOtherFee, info.getOtherFee() == null ? 0 : info.getOtherFee());
+        return mapper.update(updateWrapper);
+    }
+
+
     @Override
     public Boolean updateBusinessOrderSendStatus(String orderNo) {
 

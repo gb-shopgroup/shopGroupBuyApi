@@ -19,6 +19,9 @@ public interface GbOrderBusinessInfoService {
 
     int editMiniLeaderOrderBusinessRefundStatus(String orderNo);
 
+    // 退款成功后按剩余金额重算分账金额: 仅更新未分账(is_divide=0)订单的分账五字段, 已分账订单不覆写
+    int editOrderBusinessDivideFee(GbOrderBusinessInfo info);
+
     Boolean updateBusinessOrderSendStatus(String orderNo);
 
     Boolean updateBusinessOrderCheckStatus(String orderNo);

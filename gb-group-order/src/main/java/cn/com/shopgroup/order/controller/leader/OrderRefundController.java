@@ -64,16 +64,10 @@ public class OrderRefundController {
     private GbOrderInfoService orderInfoService;
 
     @Resource
-    private GbOrderBusinessInfoService orderBusinessInfoService;
-
-    @Resource
     private GbOrgStaffInfoService staffService;
 
     @Resource
     private GbOrgMessageInfoService messageService;
-
-    @Resource
-    private GbOrderBusinessInfoService businessService;
     @Resource
     private GbOrderGoodsRefundRecordService refundRecordService;
     @Resource
@@ -87,6 +81,9 @@ public class OrderRefundController {
 
     @Resource
     private GbGroupActivityInfoService groupActivityInfoService;
+
+    @Resource
+    private GbOrderBusinessInfoService orderBusinessService;
 
     @Resource
     private RedisHelper redisHelper;
@@ -317,6 +314,8 @@ public class OrderRefundController {
         refundRecord.setAddTime(TimeUtils.getTimeStamp());
         refundRecordService.addRefundRecord(refundRecord);
         // 同步分账订单表, 核销之后的订单才能分账, 这样只要不核销订单, 就可以随时退款
+        orderBusinessService.updateBusinessOrderCheckStatus(orderNo);
+        // 同步分账订单表, 核销之后的订单才能分账, 这样只要不核销订单, 就可以随时退款
         //businessService.updateBusinessOrderCheckStatus(request.getOrderNo());
         // 3. 恢复订单主状态: 拒绝并不产生真实退款, 该订单无其它待审核售后时从售后(5)恢复为申请前状态, 否则订单一直卡在售后
         // orderInfoService.restoreOrderStatusAfterRefundReview(request.getOrderNo());
@@ -388,8 +387,6 @@ public class OrderRefundController {
                 handleInsertTransaction(transactionLog);
                 return 0;
             } else {
-                // 同步原始订单表和商户订单表的退款状态
-                orderBusinessInfoService.editMiniLeaderOrderBusinessRefundStatus(orderNo);
                 // 注: 主表退款金额refund_fee不在此维护, 申请/审核阶段都不累加;
                 //     统一由退款回调成功后按易宝回传的实际退款金额累加(见 RefundConfirmServiceImpl#confirmRefundSuccess)
                 // 退款受理成功, 按实际退款数量回补库存(商品总库存 + SKU库存), 支持部分退款
@@ -471,9 +468,6 @@ public class OrderRefundController {
                 refundRecordService.addRefundRecord(refundRecord);
                 // 审核同意且退款受理成功后维护订单主状态: 订单商品全部退完 -> 已退款(4), 否则只要有未退完的 -> 售后(5)
                 orderInfoService.updateOrderStatusAfterRefundAgree(orderNo);
-                // 同步分账订单表, 核销之后的订单才能分账, 这样只要不核销订单, 就可以随时退款
-                businessService.updateBusinessOrderCheckStatus(orderNo);
-
                 // 添加日志, 消息类型: 1=系统消息2=内部消息3=业务消息
                 byte type = 2;
                 String opString = "通过了";
