@@ -188,11 +188,10 @@ public class LeaderGoodsManageController {
         data.setSalesPrice(Optional.ofNullable(request.getSalePrice()).orElse(0D));
         data.setMarketPrice(Optional.ofNullable(request.getMarketPrice()).orElse(0D));
         // 库存: 启用库存时使用提交库存, 否则默认 10000(产品要求)
-        data.setIsStock(request.getIsStock());
         int stockNum = 9999;//先统统设置9999
-        int isStock = Optional.ofNullable(request.getIsStock()).orElse((byte) 0).intValue();
+        data.setIsStock((byte) 1);
         int newStockNum = Optional.ofNullable(request.getStockNum()).orElse(0).intValue();
-        if (isStock == 1 && newStockNum > 0) {
+        if (newStockNum > 0) {
             stockNum = newStockNum;
         }
         data.setGoodsNum(stockNum);
@@ -243,7 +242,7 @@ public class LeaderGoodsManageController {
         data.setCostPrice(Optional.ofNullable(request.getCostPrice()).orElse(0D));
         data.setSalesPrice(Optional.ofNullable(request.getPrice()).orElse(0D));
         data.setMarketPrice(Optional.ofNullable(request.getPrice2()).orElse(0D));
-        data.setIsStock(request.getIsStock());
+        data.setIsStock((byte) 1);
         Integer goodsNum = Optional.ofNullable(request.getStockNum())
                 .filter(num -> num != 0)
                 .orElse(9999);
