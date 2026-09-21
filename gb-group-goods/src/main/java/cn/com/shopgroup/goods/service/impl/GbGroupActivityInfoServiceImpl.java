@@ -243,6 +243,18 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
     }
 
 
+    @Override
+    public Boolean decreaseGroupOrderNumber(Long groupId) {
+        // 仅当 order_total > 0 时才回退, 避免出现负数(限领减上防写库逻辑错乱)
+        LambdaUpdateWrapper<GbGroupActivityInfo> updateWrapper = Wrappers.lambdaUpdate();
+        updateWrapper.setSql("order_total = order_total - {0}", 1);
+        updateWrapper.gt(GbGroupActivityInfo::getOrderTotal, 0);
+        updateWrapper.eq(GbGroupActivityInfo::getGroupId, groupId);
+        int flag = mapper.update(updateWrapper);
+        return flag > 0 ? true : false;
+    }
+
+
     public List<GbGroupActivityInfo> getMiniLeaderGroupList(int flag, Long leaderId, Long catId, String activityName, int status, int page, int pageSize) {
         //(1、团长团查询 2 用户端查询)
         LambdaQueryWrapper<GbGroupActivityInfo> queryWrapper = Wrappers.lambdaQuery();
@@ -276,7 +288,7 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
         if (cid != 0) {
             queryWrapper.eq(GbGroupActivityInfo::getCatId, catId);
         }
-        queryWrapper.orderByDesc(GbGroupActivityInfo::getGroupId).orderByAsc(GbGroupActivityInfo::getIsClose);
+        queryWrapper.orderByAsc(GbGroupActivityInfo::getIsClose).orderByDesc(GbGroupActivityInfo::getGroupId);
         queryWrapper.last("limit " + (page - 1) * pageSize + "," + pageSize);
         List<GbGroupActivityInfo> result = mapper.selectList(queryWrapper);
         return result == null ? new ArrayList<>() : result;

@@ -272,6 +272,7 @@ public interface GbOrderInfoMapper extends BaseMapper<GbOrderInfo> {
 
 
     // (定时任务)查询超时未支付(pay_time=0)且仍为待支付(status=0)的订单商品, 用于自动取消订单并回滚库存
+    // 仅回退 is_stock=1 实际参与了扣减的商品行, 与下单扣减口径一致, 避免对不参与库存管理的商品做无效回补
     @Select({
             "SELECT g.`order_no`, g.`goods_id`, g.`sku_id`, g.`goods_num`, g.`pack_num`",
             "FROM `gb_order_goods_info` AS g",
@@ -280,6 +281,7 @@ public interface GbOrderInfoMapper extends BaseMapper<GbOrderInfo> {
             "WHERE o.`pay_time` = 0",
             "  AND o.`status` = 0",
             "  AND o.`add_time` < #{time}",
+            "  AND i.`is_stock` = 1",
             "ORDER BY g.`id` ASC, g.`goods_id` ASC",
             "LIMIT 0, #{limit}"
     })

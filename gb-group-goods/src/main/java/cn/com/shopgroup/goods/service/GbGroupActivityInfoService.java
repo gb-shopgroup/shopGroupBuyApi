@@ -34,6 +34,12 @@ public interface GbGroupActivityInfoService {
 
     Boolean addGroupOrderNumber(Long groupId);
 
+    /**
+     * 团购订单数完全回退(订单已全额退款完成, 不再参与团购跟团Redis+DB 累加):
+     * 仅当 gb_group_activity_info.order_total > 0 时才减, 防止数字 / 商品写库异常导致的负数
+     */
+    Boolean decreaseGroupOrderNumber(Long groupId);
+
     List<GbGroupActivityInfo> getMiniLeaderGroupList(int flag, Long leaderId, Long catId, String activityName, int status, int page, int pageSize);
 
     Long getMiniLeaderGroupCount(Long leaderId, Long catId, String activityName, int status);

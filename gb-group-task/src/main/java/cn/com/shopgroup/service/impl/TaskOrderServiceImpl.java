@@ -1,8 +1,11 @@
 package cn.com.shopgroup.service.impl;
 
+import cn.com.shopgroup.common.cache.RedisConstant;
+import cn.com.shopgroup.common.cache.RedisHelper;
 import cn.com.shopgroup.common.utils.TimeUtils;
 import cn.com.shopgroup.goods.service.GbGoodsInfoService;
 import cn.com.shopgroup.goods.service.GbGoodsSkuInfoService;
+import cn.com.shopgroup.goods.service.GbGroupActivityInfoService;
 import cn.com.shopgroup.order.constants.OrderStatusEnum;
 import cn.com.shopgroup.order.mapper.GbOrderGoodsInfoMapper;
 import cn.com.shopgroup.order.mapper.GbOrderInfoMapper;
@@ -17,9 +20,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -37,6 +42,12 @@ public class TaskOrderServiceImpl implements TaskOrderService {
 
     @Resource
     private GbGoodsSkuInfoService skuService;
+
+    @Resource
+    private GbGroupActivityInfoService groupActivityInfoService;
+
+    @Resource
+    private RedisHelper redisHelper;
 
     // 查询待系统自动完成收货的订单, 定时任务需要"已分账核销但核销满7天仍未完成收货"的订单自动收货掉
     // verifyEndTime: 核销时间截止点(当前时间-7天), 核销时间早于该值的未完成订单才会被查询出来
@@ -133,6 +144,10 @@ public class TaskOrderServiceImpl implements TaskOrderService {
                 log.info("超时未支付订单已取消: orderNo={}, 恢复商品行数={}", orderNo, entry.getValue().size());
             }
         }
+
+        // 库存变动后清理团购商品列表/团购详情/团购订单数计数器缓存(影响前端价格与库存展示)
+        clearStockRelatedCache(goodsList);
+
         return cancelCount;
     }
 
@@ -185,7 +200,41 @@ public class TaskOrderServiceImpl implements TaskOrderService {
             }
         }
         log.info("延迟队列取消超时未支付订单成功: orderNo={}", orderNo);
+        // 库存变动后清理团购商品列表/团购详情/团购订单数计数器缓存
+        clearStockRelatedCache(goodsList);
         return true;
+    }
+
+
+    /**
+     * 库存变动后清理团购商品列表缓存(C端 /goods/group/goods/list)与团购详情缓存(影响 C端 团购详情价格/库存展示),
+     * 以及该团购的订单数计数器(团购详情页/跟团列表暴露)
+     */
+    private void clearStockRelatedCache(List<GbOrderGoodsInfo> goodsList) {
+        if (goodsList == null || goodsList.isEmpty()) {
+            return;
+        }
+        Set<Long> stockChangedGoodsIds = new HashSet<>();
+        for (GbOrderGoodsInfo item : goodsList) {
+            if (item.getGoodsId() != null) {
+                stockChangedGoodsIds.add(item.getGoodsId());
+            }
+        }
+        if (stockChangedGoodsIds.isEmpty()) {
+            return;
+        }
+        Set<Long> stockChangedGroupIds = new HashSet<>();
+        for (Long gid : stockChangedGoodsIds) {
+            List<Long> groupIds = groupActivityInfoService.getGroupIdsByGoodsId(gid);
+            if (groupIds != null) {
+                stockChangedGroupIds.addAll(groupIds);
+            }
+        }
+        for (Long groupId : stockChangedGroupIds) {
+            redisHelper.deleteObject(RedisConstant.RedisGroupInfoKey + groupId);
+            redisHelper.deleteObject(RedisConstant.RedisGroupGoodsListKey + groupId);
+            redisHelper.deleteObject(RedisConstant.RedisOrderTotalKey + groupId);
+        }
     }
 
 }

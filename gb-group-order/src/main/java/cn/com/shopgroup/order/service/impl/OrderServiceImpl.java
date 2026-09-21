@@ -16,6 +16,8 @@ import cn.com.shopgroup.order.http.request.OrderGoodsRequest;
 import cn.com.shopgroup.order.http.request.OrderRequest;
 import cn.com.shopgroup.order.model.GbOrderGoodsInfo;
 import cn.com.shopgroup.order.model.GbOrderInfo;
+import cn.com.shopgroup.order.service.GbOrderInfoService;
+import cn.com.shopgroup.order.service.OrderService;
 import cn.com.shopgroup.order.utils.OrderNoGeneratorUtils;
 import cn.com.shopgroup.user.model.GbMemberInfo;
 import cn.com.shopgroup.user.model.GbOrgPointInfo;
@@ -24,11 +26,10 @@ import cn.com.shopgroup.user.service.GbMemberAddressInfoService;
 import cn.com.shopgroup.user.service.GbMemberInfoService;
 import cn.com.shopgroup.user.service.GbOrgPointInfoService;
 import cn.com.shopgroup.user.service.GbOrgShopInfoService;
-import cn.com.shopgroup.order.service.OrderService;
-import cn.com.shopgroup.order.service.GbOrderInfoService;
 import com.alibaba.fastjson2.JSON;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
 
@@ -36,9 +37,11 @@ import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -92,6 +95,7 @@ public class OrderServiceImpl implements OrderService {
 
     // 小程序下单
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Map<String, String> addOrder(Long memberId, OrderRequest request) {
 
         // 返回结果
@@ -140,6 +144,10 @@ public class OrderServiceImpl implements OrderService {
         Map<Long, Integer> goodsLimitNumMap = new HashMap<>();
         //订单号生成
         String orderNo = createOrderNo(leaderId);
+        // 本次下单涉及到的商品基础信息缓存(goodsId -> GbGoodsInfo), 供后续扣减库存时复用 is_stock/is_close 等基础字段
+        Map<Long, GbGoodsInfo> goodsInfoMap = new HashMap<>();
+        // 本次下单涉及到的SKU基础信息缓存(skuId -> GbGoodsSkuInfo), 供后续扣减库存时校验 is_close
+        Map<Long, GbGoodsSkuInfo> skuInfoMap = new HashMap<>();
         for (OrderGoodsRequest item : request.getGoods()) {
             // 去掉商品数量为零的情况
             if (item.getNum() <= 0) continue;
@@ -150,6 +158,12 @@ public class OrderServiceImpl implements OrderService {
                 result.put("msg", "商品不存在");
                 return result;
             }
+            // 商品基础信息校验: 已下架/已关闭的商品不允许下单, 避免前端绕过缓存提交下单
+            if (goodsInfo.getIsClose() != null && goodsInfo.getIsClose().intValue() == 1) {
+                result.put("msg", goodsInfo.getGoodsName() + "已下架, 无法购买");
+                return result;
+            }
+            goodsInfoMap.put(goodsId, goodsInfo);
 
             // 商品价格, 先使用商品表里面的销售价格, 后面被包装和sku价格覆盖
             Double goodsPrice = goodsInfo.getSalesPrice();
@@ -180,6 +194,17 @@ public class OrderServiceImpl implements OrderService {
                     result.put("msg", "商品sku信息不存在");
                     return result;
                 }
+                // SKU基础信息校验: 已下架/已关闭的SKU不允许下单, 与商品校验口径一致
+                if (skuInfo.getIsClose() != null && skuInfo.getIsClose().intValue() == 1) {
+                    result.put("msg", (skuInfo.getSkuNames() == null ? "商品SKU" : skuInfo.getSkuNames()) + "已下架, 无法购买");
+                    return result;
+                }
+                // SKU与商品归属校验: 防止用户传错 skuId (跨商品选错规格), 库存/价格口径才不会错乱
+                if (skuInfo.getGoodsId() != null && !skuInfo.getGoodsId().equals(goodsId)) {
+                    result.put("msg", "商品SKU与商品不匹配");
+                    return result;
+                }
+                skuInfoMap.put(skuId, skuInfo);
                 if (skuInfo.getSalesPrice() > 0) goodsPrice = skuInfo.getSalesPrice();
                 if (skuInfo.getPackNum() > 0) packNum = skuInfo.getPackNum();
             }
@@ -352,33 +377,73 @@ public class OrderServiceImpl implements OrderService {
         // 确认收货操作标记,新订单默认未操作
         orderInfo.setClickConfirmFlag(0);
         // 先扣减库存(商品总库存 + SKU库存), 全部成功后再写订单, 防止并发超卖产生"幽灵订单"
+        // 已扣减的商品行: 后续扣减失败 / 写订单失败 时用于按序回补, 保证扣减/回滚原子性
         List<GbOrderGoodsInfo> reducedGoodsList = new ArrayList<>();
+        // 实际参与了库存扣减的商品id(用于下单成功后清相关缓存)
+        Set<Long> stockChangedGoodsIds = new HashSet<>();
         for (GbOrderGoodsInfo item : orderGoodsInfoList) {
-            int reduceNum = item.getPackNum() * item.getGoodsNum();
-            boolean goodsFlag = goodsService.reduceGoodsStock(item.getGoodsId(), reduceNum);
-            boolean skuFlag = true;
-            if (item.getSkuId() != null && item.getSkuId() > 0) {
-                skuFlag = skuService.reduceGoodsStock(item.getSkuId(), reduceNum);
+            // 取该商品行的基础信息, 复用本方法内上方已校验过的 goodsInfo/skuInfo, 保证扣减口径与校验口径完全一致
+            GbGoodsInfo goodsInfo = goodsInfoMap.get(item.getGoodsId());
+            // 仅当商品启用库存管理(is_stock=1)时才参与扣减; is_stock=0 表示该商品不参与库存管理(如按需生产/虚拟商品), 跳过即可
+            boolean stockManaged = goodsInfo != null
+                    && goodsInfo.getIsStock() != null
+                    && goodsInfo.getIsStock().intValue() == 1;
+            if (stockManaged) {
+                int reduceNum = item.getPackNum() * item.getGoodsNum();
+                // 商品总库存扣减: 原子CAS, goods_num>=reduceNum 才更新, 不足返回false
+                boolean goodsFlag = goodsService.reduceGoodsStock(item.getGoodsId(), reduceNum);
+                // SKU库存扣减: 有SKU时才同步扣减, 保证 sku库存 与 商品总库存 在下单环节就保持一致
+                boolean skuFlag = true;
+                if (item.getSkuId() != null && item.getSkuId() > 0) {
+                    skuFlag = skuService.reduceGoodsStock(item.getSkuId(), reduceNum);
+                }
+                // 任一库存扣减失败(库存不足/CAS未命中): 回补本行已扣部分(失败的不要回补, 已成功的回补), 同时回补之前已扣减的商品行, 并整体回滚
+                if (!goodsFlag || !skuFlag) {
+                    // 当前行: 只回补已成功扣减的那一边(失败的本来就未生效, 无需回补)
+                    if (goodsFlag) {
+                        goodsService.increaseGoodsStock(item.getGoodsId(), reduceNum);
+                    }
+                    if (item.getSkuId() != null && item.getSkuId() > 0 && skuFlag) {
+                        skuService.increaseGoodsStock(item.getSkuId(), reduceNum);
+                    }
+                    // 之前已扣减的商品行: 全部回补, 避免出现"扣减了但订单没生成"的库存幽灵
+                    restoreOrderStock(reducedGoodsList, goodsInfoMap, skuInfoMap);
+                    log.warn("下单扣库存失败, 已回滚所有已扣减库存: orderNo={}, goodsId={}, skuId={}, goodsFlag={}, skuFlag={}",
+                            orderNo, item.getGoodsId(), item.getSkuId(), goodsFlag, skuFlag);
+                    result.put("msg", item.getGoodsName() + "库存不足");
+                    return result;
+                }
+                stockChangedGoodsIds.add(item.getGoodsId());
+                if (item.getSkuId() != null && item.getSkuId() > 0) {
+                    // 记录skuId供后续可能的缓存失效使用(目前SKU无独立缓存键, 仅日志)
+                    log.debug("下单SKU库存扣减: orderNo={}, skuId={}, num={}", orderNo, item.getSkuId(), reduceNum);
+                }
+                // 仅记录真正参与了库存扣减的商品行, 避免写订单失败回滚时向 is_stock=0 的商品凭空加库存
+                reducedGoodsList.add(item);
             }
-            // 任一库存扣减失败(库存不足): 回补该商品已扣部分 + 之前已扣减的商品, 并返回
-//            if (!goodsFlag || !skuFlag) {
-//                if (goodsFlag) goodsService.increaseGoodsStock(item.getGoodsId(), reduceNum);
-//                if (skuFlag && item.getSkuId() != null && item.getSkuId() > 0) {
-//                    skuService.increaseGoodsStock(item.getSkuId(), reduceNum);
-//                }
-//                restoreOrderStock(reducedGoodsList);
-//                result.put("msg", item.getGoodsName() + "库存不足");
-//                return result;
-//            }
-            reducedGoodsList.add(item);
         }
         // 写入数据库
         Long orderId = orderInfoService.addMiniOrder(orderInfo, orderGoodsInfoList);
         if (orderId.intValue() == 0) {
-            // 订单写入失败, 回补全部已扣库存
-            restoreOrderStock(reducedGoodsList);
+            // 订单写入失败, 回补全部已扣库存(按本方法口径, is_stock=1 的商品行才参与了扣减, 全部回补)
+            restoreOrderStock(reducedGoodsList, goodsInfoMap, skuInfoMap);
             result.put("msg", "下单失败");
             return result;
+        }
+        // 库存变动后清理相关缓存: 商品参与的所有团购商品列表缓存(C端 /goods/group/goods/list)
+        // 以及团购详情缓存(影响 C端 团购详情 /order/group/groupActivity/info 展示价格/库存)
+        if (!stockChangedGoodsIds.isEmpty()) {
+            Set<Long> stockChangedGroupIds = new HashSet<>();
+            for (Long gid : stockChangedGoodsIds) {
+                List<Long> groupIds = groupService.getGroupIdsByGoodsId(gid);
+                if (groupIds != null) {
+                    stockChangedGroupIds.addAll(groupIds);
+                }
+            }
+            for (Long changeGroupId : stockChangedGroupIds) {
+                redisHelper.deleteObject(RedisConstant.RedisGroupInfoKey + changeGroupId);
+                redisHelper.deleteObject(RedisConstant.RedisGroupGoodsListKey + changeGroupId);
+            }
         }
         // 订单号放入Redis延迟队列(ZSet, score=下单时间+15分钟), 到期仍未支付的订单由定时任务自动取消并回补库存
         redisHelper.addDelayQueueItem(RedisConstant.RedisOrderPayDelayQueueKey, orderNo,
@@ -399,12 +464,40 @@ public class OrderServiceImpl implements OrderService {
     }
 
     // 回补订单商品库存(商品总库存 + SKU库存), 用于下单扣减失败或订单写入失败时的补偿
-    private void restoreOrderStock(List<GbOrderGoodsInfo> goodsList) {
+    // 已按 is_stock=1 守卫, 不会向不参与库存管理的商品凭空加库存;
+    // 同时校验 skuId 与商品归属, 避免误回补到错误的 SKU
+    // 入参 goodsInfoMap/skuInfoMap 必须由调用方传入(而非读取本类的实例字段或上层方法局部变量):
+    // 1) 本 Service 是 Spring 单例, 多个请求线程并发调用 addOrder, 实例字段会被多线程共享, 出现"线程A回补时读到线程B的字段"导致漏回补/误回补
+    // 2) Java 不允许方法直接访问另一个方法的局部变量, 必须显式传参才能跨方法共享数据
+    private void restoreOrderStock(List<GbOrderGoodsInfo> goodsList,
+                                   Map<Long, GbGoodsInfo> goodsInfoMap,
+                                   Map<Long, GbGoodsSkuInfo> skuInfoMap) {
+        if (goodsList == null || goodsList.isEmpty()) {
+            return;
+        }
         for (GbOrderGoodsInfo item : goodsList) {
-            int num = item.getPackNum() * item.getGoodsNum();
-            goodsService.increaseGoodsStock(item.getGoodsId(), num);
-            if (item.getSkuId() != null && item.getSkuId() > 0) {
-                skuService.increaseGoodsStock(item.getSkuId(), num);
+            int packNum = item.getPackNum() == null || item.getPackNum() == 0 ? 1 : item.getPackNum();
+            int num = packNum * item.getGoodsNum();
+            // 仅当商品当前仍 is_stock=1 时才回补(下单时就是 is_stock=1 才扣减, 但运营可能中途关掉 is_stock, 此时不应回补以免污染)
+            GbGoodsInfo goodsInfo = goodsInfoMap == null ? null : goodsInfoMap.get(item.getGoodsId());
+            boolean stockManaged = goodsInfo != null
+                    && goodsInfo.getIsStock() != null
+                    && goodsInfo.getIsStock().intValue() == 1;
+            if (stockManaged) {
+                goodsService.increaseGoodsStock(item.getGoodsId(), num);
+                // 仅当 SKU 当前未关闭时回补 SKU 库存(避免向已下架 SKU 写入)
+                if (item.getSkuId() != null && item.getSkuId() > 0) {
+                    GbGoodsSkuInfo skuInfo = skuInfoMap == null ? null : skuInfoMap.get(item.getSkuId());
+                    if (skuInfo == null
+                            || (skuInfo.getIsClose() != null && skuInfo.getIsClose().intValue() == 0)
+                            || skuInfo.getIsClose() == null) {
+                        skuService.increaseGoodsStock(item.getSkuId(), num);
+                    } else {
+                        log.warn("回补订单库存跳过SKU(已下架): orderNo={}, skuId={}", item.getOrderNo(), item.getSkuId());
+                    }
+                }
+            } else {
+                log.warn("回补订单库存跳过商品(is_stock!=1): orderNo={}, goodsId={}", item.getOrderNo(), item.getGoodsId());
             }
         }
     }

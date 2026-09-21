@@ -190,10 +190,11 @@ public class LeaderGoodsManageController {
         // 库存: 启用库存时使用提交库存, 否则默认 10000(产品要求)
         data.setIsStock(request.getIsStock());
         int stockNum = 9999;//先统统设置9999
-//        if (request.getIsStock() != null && request.getIsStock() == 1
-//                && request.getStockNum() != null && request.getStockNum() > 0) {
-//            stockNum = request.getStockNum();
-//        }
+        int isStock = Optional.ofNullable(request.getIsStock()).orElse((byte) 0).intValue();
+        int newStockNum = Optional.ofNullable(request.getStockNum()).orElse(0).intValue();
+        if (isStock == 1 && newStockNum > 0) {
+            stockNum = newStockNum;
+        }
         data.setGoodsNum(stockNum);
         // 限购
         data.setIsLimit(request.getIsLimit());

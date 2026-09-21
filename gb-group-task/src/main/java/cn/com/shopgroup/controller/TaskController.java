@@ -200,13 +200,22 @@ public class TaskController {
             orderBusinessInfoService.editMiniLeaderOrderBusinessRefundStatus(orderNo);
             orderInfoService.editMiniLeaderRefundOrder(orderNo);
             // 退款成功, 回补该订单全部商品库存(商品总库存 + SKU库存)
+            // 与 OrderRefundController.handleAgree 口径一致: 仅当 is_stock=1 才回补, 否则会向非库存管理商品凭空加库存
             List<GbOrderGoodsInfo> goodsList = orderInfoService.getOrderGoodsList(orderNo);
             for (GbOrderGoodsInfo goods : goodsList) {
                 int packNum = goods.getPackNum() == null || goods.getPackNum() == 0 ? 1 : goods.getPackNum();
                 int stockNum = goods.getGoodsNum() * packNum;
-                goodsService.increaseGoodsStock(goods.getGoodsId(), stockNum);
-                if (goods.getSkuId() != null && goods.getSkuId() > 0) {
-                    skuService.increaseGoodsStock(goods.getSkuId(), stockNum);
+                cn.com.shopgroup.goods.model.GbGoodsInfo goodsInfo = goodsService.getGoodsInfo(goods.getGoodsId());
+                if (goodsInfo != null && goodsInfo.getIsStock() != null && goodsInfo.getIsStock().intValue() == 1) {
+                    goodsService.increaseGoodsStock(goods.getGoodsId(), stockNum);
+                    if (goods.getSkuId() != null && goods.getSkuId() > 0) {
+                        skuService.increaseGoodsStock(goods.getSkuId(), stockNum);
+                    }
+                    log.info("TaskController.refund 回补库存: orderNo={}, goodsId={}, skuId={}, stockNum={}",
+                            orderNo, goods.getGoodsId(), goods.getSkuId(), stockNum);
+                } else {
+                    log.info("TaskController.refund 跳过回补(非库存管理商品): orderNo={}, goodsId={}, isStock={}",
+                            orderNo, goods.getGoodsId(), goodsInfo == null ? "null" : goodsInfo.getIsStock());
                 }
             }
             return "ok";

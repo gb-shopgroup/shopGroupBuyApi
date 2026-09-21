@@ -416,16 +416,35 @@ public class MemberGroupController {
 
             // 查询订单销售数量, 再累加上虚拟数量
             // 不使用团购表里面的 order_total 字段嘛？
-            long total = orderInfoService.getMiniOrderSalesCount(groupId) + virtual;
+            Long total = orderInfoService.getMiniOrderSalesCount(groupId) + virtual;
 
-            // 放入Redis中缓存
-            redisHelper.increment(key, total); // 下单的时候累加这个数字
-            redisHelper.expire(key, RedisConstant.RedisOrderTotalExpired, TimeUnit.SECONDS);
+            // 首次初始化基线: 用 SET 设置基数 + 30 天 TTL, 而非 INCRBY, 避免与"支付回调 +1"语义混淆
+            // 一致性约定:
+            // 1) key 不存在 = 首次加载, 此处从 DB 读取真实订单数 + 虚拟基数, SET 设一次性基线
+            // 2) 后续仅由 OrderPaymentController 中 redisHelper.increment(key, 1L) 做增量累加, 不再覆写基数
+            // 3) Redis 6.x INCR 不会重置 TTL; 若 key 30 天后过期失效, 下次访问重新走本分支初始化, 自愈
+            redisHelper.setCacheObject(key, total, RedisConstant.RedisOrderTotalExpired, TimeUnit.SECONDS);
         }
 
-        // 使用缓存(放入的时候是long类型,读取的时候却是int类型)
-        Integer total = redisHelper.getCacheObject(key);
-        return total;
+        // 读取缓存: FastJson2 反序列化数字时按数值大小动态选择类型,
+        // 小数值(<= Integer.MAX_VALUE)反序列化为 Integer, 大数值为 Long;
+        // 支付回调走 Redis 原生 INCR 写入的也是数字字符串。
+        // 因此此处不能按 Long 强转(否则 Integer cannot be cast to Long), 必须用 Number 接口统一取数值
+        Object cached = redisHelper.getCacheObject(key);
+        if (cached instanceof Number) {
+            return ((Number) cached).intValue();
+        }
+        if (cached instanceof String) {
+            // 兜底: 若 value 以字符串形式存储(如人工 set / 其他工具写入), 尝试解析
+            try {
+                return Integer.parseInt(((String) cached).trim());
+            } catch (NumberFormatException e) {
+                log.warn("Redis订单数量缓存值无法解析: key={}, value={}", key, cached);
+            }
+        }
+        log.warn("Redis订单数量缓存值类型异常: key={}, type={}, value={}", key,
+                cached == null ? "null" : cached.getClass().getName(), cached);
+        return 0;
     }
 
     // 白天生成跟团记录, 固定部分

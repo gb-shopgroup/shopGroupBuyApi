@@ -1116,24 +1116,46 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
         if (refundNumMap == null || refundNumMap.isEmpty() || (isReturnGoods != 1 && isReturnGoods != 2)) {
             return 0;
         }
+        int affected = 0;
         for (Map.Entry<Long, Integer> entry : refundNumMap.entrySet()) {
-            LambdaUpdateWrapper<GbOrderGoodsInfo> updateGoodsWrapper = Wrappers.lambdaUpdate();
-            updateGoodsWrapper.eq(GbOrderGoodsInfo::getId, entry.getKey());
-            int refundNum = entry.getValue() == null ? 0 : Math.abs(entry.getValue());
+            // 强类型防御: Map<Long, Integer> 已保证 key/value 类型, 此处防御未来重构(如改为 Map<?, ?>)时类型被绕过
+            if (!(entry.getKey() instanceof Long) || !(entry.getValue() instanceof Integer)) {
+                continue;
+            }
+            Long orderGoodsId = entry.getKey();
+            if (orderGoodsId == null || orderGoodsId <= 0L) {
+                continue;
+            }
+            Integer rawValue = entry.getValue();
+            // 边界保护:
+            // 1) rawValue <= 0 直接丢弃, 不产生任何SQL, 防止"refund_num - 负数"反向回写
+            // 2) Math.abs(Integer.MIN_VALUE) 仍为 Integer.MIN_VALUE, 需手动夹到 [0, Integer.MAX_VALUE/2],
+            //    避免出现"refund_num = refund_num - 负数"反向加回去的越界回写
+            // 3) 防御未来被反射/AOP绕过方法签名类型校验的输入
+            int refundNum = (rawValue == null || rawValue <= 0) ? 0 : Math.min(rawValue, Integer.MAX_VALUE / 2);
             if (refundNum <= 0) {
                 continue;
             }
+
+            LambdaUpdateWrapper<GbOrderGoodsInfo> updateGoodsWrapper = Wrappers.lambdaUpdate();
+            updateGoodsWrapper.eq(GbOrderGoodsInfo::getId, orderGoodsId);
+
+            // SQL 安全性说明:
+            // - 模板字符串 "refund_num = IF(refund_num >= {0}, refund_num - {0}, 0)" 中的 {0} 是 MyBatis Plus 的
+            //   setSql(String, Object...) 内置参数化占位符, 编译期会被替换为 JDBC 的 ? 占位符, 并通过
+            //   PreparedStatement.setObject(int, Object) 绑定真实参数(非字符串拼接).
+            // - refundNum 在本方法内已被强转为 int(Java 基本类型), 不存在任何字符串注入路径, 攻击面为零.
+            // - IF 表达式防止 refund_num 回退到负数.
             if (isReturnGoods == 1) {
-                // 扣减不足时置0, 避免出现负数
-                updateGoodsWrapper.setSql("refund_num = IF(refund_num >= " + refundNum + ", refund_num - " + refundNum + ", 0)");
+                updateGoodsWrapper.setSql("refund_num = IF(refund_num >= {0}, refund_num - {0}, 0)", refundNum);
             } else {
-                updateGoodsWrapper.setSql("refund_goods_num = IF(refund_goods_num >= " + refundNum + ", refund_goods_num - " + refundNum + ", 0)");
+                updateGoodsWrapper.setSql("refund_goods_num = IF(refund_goods_num >= {0}, refund_goods_num - {0}, 0)", refundNum);
             }
             // 审核拒绝: 本次申请被驳回, 申请退中数量清零(回退占坑后该行已无"申请中"数量, 可再次申请)
             updateGoodsWrapper.set(GbOrderGoodsInfo::getApplyRefundNum, 0);
-            goodsMapper.update(updateGoodsWrapper);
+            affected += goodsMapper.update(updateGoodsWrapper);
         }
-        return 1;
+        return affected > 0 ? 1 : 0;
     }
 
     /**

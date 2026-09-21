@@ -337,9 +337,15 @@ public class OrderPaymentController {
         // 累加团购订单数量
         groupService.addGroupOrderNumber(orderInfo.getGroupId());
 
-        // 累加Redis订单数量
+        // 累加Redis订单数量(跟团人次 = 实际支付订单数 + 虚拟基数)
+        // 一致性约定:
+        // 1) 首次基线由 MemberGroupController.getRedisOrderTotal 在 key 不存在时从 DB 读取真实订单数 + 虚拟基数初始化, 此处不主动创建
+        // 2) 支付回调仅做增量(+1), 不再覆写基数, 避免与"首次初始化基数"语义冲突
+        // 3) 显式续期 TTL: Redis 6.x INCR 命令不会重置 TTL, 但若 key 因外部原因被删除, 下次 INCR 会创建无 TTL 的永久 key;
+        //    显式调用 expire 保证 key 在任何情况下都带 30 天过期, 到期后由 getRedisOrderTotal 重新从 DB 初始化
         String key = RedisConstant.RedisOrderTotalKey + orderInfo.getGroupId();
-        redisHelper.increment(key);
+        redisHelper.increment(key, 1L);
+        redisHelper.expire(key, RedisConstant.RedisOrderTotalExpired, TimeUnit.SECONDS);
         //订单对应的团长的cashType[结算到账方式,0=支付时延迟到账型,1=核销时延迟到账型]
         handleWxUploadShippingInfo(orderInfo, channelTrxId);
         // 返回

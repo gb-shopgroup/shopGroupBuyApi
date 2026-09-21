@@ -7,8 +7,10 @@ import cn.com.shopgroup.common.utils.CustomIdGenerator;
 import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.MoneyUtil;
 import cn.com.shopgroup.common.utils.TimeUtils;
+import cn.com.shopgroup.goods.model.GbGoodsInfo;
 import cn.com.shopgroup.goods.service.GbGoodsInfoService;
 import cn.com.shopgroup.goods.service.GbGoodsSkuInfoService;
+import cn.com.shopgroup.goods.service.GbGroupActivityInfoService;
 import cn.com.shopgroup.order.constants.PaymentStatusEnum;
 import cn.com.shopgroup.order.exception.OrderErrorCodeEnum;
 import cn.com.shopgroup.order.http.request.LeaderRefundApplyListRequest;
@@ -46,9 +48,11 @@ import org.springframework.web.bind.annotation.RestController;
 import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 @RestController
 @Slf4j
@@ -80,6 +84,9 @@ public class OrderRefundController {
 
     @Resource
     private GbGoodsSkuInfoService skuService;
+
+    @Resource
+    private GbGroupActivityInfoService groupActivityInfoService;
 
     @Resource
     private RedisHelper redisHelper;
@@ -387,16 +394,56 @@ public class OrderRefundController {
                 //     统一由退款回调成功后按易宝回传的实际退款金额累加(见 RefundConfirmServiceImpl#confirmRefundSuccess)
                 // 退款受理成功, 按实际退款数量回补库存(商品总库存 + SKU库存), 支持部分退款
                 // 注: 商品行的退款/退货退款数量已在用户申请时累计占坑, 审核同意后保留不再重复累加
+                // 回补口径与下单扣减完全对称:
+                // 1) 仅当商品 is_stock=1(启用库存管理, 下单时确实扣减了)时才回补; is_stock=0 商品当时未扣减, 不能凭空回补;
+                // 2) 数量公式: refundNum × packNum(与下单 reduceNum 一致);
+                // 3) 有 SKU 时同步回补 SKU 库存, 保证 sku库存 与 商品总库存 一致;
+                // 4) 已下架/已关闭的商品和 SKU 仍可回补(下单时它们可能为在线状态, 已成功扣减; 库存回补不依赖其当前销售状态, 仅依赖下单时的扣减事实)
+                Set<Long> stockChangedGoodsIds = new HashSet<>();
                 for (GbOrderGoodsInfo goods : goodsList) {
                     OrderRefundGoodsRequest refundGoods = request.getRefundGoodsMap().get(goods.getId());
                     int refundNum = refundGoods != null && refundGoods.getRefundNum() != null ? refundGoods.getRefundNum() : 0;
-                    if (refundNum > 0) {
-                        int packNum = goods.getPackNum() == null || goods.getPackNum() == 0 ? 1 : goods.getPackNum();
-                        int stockNum = refundNum * packNum;
-                        goodsService.increaseGoodsStock(goods.getGoodsId(), stockNum);
-                        if (goods.getSkuId() != null && goods.getSkuId() > 0) {
-                            skuService.increaseGoodsStock(goods.getSkuId(), stockNum);
+                    if (refundNum <= 0) {
+                        continue;
+                    }
+                    // 取当前商品基础信息, 用于判断是否实际参与了扣减(is_stock)
+                    GbGoodsInfo goodsInfo = goodsService.getGoodsInfo(goods.getGoodsId());
+                    if (ObjectUtils.isEmpty(goodsInfo)) {
+                        // 商品已被删除, 仍按订单快照回补, 但仅能回补商品总库存(skuId可能已无对应记录); 跳过以避免误回补到错误商品, 改为日志告警
+                        log.warn("退款回补库存: 订单{} 商品{}已被删除, 跳过库存回补, 需人工核对", orderNo, goods.getGoodsId());
+                        continue;
+                    }
+                    if (goodsInfo.getIsStock() == null || goodsInfo.getIsStock().intValue() != 1) {
+                        // 该商品当前不参与库存管理(可能运营后续关闭了 is_stock); 下单时未扣减, 此处不能凭空回补
+                        log.info("退款跳过库存回补(商品当前不参与库存管理): orderNo={}, goodsId={}, isStock={}",
+                                orderNo, goods.getGoodsId(), goodsInfo.getIsStock());
+                        continue;
+                    }
+                    int packNum = goods.getPackNum() == null || goods.getPackNum() == 0 ? 1 : goods.getPackNum();
+                    int stockNum = refundNum * packNum;
+                    boolean goodsIncFlag = goodsService.increaseGoodsStock(goods.getGoodsId(), stockNum);
+                    boolean skuIncFlag = true;
+                    if (goods.getSkuId() != null && goods.getSkuId() > 0) {
+                        skuIncFlag = skuService.increaseGoodsStock(goods.getSkuId(), stockNum);
+                    }
+                    log.info("退款回补库存: orderNo={}, goodsId={}, skuId={}, refundNum={}, packNum={}, stockNum={}, goodsInc={}, skuInc={}",
+                            orderNo, goods.getGoodsId(), goods.getSkuId(), refundNum, packNum, stockNum, goodsIncFlag, skuIncFlag);
+                    stockChangedGoodsIds.add(goods.getGoodsId());
+                }
+                // 退款成功后清理团购商品列表缓存(C端 /goods/group/goods/list)与团购详情缓存(影响 C端 团购详情价格/库存展示)
+                // 同时清理该团购的订单数计数器(团购详情页/跟团列表暴露, 退款成功后需刷新)
+                if (!stockChangedGoodsIds.isEmpty()) {
+                    Set<Long> stockChangedGroupIds = new HashSet<>();
+                    for (Long gid : stockChangedGoodsIds) {
+                        List<Long> groupIds = groupActivityInfoService.getGroupIdsByGoodsId(gid);
+                        if (groupIds != null) {
+                            stockChangedGroupIds.addAll(groupIds);
                         }
+                    }
+                    for (Long groupId : stockChangedGroupIds) {
+                        redisHelper.deleteObject(RedisConstant.RedisGroupInfoKey + groupId);
+                        redisHelper.deleteObject(RedisConstant.RedisGroupGoodsListKey + groupId);
+                        redisHelper.deleteObject(RedisConstant.RedisOrderTotalKey + groupId);
                     }
                 }
                 //本次审核同意的商品行id集合
