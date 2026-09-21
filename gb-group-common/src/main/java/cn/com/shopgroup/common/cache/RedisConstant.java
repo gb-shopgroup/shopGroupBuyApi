@@ -16,6 +16,14 @@ public class RedisConstant {
     public final static long RedisPointListExpired = 30*24*60*60;
     public final static String RedisPointListKey = "PointList:";
 
+    // 团长端-管理用提货点全量列表缓存(不过滤is_close, 与C端PointList口径不同)
+    public final static long RedisLeaderPointListExpired = 30*24*60*60;
+    public final static String RedisLeaderPointListKey = "LeaderPointList:";
+
+    // 团长端-提货点详情缓存(编辑/作废/二维码生成后删除)
+    public final static long RedisPointInfoExpired = 30*24*60*60;
+    public final static String RedisPointInfoKey = "PointInfo:";
+
 
     public final static long RedisOrderTotalExpired = 30*24*60*60;
     public final static String RedisOrderTotalKey = "OrderTotal:";

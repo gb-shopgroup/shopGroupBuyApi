@@ -87,6 +87,10 @@ public class GbOrgPointInfoServiceImpl implements GbOrgPointInfoService {
 
     public boolean editMiniLeaderPoint(Long leaderId, GbOrgPointInfo info) {
 
+        // pointId 是更新定位条件, 缺失直接判失败(避免拼出无定位条件的 update)
+        if (info.getPointId() == null) {
+            return false;
+        }
         LambdaUpdateWrapper<GbOrgPointInfo> updateWrapper = Wrappers.lambdaUpdate();
         updateWrapper.set(GbOrgPointInfo::getPointName, info.getPointName());
         updateWrapper.set(GbOrgPointInfo::getPointAddress, info.getPointAddress());
@@ -95,16 +99,24 @@ public class GbOrgPointInfoServiceImpl implements GbOrgPointInfoService {
         }
         updateWrapper.set(GbOrgPointInfo::getLongitude, info.getLongitude());
         updateWrapper.set(GbOrgPointInfo::getLatitude, info.getLatitude());
-        if (info.getPointId() != null && info.getPointScope().intValue() != 0) {
+        // 自提范围: 非空且>0才更新(不传保持原值), 原代码 info.getPointScope() 未判空直接 .intValue() 会 NPE
+        if (info.getPointScope() != null && info.getPointScope() > 0) {
             updateWrapper.set(GbOrgPointInfo::getPointScope, info.getPointScope());
         }
         updateWrapper.set(GbOrgPointInfo::getPointInfo, info.getPointInfo());
+        // 修复: 联系人/电话原来被误放在 eq(WHERE) 条件, 导致 1) 无法修改联系人/电话 2) controller 漏传时条件为 null 更新永不命中;
+        // 现改为非空才更新(不传保持原值), 编辑与新增的修改口径保持一致
+        if (!StringUtils.isEmpty(info.getPerson())) {
+            updateWrapper.set(GbOrgPointInfo::getPerson, info.getPerson());
+        }
+        if (!StringUtils.isEmpty(info.getPhone())) {
+            updateWrapper.set(GbOrgPointInfo::getPhone, info.getPhone());
+        }
+        // 权限收敛: 仅允许团长修改自己的提货点
         updateWrapper.eq(GbOrgPointInfo::getLeaderId, leaderId);
         updateWrapper.eq(GbOrgPointInfo::getPointId, info.getPointId());
-        updateWrapper.eq(GbOrgPointInfo::getPerson, info.getPerson());
-        updateWrapper.eq(GbOrgPointInfo::getPhone, info.getPhone());
         int flag = orgPointInfoMapper.update(updateWrapper);
-        return flag > 0 ? true : false;
+        return flag > 0;
     }
 
 

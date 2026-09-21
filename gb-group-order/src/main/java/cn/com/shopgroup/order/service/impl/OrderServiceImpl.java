@@ -368,7 +368,8 @@ public class OrderServiceImpl implements OrderService {
         // 自提点名称,实际领取自提点
         orderInfo.setPointName2("");
         // 订单备注
-        orderInfo.setRemark("");
+        String remark = Optional.ofNullable(request.getRemark()).orElse("");
+        orderInfo.setRemark(remark);
         // 下单时间
         orderInfo.setAddTime(TimeUtils.getTimeStamp());
         orderInfo.setUpdateTime(TimeUtils.getTimeStamp());

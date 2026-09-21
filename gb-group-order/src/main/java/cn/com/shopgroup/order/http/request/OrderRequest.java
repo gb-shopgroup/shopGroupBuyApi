@@ -24,8 +24,8 @@ public class OrderRequest {
     // 邮寄地址
     //private int addressId;
 
-    // 客户订单备注
-    //private String remark;
+    // 客户下单订单备注
+    private String remark;
 
     @NotEmpty(message = "订单商品不能为空")
     private List<OrderGoodsRequest> goods;
