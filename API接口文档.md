@@ -86,13 +86,13 @@
 | [16](#16-post-userleaderbusinessadd) | user | POST | `/user/leader/business/add` | 添加团长收款账户（校验证件号码唯一，返回新增账户ID） |
 | [17](#17-post-userleaderbusinessedit) | user | POST | `/user/leader/business/edit` | 修改收款账户（已审核通过的账户不允许修改） |
 | [18](#18-post-userleaderbusinessclose) | user | POST | `/user/leader/business/close` | 关闭/启用收款账户（禁用或启用商户收款） |
-| [19](#19-get-userleaderpointlist) | user | GET | `/user/leader/point/list` | *查询团长自提点列表* |
-| [20](#20-get-userleaderpointaddgrouplist) | user | GET | `/user/leader/point/addGroup/list` | *查询团长自提点团购列表* |
-| [21](#21-post-userleaderpointadd) | user | POST | `/user/leader/point/add` | *新增团长自提点* |
-| [22](#22-post-userleaderpointedit) | user | POST | `/user/leader/point/edit` | *修改团长自提点* |
-| [23](#23-get-userleaderpointclose) | user | GET | `/user/leader/point/close` | *启用/关闭团长自提点* |
-| [24](#24-get-userleaderpointinfo) | user | GET | `/user/leader/point/info` | *查询团长自提点详情* |
-| [25](#25-get-userleaderpointercode) | user | GET | `/user/leader/point/ercode` | *查询团长自提点二维码* |
+| [19](#19-get-userleaderpointlist) | user | GET | `/user/leader/point/list` | *查询团长自提点列表*（全量含已作废，无搜索词走缓存） |
+| [20](#20-get-userleaderpointaddgrouplist) | user | GET | `/user/leader/point/addGroup/list` | *查询团长自提点团购列表*（仅未作废，走缓存） |
+| [21](#21-post-userleaderpointadd) | user | POST | `/user/leader/point/add` | *新增团长自提点*（成功后失效列表缓存） |
+| [22](#22-post-userleaderpointedit) | user | POST | `/user/leader/point/edit` | *修改团长自提点*（成功后失效列表+详情缓存） |
+| [23](#23-get-userleaderpointclose) | user | GET | `/user/leader/point/close` | *启用/关闭团长自提点*（作废/恢复切换，失效列表+详情缓存） |
+| [24](#24-get-userleaderpointinfo) | user | GET | `/user/leader/point/info` | *查询团长自提点详情*（走缓存） |
+| [25](#25-get-userleaderpointercode) | user | GET | `/user/leader/point/ercode` | *查询团长自提点二维码*（已生成直接返回，未生成则生成后失效详情缓存） |
 | [26](#26-get-userleadershopinfo) | user | GET | `/user/leader/shop/info` | 查看店铺信息 |
 | [27](#27-post-userleadershopsave) | user | POST | `/user/leader/shop/save` | *保存团长店铺* |
 | [28](#28-post-userleadershopupdate) | user | POST | `/user/leader/shop/update` | *修改团长店铺* |
@@ -736,13 +736,13 @@ data 类型：无（接口仅返回操作结果，data 为 null）
 
 #### 1. GET `/user/leader/point/list`
 
-**功能说明**：*查询团长自提点列表*（自动推断）
+**功能说明**：*查询团长自提点列表*（管理端全量列表，含已作废的自提点；不带搜索词时结果走 Redis 缓存，30 天，写操作后失效）
 
 **入参**
 
 | 参数 | 类型 | 位置 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
-| name | `String` | Query 参数 | 是 | 名称 |
+| name | `String` | Query 参数 | 否 | 名称模糊搜索；不传时返回全量列表并使用缓存，带搜索词时直接查库不缓存 |
 
 **出参（JsonResult 统一返回体）**
 
@@ -775,7 +775,7 @@ data 类型：`List<PointResponse>`（数组，元素类型 `PointResponse`，�
 
 #### 2. GET `/user/leader/point/addGroup/list`
 
-**功能说明**：*查询团长自提点团购列表*（自动推断）
+**功能说明**：*查询团长自提点团购列表*（添加团购活动时选择自提点用；仅返回未作废（is_close=0）的自提点，按 pointId 升序，最多 20 条；结果走 Redis 缓存，写操作后失效）
 
 **入参**：无
 
@@ -810,7 +810,7 @@ data 类型：`List<PointResponse>`（数组，元素类型 `PointResponse`，�
 
 #### 3. POST `/user/leader/point/add`
 
-**功能说明**：*新增团长自提点*（自动推断）
+**功能说明**：*新增团长自提点*（成功后失效 C 端与管理端的列表缓存；scope 不传默认 20 公里）
 
 **入参**
 
@@ -847,7 +847,7 @@ data 类型：`Long`（基本类型，无子字段）
 
 #### 4. POST `/user/leader/point/edit`
 
-**功能说明**：*修改团长自提点*（自动推断）
+**功能说明**：*修改团长自提点*（仅能修改属于当前登录团长的自提点；成功后失效列表缓存与详情缓存）
 
 **入参**
 
@@ -860,7 +860,7 @@ data 类型：`Long`（基本类型，无子字段）
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| id | `Long` | 否 | 自提点Id |
+| id | `Long` | 是 | 自提点Id（更新定位条件，必传） |
 | name | `String` | 是 | 自提点名称 |
 | address | `String` | 是 | 详细地址 |
 | img | `String` | 否 | 门头照片 |
@@ -884,7 +884,7 @@ data 类型：无（接口仅返回操作结果，data 为 null）
 
 #### 5. GET `/user/leader/point/close`
 
-**功能说明**：*启用/关闭团长自提点*（自动推断）
+**功能说明**：*启用/关闭团长自提点*（作废/恢复切换：已启用则作废，已作废则恢复；成功后失效列表缓存与详情缓存）
 
 **入参**
 
@@ -904,13 +904,13 @@ data 类型：无（接口仅返回操作结果，data 为 null）
 
 #### 6. GET `/user/leader/point/info`
 
-**功能说明**：*查询团长自提点详情*（自动推断）
+**功能说明**：*查询团长自提点详情*（结果走 Redis 缓存，30 天，编辑/作废/二维码生成后失效）
 
 **入参**
 
 | 参数 | 类型 | 位置 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
-| pointId | `Long` | Query 参数 | 是 | 提货点（自提点）ID（<=0 或 null 时表示不过滤） |
+| pointId | `Long` | Query 参数 | 是 | 提货点（自提点）ID（null 或 <=0 时返回参数错误） |
 
 **出参（JsonResult 统一返回体）**
 
@@ -943,7 +943,7 @@ data 类型：`PointResponse`（字段说明见下）
 
 #### 7. GET `/user/leader/point/ercode`
 
-**功能说明**：*查询团长自提点二维码*（自动推断）
+**功能说明**：*查询团长自提点二维码*（读取详情走缓存；若已生成过直接返回库中的二维码地址，否则调用微信接口生成小程序码并上传存储；自提点不存在时返回 300 数据不存在）
 
 **入参**
 
