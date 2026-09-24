@@ -79,18 +79,18 @@
         </logger>
     </springProfile>
 
-    <!-- 生产环境配置(推荐WARN级别) -->
+    <!-- 生产环境配置(INFO级别，同时输出ERROR/WARN/INFO到控制台和文件) -->
     <springProfile name="prod">
         <root level="INFO">
             <appender-ref ref="Console" />
-        </root>
-        <root level="INFO">
             <appender-ref ref="RollingFile" />
         </root>
-        <logger name="cn.com.shopgroup" level="WARN" additivity="false">
+        <logger name="cn.com.shopgroup" level="INFO" additivity="false">
+            <appender-ref ref="Console" />
             <appender-ref ref="RollingFile" />
         </logger>
-        <logger name="cn.com.shopgroup.mapper" level="WARN" additivity="false">
+        <logger name="cn.com.shopgroup.mapper" level="INFO" additivity="false">
+            <appender-ref ref="Console" />
             <appender-ref ref="RollingFile" />
         </logger>
     </springProfile>
