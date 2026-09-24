@@ -58,6 +58,8 @@ public class OrderResponse {
 
     // 确认收货操作标记:0=未操作,1=已操作
     private Integer clickConfirmFlag;
+    //备注（下单用户天天填写）
+    private String remark;
 
     // 核销记录(仅订单详情接口返回, 支持一单多次部分核销产生多条记录, 按核销时间正序; 列表接口不填充)
     private List<OrderVerifyRecordResponse> verifyRecords;
@@ -86,7 +88,7 @@ public class OrderResponse {
         // 拒绝退款理由
         this.reason = data.getRefundReason();
         this.receiptTime = data.getReceiptTime();
-       this.status = data.getStatus();
+        this.status = data.getStatus();
         // 商品信息
         List<GbOrderGoodsInfo> goodsList = data.getGoodsInfoList();
         this.goods = OrderGoodsReponse.getOrderGoodsReponseList(goodsList);
@@ -111,6 +113,7 @@ public class OrderResponse {
 
         // 确认收货操作标记:0=未操作,1=已操作
         this.clickConfirmFlag = data.getClickConfirmFlag();
+        this.remark = data.getRemark();
     }
 
     // 列表转换

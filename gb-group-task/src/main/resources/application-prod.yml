@@ -26,8 +26,8 @@ spring:
     type: com.alibaba.druid.pool.DruidDataSource
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://192.168.0.122:3306/group_purchase?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-    username: group_buy
-    password: GI#Q#uw23AJ0o3u
+    username: group_purchase
+    password: sdf#W6s%Wdf43*53e
     # Druid 连接池核心配置
     druid:
       # 空闲连接检测间隔（毫秒）, 建议小于MySQL wait_timeout, 默认值：60000 毫秒 = 60 秒
