@@ -121,7 +121,8 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
         LambdaQueryWrapper<GbOrderInfo> queryWrapper = Wrappers.lambdaQuery();
         queryWrapper.select(GbOrderInfo::getOrderNo);
         queryWrapper.eq(GbOrderInfo::getGroupId, groupId);
-        queryWrapper.gt(GbOrderInfo::getStatus, 0);
+        queryWrapper.gt(GbOrderInfo::getStatus, 0)
+                .lt(GbOrderInfo::getStatus, 6);
         return mapper.selectCount(queryWrapper);
     }
 

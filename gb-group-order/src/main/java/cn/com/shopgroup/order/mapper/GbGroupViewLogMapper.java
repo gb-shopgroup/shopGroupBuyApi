@@ -24,4 +24,9 @@ public interface GbGroupViewLogMapper extends BaseMapper<GbGroupViewLog> {
      */
     List<Map<String, Object>> getLastViewByMembers(@Param("leaderId") Long leaderId,
                                                    @Param("memberIds") List<Long> memberIds);
+
+    /**
+     * C端团购详情-统计某团购的查看人数(按 member_id 去重)
+     */
+    Integer countGroupViewers(@Param("groupId") Long groupId);
 }

@@ -23,6 +23,8 @@ public class GroupActivityResponse {
     private Byte pickup;     // 商品提货方式：1自提2邮递
     private Integer num;       // 订单数量（实际支付订单数 + 虚拟订单数）
     private Integer num2;      // 虚拟数量
+    // 当前团购查看人数(按用户去重, 实时统计, 不入详情缓存)
+    private Integer viewCount;
 
     private Byte isClose;   // 是否关闭
 

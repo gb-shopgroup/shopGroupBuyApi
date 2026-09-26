@@ -112,4 +112,12 @@ public class GbMemberInfoServiceImpl implements GbMemberInfoService {
         return mapper.update(updateWrapper);
     }
 
+    @Override
+    public int updateMemberSwapLeaderId(String openid, Long leaderId) {
+        LambdaUpdateWrapper<GbMemberInfo> updateWrapper = Wrappers.lambdaUpdate();
+        updateWrapper.set(GbMemberInfo::getLeaderId, leaderId);
+        updateWrapper.eq(GbMemberInfo::getOpenid, openid);
+        return mapper.update(updateWrapper);
+    }
+
 }

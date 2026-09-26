@@ -116,10 +116,10 @@ public class MemberGroupController {
         fillGroupGoodsList(data);
         // 填充每个团购活动中商品的规格(含规格值), 一次批量查询避免 N+1
         fillGoodsSpecList(extractAllGoods(data));
-        fillGroupLogList(data);
         for (MemberHomeGroupActResponse item : data) {
             item.setOrder(this.getRedisOrderTotal(item.getId(), item.getVirtual()));
         }
+        fillGroupLogList(data);
         log.info("用户首页获取团购活动数据条数size:{},data:{}", data.size(), JSON.toJSONString(data));
         return JsonResult.success(data);
     }
@@ -154,7 +154,7 @@ public class MemberGroupController {
             return;
         }
         for (MemberHomeGroupActResponse item : data) {
-            List<GroupLogs> logList = getGroupList(item.getId());
+            List<GroupLogs> logList = getGroupList(item.getId(), item.getOrder());
             if (!CollectionUtils.isEmpty(logList)) {
                 item.setGroupLogs(logList);
             }
@@ -262,11 +262,18 @@ public class MemberGroupController {
         GroupActivityResponse cacheData = redisHelper.getCacheObject(key);
 
         // 订单销售数量（跟团人次 = 实际支付订单数 + 虚拟订单数）
-        cacheData.setNum(this.getRedisOrderTotal(groupId, cacheData.getNum2()));
+        // 注意: 不能使用缓存里的 num2(虚拟数量是 30 天详情缓存里的旧快照)。
+        // 计数器(OrderTotal:{groupId})被删除重建时(下单/退款/task/过期), 基数 = DB真实订单数 + 虚拟数,
+        // 若此处传入旧 num2 而列表接口 getGroupActiveList 传实时 DB virtual, 会导致两接口订单数不一致;
+        // 统一走 getOrderNumByGroupId(实时查 DB virtual + Redis 计数器) 保证口径一致
+        cacheData.setNum(this.getOrderNumByGroupId(groupId));
+        // 当前团购查看人数(按用户去重, 实时统计; 统计异常不影响主流程, 兜底为0)
+        cacheData.setViewCount(this.getGroupViewCountQuietly(groupId));
         // 服务端自动埋点: 记录用户"查看"团购(未登录/防抖命中会忽略, 不影响主流程)
         this.recordViewQuietly(groupId);
 
         // 返回数据
+        log.info("团购详情:/order/group/groupActivity/info info:{}", JSON.toJSONString(cacheData));
         return JsonResult.success(cacheData);
     }
 
@@ -315,6 +322,16 @@ public class MemberGroupController {
         }
     }
 
+    // 静默统计团购查看人数(异常不影响主流程, 兜底返回0)
+    private Integer getGroupViewCountQuietly(Long groupId) {
+        try {
+            return viewLogService.getGroupViewCount(groupId);
+        } catch (Exception e) {
+            log.error("统计团购查看人数异常 groupId:{}", groupId, e);
+            return 0;
+        }
+    }
+
     // 团长店铺详情
     @GetMapping("/group/groupActivity/shop")
     public JsonResult groupShop(@RequestParam("leaderId") Long leaderId) {
@@ -339,6 +356,17 @@ public class MemberGroupController {
         return JsonResult.success(data);
     }
 
+    //获取某个活动的真实订单+虚拟订单
+    public int getOrderNumByGroupId(Long groupId) {
+        // 根据id查询团购详情
+        GbGroupActivityInfo activityInfo = groupActivityInfoService.getMiniGroupActivityInfo(groupId);
+        if (ObjectUtils.isEmpty(activityInfo)) {
+            return 0;
+        }
+
+        return getRedisOrderTotal(groupId, activityInfo.getVirtualOrder());
+    }
+
     // 团购记录(跟团记录)
     // 早上6点到晚上8点之间，每个小时生成一批跟团记录（固定部分+滚动部分），
     // 固定部分打开页面就显示，滚动部分每隔几秒显示一条；
@@ -346,21 +374,31 @@ public class MemberGroupController {
     @GetMapping("/group/groupActivity/logs")
     public JsonResult groupLogs(@RequestParam("groupId") Long groupId) {
         log.info("团购记录 /group/groupActivity/logs, groupId:{}", groupId);
-        List<GroupLogs> data = getGroupList(groupId);
+        List<GroupLogs> data = getGroupList(groupId, getOrderNumByGroupId(groupId));
         log.info("团购记录 /group/groupActivity/logs 返回:{}", JSON.toJSONString(data));
         return JsonResult.success(data);
     }
 
-    private List<GroupLogs> getGroupList(Long groupId) {
+    //orderNum 实际+虚拟 订单数
+    private List<GroupLogs> getGroupList(Long groupId, int orderNum) {
         // 放入缓存
         String key = RedisConstant.RedisGroupLogsKey + groupId;
         if (redisHelper.hasKey(key) == false) {
-
-            // 随机 [10,20] 之间的数字
-            int total = ThreadLocalRandom.current().nextInt(10, 21);
+            int total = 0;
+            if (orderNum < 10) {
+                // orderNum 为 0 时(如缓存异常兜底返回0), total 钳位为 0, 避免负数传入 ArrayList 构造抛 Illegal Capacity
+                total = Math.max(orderNum - 1, 0);
+            } else {
+                // 随机 [10,20] 之间的数字
+                total = ThreadLocalRandom.current().nextInt(10, 21);
+            }
 
             // 生成记录
             List<GroupLogs> data = new ArrayList<>();
+            if (total < 1) {
+                // 无记录可生成, 直接返回空列表(不缓存, 待订单数恢复后重新生成)
+                return data;
+            }
             if (this.isBetween6And20()) {
                 // 白天的数据, 早上6点到晚上8点之间
                 data = this.getDayGroupLogs(total, groupId);
@@ -388,9 +426,14 @@ public class MemberGroupController {
         // 放入缓存
         String key = RedisConstant.RedisGroupLogsKey2 + groupId;
         if (redisHelper.hasKey(key) == false) {
-
-            // 随机 [10,20] 之间的数字
-            int total = ThreadLocalRandom.current().nextInt(10, 21);
+            int total = 0;
+            int orderTotal = getOrderNumByGroupId(groupId);
+            if (orderTotal < 10) {
+                total = orderTotal;
+            } else {
+                // 随机 [10,20] 之间的数字
+                total = ThreadLocalRandom.current().nextInt(10, 21);
+            }
 
             // 生成记录
             List<GroupLogs> data = this.getDayGroupLogs2(total, groupId);

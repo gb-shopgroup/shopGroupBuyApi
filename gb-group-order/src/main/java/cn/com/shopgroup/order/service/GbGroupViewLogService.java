@@ -36,4 +36,9 @@ public interface GbGroupViewLogService {
      */
     List<GbGroupViewLog> getRecentViewList(Long leaderId, Long memberId);
 
+    /**
+     * C端团购详情-某团购的查看人数(按用户去重)
+     */
+    Integer getGroupViewCount(Long groupId);
+
 }

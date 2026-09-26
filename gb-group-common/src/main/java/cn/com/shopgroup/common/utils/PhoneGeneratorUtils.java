@@ -23,6 +23,10 @@ public class PhoneGeneratorUtils {
      */
     public static List<String> generateDesensitizePhone(int count) {
 
+        // 防御: count 非法(负数)时返回空列表, 避免 new ArrayList<>(负数) 抛 Illegal Capacity
+        if (count < 0) {
+            return new ArrayList<>(0);
+        }
         List<String> list = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             String fullPhone = getRandomPhone();

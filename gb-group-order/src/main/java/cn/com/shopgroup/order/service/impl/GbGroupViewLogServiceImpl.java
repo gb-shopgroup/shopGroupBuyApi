@@ -168,6 +168,18 @@ public class GbGroupViewLogServiceImpl implements GbGroupViewLogService {
         return list == null ? new ArrayList<>() : list;
     }
 
+    /**
+     * C端团购详情-某团购的查看人数(按用户去重)
+     */
+    @Override
+    public Integer getGroupViewCount(Long groupId) {
+        if (groupId == null || groupId <= 0) {
+            return 0;
+        }
+        Integer count = viewLogMapper.countGroupViewers(groupId);
+        return count == null ? 0 : count;
+    }
+
     private Long toLong(Object obj) {
         if (obj == null) {
             return 0L;

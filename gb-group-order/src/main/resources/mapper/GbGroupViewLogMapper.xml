@@ -36,5 +36,11 @@
         GROUP BY v.`member_id`, v.`group_name`, v.`view_time`
         ORDER BY v.`view_time` DESC
     </select>
+    <!-- C端团购详情-统计某团购的查看人数(按 member_id 去重) -->
+    <select id="countGroupViewers" resultType="java.lang.Integer">
+        SELECT COUNT(DISTINCT v.`member_id`)
+        FROM `gb_group_view_log` v
+        WHERE v.`group_id` = #{groupId}
+    </select>
 
 </mapper>

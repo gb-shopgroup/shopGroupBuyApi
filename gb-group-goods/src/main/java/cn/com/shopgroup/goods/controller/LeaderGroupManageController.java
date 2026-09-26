@@ -474,8 +474,8 @@ public class LeaderGroupManageController {
 
         // 团购介绍
         data.setGroupInfo(request.getInfo());
-        // 虚拟订单数量从10开始计算，有10但是虚拟
-        Integer virOrder = Optional.ofNullable(request.getVirtual()).orElse(10);
+        // 虚拟订单数量
+        Integer virOrder = Optional.ofNullable(request.getVirtual()).orElse(0);
         data.setVirtualOrder(virOrder);
         data.setStartTime(request.getStartTime());
         data.setEndTime(request.getEndTime());
@@ -805,6 +805,12 @@ public class LeaderGroupManageController {
         // 该详情缓存在订单模块库(order, db4)中, 各模块分库后需跨库删除, 保持缓存失效联动
         String key = RedisConstant.RedisGroupInfoKey + groupId;
         redisHelper.deleteObjectInDb(key, RedisDbConstant.DB_ORDER);
+
+        // 清空订单数计数器缓存(同在订单模块库 db4):
+        // 计数器基线 = DB真实订单数 + 虚拟订单数(初始化时烙入), 团购关闭期间可修改虚拟订单数,
+        // 重新上线时若不删除, 旧 virtual 基线会一直生效(30天TTL), 导致列表/详情展示的订单数不更新
+        String orderTotalKey = RedisConstant.RedisOrderTotalKey + groupId;
+        redisHelper.deleteObjectInDb(orderTotalKey, RedisDbConstant.DB_ORDER);
 
         // 清空团购商品缓存数据(本模块自己的缓存, 直接删除)
         String key2 = RedisConstant.RedisGroupGoodsListKey + groupId;

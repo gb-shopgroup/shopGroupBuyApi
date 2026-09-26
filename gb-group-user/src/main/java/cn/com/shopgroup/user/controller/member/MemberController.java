@@ -8,6 +8,7 @@ import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.TokenUtils;
 import cn.com.shopgroup.common.wxmini.WxMiniAccessTokenHelper;
 import cn.com.shopgroup.user.exception.UserErrorCodeEnum;
+import cn.com.shopgroup.user.http.request.MemberSwapLeaderRequest;
 import cn.com.shopgroup.user.http.response.LeaderResponse;
 import cn.com.shopgroup.user.http.response.LoginMemberResponse;
 import cn.com.shopgroup.user.model.GbMemberInfo;
@@ -23,11 +24,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.ObjectUtils;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.Resource;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 @RestController
@@ -161,6 +163,39 @@ public class MemberController {
 
         // 返回团长员工信息
         return JsonResult.success(leader);
+    }
+
+    // 登录用户获取最新团长id
+    @PostMapping("/swap/getInfo")
+    public JsonResult reg(@RequestBody MemberSwapLeaderRequest request) {
+        log.info("登录用户获取最新团长id,/user/member/swap/getInfo req:{}", JSON.toJSONString(request));
+        // 查询是否已经注册成功了
+        String openid = request.getOpenid();
+        Long leaderId = request.getLeaderId();
+        /**
+         * 更新最新的团长id
+         */
+        service.updateMemberSwapLeaderId(openid, leaderId);
+        GbMemberInfo memberInfo = service.getMiniMemberByOpenId(openid);
+        log.info("更新用户最新团长id后用户信息memberInfo:{}", JSON.toJSONString(memberInfo));
+        if (!ObjectUtils.isEmpty(memberInfo)) {
+            redisHelper.releaseLock(RedisConstant.RedisMemberTokenKey + memberInfo.getMemberId());
+        }
+        Long memberId = memberInfo.getMemberId();
+        // 生成token
+        String token = TokenUtils.createToken(String.valueOf(memberId));
+        // 记录登录态到Redis(30天有效), 用于退出登录时清除
+        redisHelper.setCacheObject(RedisConstant.RedisMemberTokenKey + memberId, token, RedisConstant.RedisMemberTokenExpired, TimeUnit.SECONDS);
+
+        // 响应数据
+        LoginMemberResponse result = new LoginMemberResponse();
+        result.setName(memberInfo.getNickname());
+        result.setAvatar(memberInfo.getAvatar());
+        result.setMobile(memberInfo.getMobile());
+        result.setOpenid(memberInfo.getOpenid());
+        result.setLeaderId(memberInfo.getLeaderId());
+        result.setToken(token);
+        return JsonResult.success(result);
     }
 
 

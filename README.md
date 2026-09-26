@@ -127,7 +127,7 @@ Maven 依赖仓库使用阿里云镜像（`https://maven.aliyun.com/repository/p
 
 ### 4.3 gb-group-user — 用户 / 团长 / 员工服务
 
-覆盖：会员登录注册（微信 openid / 手机号）、用户信息、团长店铺管理、自提点管理、员工管理、黑名单、消息、图片上传、文章与轮播图等。**46 个接口**。
+覆盖：会员登录注册（微信 openid / 手机号）、用户信息、团长店铺管理、自提点管理、员工管理、黑名单、消息、图片上传、文章与轮播图等。**47 个接口**。
 
 ### 4.4 gb-group-goods — 商品 / 团购服务
 
@@ -288,14 +288,14 @@ mvn -pl gb-group-task spring-boot:run
 | `page` / `pageSize` | 页码（从 1 开始）/ 每页条数 |
 | `start` / `end` | 开始时间 / 结束时间（如 yyyy-MM-dd） |
 
-- **接口数量统计**：user 46 个、order 47 个、goods 22 个、admin 29 个、task 8 个，合计 **152 个**。
+- **接口数量统计**：user 47 个、order 47 个、goods 22 个、admin 29 个、task 8 个，合计 **153 个**。
 - **详细版接口文档**（含每个接口的完整入参 / 出参字段说明，参数含义、必填、嵌套字段均已细化）见根目录 **`API接口文档.md`**，可通过 `python3 generate_api_doc.py` 扫描各模块 `*Controller.java` 重新生成。下方为接口总览清单。
 
 ### 8.2 接口清单
 
 > 功能说明优先取源码方法注释；*斜体* 为脚本依据路径与出入参自动推断（仅供参考），字段级说明见 [`API接口文档.md`](API接口文档.md)。
 
-#### 8.2.1 gb-group-user（用户/团长/员工）— 46 个接口
+#### 8.2.1 gb-group-user（用户/团长/员工）— 47 个接口
 
 **ImageSourceController**（`cn.com.shopgroup.user.controller`）
 
@@ -402,6 +402,7 @@ mvn -pl gb-group-task spring-boot:run
 | --- | --- | --- | --- | --- |
 | 1 | GET | `/user/member/info` | *查询会员详情* | 无 |
 | 2 | GET | `/user/member/isleader` | *查询会员是否为团长* | 无 |
+| 3 | POST | `/user/member/swap/getInfo` | *查询会员swap详情* | Body: **request** (MemberSwapLeaderRequest, JSON) |
 
 #### 8.2.2 gb-group-order（订单/退款/分账）— 47 个接口
 
@@ -440,12 +441,12 @@ mvn -pl gb-group-task spring-boot:run
 | 3 | GET | `/order/group/order/count` | *查询团购订单总数* | **pid** (Long) |
 | 4 | GET | `/order/group/order/info` | *查询团购订单详情* | **orderNo** (String) |
 | 5 | GET | `/order/group/order/makeErcode` | *生成二维码（团购订单）* | **orderNo** (String) |
-| 6 | GET | `/order/group/order/receipt` | 用户扫码核销-整单核销<br>核销后订单状态：已有售后(5)保持不变；无售后则置已收货(3)并记录收货时间 | **orderNo** (String); **point** (Long) |
-| 7 | POST | `/order/group/order/part/receipt` | 用户扫码核销-部分核销（可多次核销）<br>核销后订单状态：已有售后(5)保持不变；无售后且完全核销置已收货(3)+收货时间，未完全核销置部分收货(2) | Body: **request** (MemberOrderReceiptRequest, JSON) |
+| 6 | GET | `/order/group/order/receipt` | *提货（团购订单）* | **orderNo** (String); **point** (Long) |
+| 7 | POST | `/order/group/order/part/receipt` | *提货（团购订单）* | Body: **request** (MemberOrderReceiptRequest, JSON) |
 | 8 | POST | `/order/group/order/apply/refund` | *退款（团购订单）* | Body: **refundApplyRequest** (OrderRefundApplyRequest, JSON) |
 | 9 | GET | `/order/group/order/refund/reasonList` | *查询团购订单退款原因列表* | 无 |
 | 10 | GET | `/order/group/order/refund/recodes` | *查询团购订单退款记录* | **orderNo** (String) |
-| 11 | GET | `/order/group/order/notAllReceiptList` | 查询团购订单未全部提货列表<br>用户id+团长id查询（shopId仅用于解析团长id），已支付且状态1待收货/2部分收货/5售后，须存在未核销商品（购买数&gt;已核销数）；状态5时商品行还须购买数&gt;（已核销数+退款数）；返回订单并回填商品信息 | **shopId** (Long) |
+| 11 | GET | `/order/group/order/notAllReceiptList` | *查询团购订单未全部提货列表* | **shopId** (Long) |
 | 12 | POST | `/order/group/order/confirmShipping` | *确认发货（团购订单）* | **orderNo** (String) |
 | 13 | POST | `/order/group/order/applyRefund/orderInfo` | *查询团购订单退款申请订单详情* | Body: **request** (MemberOrderRefundRequest, JSON) |
 
@@ -496,7 +497,7 @@ mvn -pl gb-group-task spring-boot:run
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
 | 1 | GET | `/order/leader/refund/count` | *查询团长退款总数* | **gid** (Long); **pid** (Long) |
-| 2 | POST | `/order/leader/refund/applyList` | 查询团长退款列表（待审核申请）<br>口径：订单状态5售后 + 存在待审核(apply_refund=1)商品行，"先筛选再分页"，total 与列表一致；每单回填该笔申请的整笔待审核商品行；商品行数量以"申请退中数量"(gb_order_goods_info.apply_refund_num)为准 | Body: **request** (LeaderRefundApplyListRequest, JSON) |
+| 2 | POST | `/order/leader/refund/applyList` | *查询团长退款列表* | Body: **request** (LeaderRefundApplyListRequest, JSON) |
 | 3 | POST | `/order/leader/refund/approve` | *审核（团长退款）* | Body: **approveRequest** (OrderApproveRequest, JSON) |
 
 **OrderRefundNotifyController**（`cn.com.shopgroup.order.controller.leader`）
@@ -544,7 +545,7 @@ mvn -pl gb-group-task spring-boot:run
 | 2 | GET | `/goods/Leader/get/groupActivity/count` | *查询团长团购活动总数* | **cat** (Long); **name** (String); **status** (Integer) |
 | 3 | GET | `/goods/Leader/groupActivity/tag/list` | *查询团长团购活动标签列表* | 无 |
 | 4 | POST | `/goods/Leader/groupActivity/add` | *新增团长团购活动* | Body: **request** (GroupActRequest, JSON) |
-| 5 | GET | `/goods/Leader/get/groupActivity/info` | 查询团长团购活动详情<br>返回跟团统计 `genTuanResponse` 与跟团记录 `followRecords`（真实订单数据：手机号/姓名/头像/购买时间/购买商品/数量，已支付未取消，按购买时间倒序取最新50条） | **groupId** (Long) |
+| 5 | GET | `/goods/Leader/get/groupActivity/info` | *查询团长团购活动详情* | **groupId** (Long) |
 | 6 | POST | `/goods/Leader/groupActivity/edit` | *修改团长团购活动* | Body: **request** (GroupActRequest, JSON) |
 | 7 | POST | `/goods/Leader/groupActivity/close` | *启用/关闭团长团购活动* | **groupId** (Long) |
 | 8 | GET | `/goods/Leader/get/groupActivity/cat` | *查询团长团购活动分类* | 无 |
