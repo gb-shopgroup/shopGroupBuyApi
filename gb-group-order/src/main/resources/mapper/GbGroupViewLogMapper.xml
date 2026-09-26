@@ -27,18 +27,18 @@
                 #{mid}
             </foreach>
         </if>
-          AND v.`view_time` = (
-              SELECT MAX(v2.`view_time`)
-              FROM `gb_group_view_log` v2
-              WHERE v2.`leader_id` = v.`leader_id`
-                AND v2.`member_id` = v.`member_id`
-          )
+        AND v.`view_time` = (
+        SELECT MAX(v2.`view_time`)
+        FROM `gb_group_view_log` v2
+        WHERE v2.`leader_id` = v.`leader_id`
+        AND v2.`member_id` = v.`member_id`
+        )
         GROUP BY v.`member_id`, v.`group_name`, v.`view_time`
         ORDER BY v.`view_time` DESC
     </select>
     <!-- C端团购详情-统计某团购的查看人数(按 member_id 去重) -->
     <select id="countGroupViewers" resultType="java.lang.Integer">
-        SELECT COUNT(DISTINCT v.`member_id`)
+        SELECT COUNT(v.`member_id`)
         FROM `gb_group_view_log` v
         WHERE v.`group_id` = #{groupId}
     </select>

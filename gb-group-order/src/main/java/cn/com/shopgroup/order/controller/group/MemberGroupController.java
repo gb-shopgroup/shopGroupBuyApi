@@ -266,9 +266,17 @@ public class MemberGroupController {
         // 计数器(OrderTotal:{groupId})被删除重建时(下单/退款/task/过期), 基数 = DB真实订单数 + 虚拟数,
         // 若此处传入旧 num2 而列表接口 getGroupActiveList 传实时 DB virtual, 会导致两接口订单数不一致;
         // 统一走 getOrderNumByGroupId(实时查 DB virtual + Redis 计数器) 保证口径一致
-        cacheData.setNum(this.getOrderNumByGroupId(groupId));
-        // 当前团购查看人数(按用户去重, 实时统计; 统计异常不影响主流程, 兜底为0)
-        cacheData.setViewCount(this.getGroupViewCountQuietly(groupId));
+        int totalOrderNum = this.getOrderNumByGroupId(groupId);
+        int viwNum = this.getGroupViewCountQuietly(groupId);
+        cacheData.setNum(totalOrderNum);
+        if (viwNum <= totalOrderNum) {
+            // 当前团购查看人数
+            cacheData.setViewCount(totalOrderNum);
+        }else{
+            // 当前团购查看人数
+            cacheData.setViewCount(viwNum);
+        }
+
         // 服务端自动埋点: 记录用户"查看"团购(未登录/防抖命中会忽略, 不影响主流程)
         this.recordViewQuietly(groupId);
 
