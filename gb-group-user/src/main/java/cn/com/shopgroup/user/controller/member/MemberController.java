@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.Resource;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 @RestController
@@ -171,11 +172,13 @@ public class MemberController {
         log.info("登录用户获取最新团长id,/user/member/swap/getInfo req:{}", JSON.toJSONString(request));
         // 查询是否已经注册成功了
         String openid = request.getOpenid();
-        Long leaderId = request.getLeaderId();
+        Long leaderId = Optional.ofNullable(request.getLeaderId()).orElse(0L);
         /**
          * 更新最新的团长id
          */
-        service.updateMemberSwapLeaderId(openid, leaderId);
+        if (leaderId.intValue() != 0) {
+            service.updateMemberSwapLeaderId(openid, leaderId);
+        }
         GbMemberInfo memberInfo = service.getMiniMemberByOpenId(openid);
         log.info("更新用户最新团长id后用户信息memberInfo:{}", JSON.toJSONString(memberInfo));
         if (!ObjectUtils.isEmpty(memberInfo)) {
