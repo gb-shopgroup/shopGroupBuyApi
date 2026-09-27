@@ -41,4 +41,9 @@ public interface GbGroupViewLogService {
      */
     Integer getGroupViewCount(Long groupId);
 
+    /**
+     * C端活动列表-批量统计查看人数: groupId -> viewCount(按用户去重)
+     */
+    Map<Long, Integer> getGroupViewCountMap(List<Long> groupIds);
+
 }

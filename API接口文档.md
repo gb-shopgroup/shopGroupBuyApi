@@ -1,6 +1,6 @@
 # ShopGroupBuyApi 接口文档（详细版）
 
-> 自动生成时间：2026-09-26 21:30:56
+> 自动生成时间：2026-09-27 15:00:31
 
 > 生成方式：扫描各模块 `*Controller.java` 源码（`python3 generate_api_doc.py` 可重新生成）
 
@@ -36,6 +36,10 @@
 
 | 日期 | 提交 | 摘要 | 涉及文件 |
 | --- | --- | --- | --- |
+| 2026-09-27 | `2dc978b` | c端团购活动详情 | LeaderGroupManageController.java |
+| 2026-09-26 | `1716c27` | c端团购活动详情 | MemberGroupController.java |
+| 2026-09-26 | `07a1b89` | 用户更换团长 | MemberController.java |
+| 2026-09-26 | `0ff6515` | 修改 | GroupActivityResponse.java, LeaderGroupManageController.java, MemberController.java, MemberGroupController.java, MemberSwapLeaderRequest.java |
 | 2026-09-24 | `5831cee` | prod  -mysql | OrderResponse.java |
 | 2026-09-22 | `8d59591` | 自提点修改 | LeaderPointController.java, OrderRequest.java |
 | 2026-09-22 | `190aeda` | 商品 | LeaderGoodsManageController.java, MemberHomeGroupActResponse.java, OrderRefundController.java, OrderRefundNotifyController.java |
@@ -47,10 +51,6 @@
 | 2026-09-19 | `cd59adc` | 修改核销状态 | MemberOrderController.java |
 | 2026-09-19 | `33ce45b` | 修改核销状态 | MemberOrderController.java |
 | 2026-09-19 | `678a07b` | 修改 | MemberOrderController.java |
-| 2026-09-19 | `70e1ffe` | 修改 | LeaderOrderApplyRefundRequest.java, MemberOrderController.java, OrderController.java, OrderRefundController.java |
-| 2026-09-19 | `20da595` | 核销记录 | MemberOrderController.java |
-| 2026-09-19 | `523da65` | 核销记录 | LeaderRefundApplyGoodsResponse.java, LeaderRefundApplyListRequest.java, LeaderRefundApplyListResponse.java, LeaderRefundApplyResponse.java, LeaderShopController.java 等 |
-| 2026-09-18 | `e803c05` | 退款 | LeaderGroupGenTuanResponse.java, MemberOrderController.java, OrderRefundController.java, OrderRefundNotifyController.java, OrderRefundRecordResponse.java |
 
 ## 目录
 
@@ -1811,6 +1811,7 @@ data 类型：`List<MemberHomeGroupActResponse>`（数组，元素类型 `Member
 | info | `String` | 否 | 团购介绍 |
 | virtual | `Integer` | 否 | 虚拟订单数量 |
 | order | `Integer` | 否 | 实际订单数量 |
+| viewCount | `Integer` | 否 | 当前团购查看人数(按用户去重, 与团购详情 viewCount 口径一致) |
 | isClose | `Byte` | 否 | 是否禁用,0上线1下线 |
 | startTime | `Integer` | 否 | 开团时间 |
 | endTime | `Integer` | 否 | 结束时间 |

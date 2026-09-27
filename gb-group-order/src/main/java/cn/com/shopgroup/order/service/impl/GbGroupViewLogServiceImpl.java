@@ -180,6 +180,35 @@ public class GbGroupViewLogServiceImpl implements GbGroupViewLogService {
         return count == null ? 0 : count;
     }
 
+    /**
+     * C端活动列表-批量统计查看人数: groupId -> viewCount(按用户去重)
+     */
+    @Override
+    public Map<Long, Integer> getGroupViewCountMap(List<Long> groupIds) {
+        Map<Long, Integer> result = new HashMap<>();
+        if (CollectionUtils.isEmpty(groupIds)) {
+            return result;
+        }
+        // 过滤非法 id 后一次 IN 查询, 避免 N+1
+        List<Long> ids = new ArrayList<>(groupIds.size());
+        for (Long gid : groupIds) {
+            if (gid != null && gid > 0) {
+                ids.add(gid);
+            }
+        }
+        if (ids.isEmpty()) {
+            return result;
+        }
+        List<Map<String, Object>> rows = viewLogMapper.countViewersByGroups(ids);
+        if (CollectionUtils.isEmpty(rows)) {
+            return result;
+        }
+        for (Map<String, Object> row : rows) {
+            result.put(toLong(row.get("groupId")), toInt(row.get("viewCount")));
+        }
+        return result;
+    }
+
     private Long toLong(Object obj) {
         if (obj == null) {
             return 0L;

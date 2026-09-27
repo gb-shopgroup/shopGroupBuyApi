@@ -38,9 +38,20 @@
     </select>
     <!-- C端团购详情-统计某团购的查看人数(按 member_id 去重) -->
     <select id="countGroupViewers" resultType="java.lang.Integer">
-        SELECT COUNT(v.`member_id`)
+        SELECT COUNT(DISTINCT v.`member_id`)
         FROM `gb_group_view_log` v
         WHERE v.`group_id` = #{groupId}
+    </select>
+
+    <!-- C端活动列表-批量统计各团购的查看人数(按 member_id 去重) -->
+    <select id="countViewersByGroups" resultType="java.util.HashMap">
+        SELECT v.`group_id` AS groupId, COUNT(DISTINCT v.`member_id`) AS viewCount
+        FROM `gb_group_view_log` v
+        WHERE v.`group_id` IN
+        <foreach collection="groupIds" item="gid" open="(" separator="," close=")">
+            #{gid}
+        </foreach>
+        GROUP BY v.`group_id`
     </select>
 
 </mapper>

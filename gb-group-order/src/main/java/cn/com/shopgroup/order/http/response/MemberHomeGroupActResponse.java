@@ -36,6 +36,8 @@ public class MemberHomeGroupActResponse {
     private Integer virtual;
     // 实际订单数量
     private Integer order;
+    // 当前团购查看人数(按用户去重, 与团购详情 viewCount 口径一致)
+    private Integer viewCount;
     // 是否禁用,0上线1下线
     private Byte isClose;
     // 开团时间

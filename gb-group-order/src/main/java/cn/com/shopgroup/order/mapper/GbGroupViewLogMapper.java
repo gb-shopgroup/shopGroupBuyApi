@@ -29,4 +29,9 @@ public interface GbGroupViewLogMapper extends BaseMapper<GbGroupViewLog> {
      * C端团购详情-统计某团购的查看人数(按 member_id 去重)
      */
     Integer countGroupViewers(@Param("groupId") Long groupId);
+
+    /**
+     * C端活动列表-批量统计各团购的查看人数(按 member_id 去重), key: groupId, value: count
+     */
+    List<Map<String, Object>> countViewersByGroups(@Param("groupIds") List<Long> groupIds);
 }

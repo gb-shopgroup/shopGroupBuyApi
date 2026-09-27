@@ -119,6 +119,8 @@ public class MemberGroupController {
         for (MemberHomeGroupActResponse item : data) {
             item.setOrder(this.getRedisOrderTotal(item.getId(), item.getVirtual()));
         }
+        // 填充每个团购活动的查看人数(按用户去重, 与团购详情 viewCount 口径一致), 一次批量查询避免 N+1
+        fillGroupViewCount(data);
         fillGroupLogList(data);
         log.info("用户首页获取团购活动数据条数size:{},data:{}", data.size(), JSON.toJSONString(data));
         return JsonResult.success(data);
@@ -272,7 +274,7 @@ public class MemberGroupController {
         if (viwNum <= totalOrderNum) {
             // 当前团购查看人数
             cacheData.setViewCount(totalOrderNum);
-        }else{
+        } else {
             // 当前团购查看人数
             cacheData.setViewCount(viwNum);
         }
@@ -337,6 +339,29 @@ public class MemberGroupController {
         } catch (Exception e) {
             log.error("统计团购查看人数异常 groupId:{}", groupId, e);
             return 0;
+        }
+    }
+
+    /**
+     * 为活动列表填充查看人数(viewCount)
+     * 统计口径与团购详情(/group/groupActivity/info) viewCount 一致: 按用户去重;
+     * 一次批量查询避免 N+1; 统计异常不影响主流程, 无查看记录的团购填 0
+     */
+    private void fillGroupViewCount(List<MemberHomeGroupActResponse> data) {
+        if (CollectionUtils.isEmpty(data)) {
+            return;
+        }
+        for (MemberHomeGroupActResponse item : data) {
+            int totalOrderNum = this.getOrderNumByGroupId(item.getId());
+            int viwNum = this.getGroupViewCountQuietly(item.getId());
+            // 回填到响应对象
+            if (viwNum <= totalOrderNum) {
+                // 当前团购查看人数
+                item.setViewCount(totalOrderNum);
+            } else {
+                // 当前团购查看人数
+                item.setViewCount(viwNum);
+            }
         }
     }
 
