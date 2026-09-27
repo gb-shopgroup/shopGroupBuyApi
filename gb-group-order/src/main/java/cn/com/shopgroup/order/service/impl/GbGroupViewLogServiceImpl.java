@@ -169,7 +169,7 @@ public class GbGroupViewLogServiceImpl implements GbGroupViewLogService {
     }
 
     /**
-     * C端团购详情-某团购的查看人数(按用户去重)
+     * C端团购详情-某团购的查看次数(不去重, 总浏览人次)
      */
     @Override
     public Integer getGroupViewCount(Long groupId) {

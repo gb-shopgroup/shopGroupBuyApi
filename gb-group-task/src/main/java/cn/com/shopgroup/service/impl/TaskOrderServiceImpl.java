@@ -233,7 +233,6 @@ public class TaskOrderServiceImpl implements TaskOrderService {
         for (Long groupId : stockChangedGroupIds) {
             redisHelper.deleteObject(RedisConstant.RedisGroupInfoKey + groupId);
             redisHelper.deleteObject(RedisConstant.RedisGroupGoodsListKey + groupId);
-            redisHelper.deleteObject(RedisConstant.RedisOrderTotalKey + groupId);
         }
     }
 

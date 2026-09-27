@@ -19,7 +19,6 @@ import cn.com.shopgroup.goods.service.GbGroupActivityInfoService;
 import cn.com.shopgroup.goods.service.GbGroupCategoryInfoService;
 import cn.com.shopgroup.order.exception.OrderErrorCodeEnum;
 import cn.com.shopgroup.order.http.request.MemberGroupActListRequest;
-import cn.com.shopgroup.order.http.request.MemberGroupListRequest;
 import cn.com.shopgroup.order.http.request.MemberGroupViewRequest;
 import cn.com.shopgroup.order.http.response.GroupLogs;
 import cn.com.shopgroup.order.http.response.GroupOrderRecordResponse;
@@ -116,35 +115,10 @@ public class MemberGroupController {
         fillGroupGoodsList(data);
         // 填充每个团购活动中商品的规格(含规格值), 一次批量查询避免 N+1
         fillGoodsSpecList(extractAllGoods(data));
-        for (MemberHomeGroupActResponse item : data) {
-            item.setOrder(this.getRedisOrderTotal(item.getId(), item.getVirtual()));
-        }
-        // 填充每个团购活动的查看人数(按用户去重, 与团购详情 viewCount 口径一致), 一次批量查询避免 N+1
+        // 填充每个团购活动的查看次数(不去重, 总浏览人次, 与团购详情 viewCount 口径一致), 一次批量查询避免 N+1
         fillGroupViewCount(data);
         fillGroupLogList(data);
         log.info("用户首页获取团购活动数据条数size:{},data:{}", data.size(), JSON.toJSONString(data));
-        return JsonResult.success(data);
-    }
-
-    // 用户首页-查询所有团购活动列表----旧-废弃
-    //@PostMapping("/group/get/groupActivity/list")
-    public JsonResult getGroupActiveList(@RequestBody MemberGroupListRequest request) {
-        log.info("用户首页-查询所有团购活动列表,order/group/get/groupActivity/list req:{}", JSON.toJSONString(request));
-        // 请求参数矫正
-        int page = Optional.ofNullable(request.getPage()).orElse(1);
-        int pageSize = Optional.ofNullable(request.getPageSize())
-                .map(size -> Math.min(size, 20))
-                .orElse(10);
-        String activityName = request.getName();
-        Long leaderId = request.getLeaderId();
-        // 查询列表(flag 1、团长团查询 2 用户端查询) -7 不做任何处理，填充参数
-        List<GbGroupActivityInfo> result = groupActivityInfoService.getMiniLeaderGroupList(2, leaderId, request.getCatId(), activityName, -7, page, pageSize);
-        List<MemberHomeGroupActResponse> data = MemberHomeGroupActResponse.getGroupActResponseList(result);
-        fillGroupLogList(data);
-        for (MemberHomeGroupActResponse item : data) {
-            item.setOrder(this.getRedisOrderTotal(item.getId(), item.getVirtual()));
-        }
-        log.info("获取团购活动数据条数：size:{}", data.size());
         return JsonResult.success(data);
     }
 
@@ -343,25 +317,39 @@ public class MemberGroupController {
     }
 
     /**
-     * 为活动列表填充查看人数(viewCount)
-     * 统计口径与团购详情(/group/groupActivity/info) viewCount 一致: 按用户去重;
+     * 为活动列表填充查看次数(viewCount)
+     * 统计口径与团购详情(/group/groupActivity/info) viewCount 一致: 不去重(总浏览人次);
      * 一次批量查询避免 N+1; 统计异常不影响主流程, 无查看记录的团购填 0
      */
     private void fillGroupViewCount(List<MemberHomeGroupActResponse> data) {
         if (CollectionUtils.isEmpty(data)) {
             return;
         }
+        // 收集 groupId
+        List<Long> groupIds = new ArrayList<>(data.size());
         for (MemberHomeGroupActResponse item : data) {
-            int totalOrderNum = this.getOrderNumByGroupId(item.getId());
-            int viwNum = this.getGroupViewCountQuietly(item.getId());
-            // 回填到响应对象
-            if (viwNum <= totalOrderNum) {
-                // 当前团购查看人数
-                item.setViewCount(totalOrderNum);
-            } else {
-                // 当前团购查看人数
-                item.setViewCount(viwNum);
+            if (item.getId() != null && item.getId() > 0) {
+                groupIds.add(item.getId());
             }
+        }
+        if (groupIds.isEmpty()) {
+            return;
+        }
+        // 一次批量查询各团购查看次数(不去重, 总浏览人次), 避免 N+1; 统计异常兜底为空Map(按0处理)
+        Map<Long, Integer> viewCountMap;
+        try {
+            viewCountMap = viewLogService.getGroupViewCountMap(groupIds);
+        } catch (Exception e) {
+            log.error("批量统计团购查看次数异常, 兜底按0处理", e);
+            viewCountMap = Collections.emptyMap();
+        }
+        for (MemberHomeGroupActResponse item : data) {
+            // 订单数: 实际支付订单数 + 虚拟订单数(Redis 计数器), 与详情 getOrderNumByGroupId 口径一致,前端已经算了
+            int totalOrderNum = this.getRedisOrderTotal(item.getId(), 0);
+            item.setOrder(totalOrderNum);
+            // 查看次数(不去重): 不低于订单数时取查看次数, 否则取订单数(与详情口径一致)
+            Integer viwNum = viewCountMap.get(item.getId());
+            item.setViewCount(Math.max(viwNum == null ? 0 : viwNum, totalOrderNum));
         }
     }
 
@@ -486,42 +474,11 @@ public class MemberGroupController {
     // 使用Redis计数器来解决这个问题
     private Integer getRedisOrderTotal(Long groupId, long virtual) {
 
-        // 订单销售数量缓存
-        String key = RedisConstant.RedisOrderTotalKey + groupId;
-        if (redisHelper.hasKey(key) == false) {
-
-            // 查询订单销售数量, 再累加上虚拟数量
-            // 不使用团购表里面的 order_total 字段嘛？
-            Long total = orderInfoService.getMiniOrderSalesCount(groupId) + virtual;
-
-            // 首次初始化基线: 用 SET 设置基数 + 30 天 TTL, 而非 INCRBY, 避免与"支付回调 +1"语义混淆
-            // 一致性约定:
-            // 1) key 不存在 = 首次加载, 此处从 DB 读取真实订单数 + 虚拟基数, SET 设一次性基线
-            // 2) 后续仅由 OrderPaymentController 中 redisHelper.increment(key, 1L) 做增量累加, 不再覆写基数
-            // 3) Redis 6.x INCR 不会重置 TTL; 若 key 30 天后过期失效, 下次访问重新走本分支初始化, 自愈
-            redisHelper.setCacheObject(key, total, RedisConstant.RedisOrderTotalExpired, TimeUnit.SECONDS);
-        }
-
-        // 读取缓存: FastJson2 反序列化数字时按数值大小动态选择类型,
-        // 小数值(<= Integer.MAX_VALUE)反序列化为 Integer, 大数值为 Long;
-        // 支付回调走 Redis 原生 INCR 写入的也是数字字符串。
-        // 因此此处不能按 Long 强转(否则 Integer cannot be cast to Long), 必须用 Number 接口统一取数值
-        Object cached = redisHelper.getCacheObject(key);
-        if (cached instanceof Number) {
-            return ((Number) cached).intValue();
-        }
-        if (cached instanceof String) {
-            // 兜底: 若 value 以字符串形式存储(如人工 set / 其他工具写入), 尝试解析
-            try {
-                return Integer.parseInt(((String) cached).trim());
-            } catch (NumberFormatException e) {
-                log.warn("Redis订单数量缓存值无法解析: key={}, value={}", key, cached);
-            }
-        }
-        log.warn("Redis订单数量缓存值类型异常: key={}, type={}, value={}", key,
-                cached == null ? "null" : cached.getClass().getName(), cached);
-        return 0;
+        // 查询订单销售数量, 再累加上虚拟数量
+        long total = orderInfoService.getMiniOrderSalesCount(groupId) + virtual;
+        return (int) total;
     }
+
 
     // 白天生成跟团记录, 固定部分
     private List<GroupLogs> getDayGroupLogs(int total, Long groupId) {

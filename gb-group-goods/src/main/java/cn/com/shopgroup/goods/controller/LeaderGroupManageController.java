@@ -810,12 +810,6 @@ public class LeaderGroupManageController {
         String key = RedisConstant.RedisGroupInfoKey + groupId;
         redisHelper.deleteObjectInDb(key, RedisDbConstant.DB_ORDER);
 
-        // 清空订单数计数器缓存(同在订单模块库 db4):
-        // 计数器基线 = DB真实订单数 + 虚拟订单数(初始化时烙入), 团购关闭期间可修改虚拟订单数,
-        // 重新上线时若不删除, 旧 virtual 基线会一直生效(30天TTL), 导致列表/详情展示的订单数不更新
-        String orderTotalKey = RedisConstant.RedisOrderTotalKey + groupId;
-        redisHelper.deleteObjectInDb(orderTotalKey, RedisDbConstant.DB_ORDER);
-
         // 清空团购商品缓存数据(本模块自己的缓存, 直接删除)
         String key2 = RedisConstant.RedisGroupGoodsListKey + groupId;
         redisHelper.deleteObject(key2);
@@ -846,7 +840,7 @@ public class LeaderGroupManageController {
     // 分享团购海报生成1
     @PostMapping("/share/groupActivity/poster")
     public JsonResult shareGroup(@RequestParam("groupId") Long groupId) {
-        log.info("分享团购海报生成 /share/groupActivity/poster groupId:{}",groupId);
+        log.info("分享团购海报生成 /share/groupActivity/poster groupId:{}", groupId);
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) throw new BusinessException(GoodsErrorCodeEnum.LEADER_NOT_EXIST);
@@ -920,7 +914,7 @@ public class LeaderGroupManageController {
     // 分享团购活动海报（带有logo的海报）
     @PostMapping("/share/groupActivity/make/poster")
     public JsonResult makeShareGroupPoster(@RequestParam("groupId") Long groupId) {
-        log.info("分享团购活动海报 /share/groupActivity/make/poster groupId:{}",groupId);
+        log.info("分享团购活动海报 /share/groupActivity/make/poster groupId:{}", groupId);
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) throw new BusinessException(GoodsErrorCodeEnum.LEADER_NOT_EXIST);

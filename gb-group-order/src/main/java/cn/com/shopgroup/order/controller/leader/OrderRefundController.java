@@ -440,7 +440,6 @@ public class OrderRefundController {
                     for (Long groupId : stockChangedGroupIds) {
                         redisHelper.deleteObject(RedisConstant.RedisGroupInfoKey + groupId);
                         redisHelper.deleteObject(RedisConstant.RedisGroupGoodsListKey + groupId);
-                        redisHelper.deleteObject(RedisConstant.RedisOrderTotalKey + groupId);
                     }
                 }
                 //本次审核同意的商品行id集合

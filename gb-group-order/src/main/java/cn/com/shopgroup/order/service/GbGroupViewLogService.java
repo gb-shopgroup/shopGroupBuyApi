@@ -37,12 +37,12 @@ public interface GbGroupViewLogService {
     List<GbGroupViewLog> getRecentViewList(Long leaderId, Long memberId);
 
     /**
-     * C端团购详情-某团购的查看人数(按用户去重)
+     * C端团购详情-某团购的查看次数(不去重, 总浏览人次)
      */
     Integer getGroupViewCount(Long groupId);
 
     /**
-     * C端活动列表-批量统计查看人数: groupId -> viewCount(按用户去重)
+     * C端活动列表-批量统计查看次数(不去重): groupId -> viewCount
      */
     Map<Long, Integer> getGroupViewCountMap(List<Long> groupIds);
 
