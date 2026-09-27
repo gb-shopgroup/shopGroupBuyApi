@@ -332,11 +332,18 @@ public class OrderPaymentController {
         merchantService.addMerchantMoney(orderInfo.getLeaderId(), orderInfo.getBusId(), merchantMoney);
         // 累加团购订单数量
         groupService.addGroupOrderNumber(orderInfo.getGroupId());
-
+        delRedisKey(orderInfo.getGroupId());
         //订单对应的团长的cashType[结算到账方式,0=支付时延迟到账型,1=核销时延迟到账型]
         handleWxUploadShippingInfo(orderInfo, channelTrxId);
         // 返回
         return "success";
+    }
+
+    private void delRedisKey(Long groupId) {
+        String key1 = RedisConstant.RedisGroupLogsKey2 + groupId;
+        redisHelper.releaseLock(key1);
+        String key = RedisConstant.RedisGroupLogsKey + groupId;
+        redisHelper.releaseLock(key);
     }
 
     public void handleWxUploadShippingInfo(GbOrderInfo orderInfo, String transactionId) {

@@ -130,7 +130,7 @@ public class MemberGroupController {
             return;
         }
         for (MemberHomeGroupActResponse item : data) {
-            List<GroupLogs> logList = getGroupList(item.getId(), item.getOrder());
+            List<GroupLogs> logList = getGroupList(item.getId(), item.getOrder() + item.getVirtual());
             if (!CollectionUtils.isEmpty(logList)) {
                 item.setGroupLogs(logList);
             }
@@ -348,8 +348,12 @@ public class MemberGroupController {
             int totalOrderNum = this.getRedisOrderTotal(item.getId(), 0);
             item.setOrder(totalOrderNum);
             // 查看次数(不去重): 不低于订单数时取查看次数, 否则取订单数(与详情口径一致)
+            int virtual = item.getVirtual();
             Integer viwNum = viewCountMap.get(item.getId());
-            item.setViewCount(Math.max(viwNum == null ? 0 : viwNum, totalOrderNum));
+            int orderTotal = totalOrderNum + virtual;
+            int viewCount = (viwNum != null && viwNum > orderTotal) ? viwNum : orderTotal;
+            item.setViewCount(viewCount);
+
         }
     }
 
@@ -403,12 +407,13 @@ public class MemberGroupController {
     //orderNum 实际+虚拟 订单数
     private List<GroupLogs> getGroupList(Long groupId, int orderNum) {
         // 放入缓存
+        log.info("滚动日志生成groupId:{},orderNum:{}",groupId,orderNum);
         String key = RedisConstant.RedisGroupLogsKey + groupId;
         if (redisHelper.hasKey(key) == false) {
             int total = 0;
-            if (orderNum < 10) {
+            if (10 > orderNum) {
                 // orderNum 为 0 时(如缓存异常兜底返回0), total 钳位为 0, 避免负数传入 ArrayList 构造抛 Illegal Capacity
-                total = Math.max(orderNum - 1, 0);
+                total = Math.max(orderNum - 2, 0);
             } else {
                 // 随机 [10,20] 之间的数字
                 total = ThreadLocalRandom.current().nextInt(10, 21);
