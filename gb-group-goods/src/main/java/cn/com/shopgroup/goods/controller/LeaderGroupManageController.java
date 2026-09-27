@@ -278,7 +278,7 @@ public class LeaderGroupManageController {
     public JsonResult groupActivityCount(@RequestParam(value = "cat", required = false) Long catId,
                                          @RequestParam(value = "name", required = false) String name,
                                          @RequestParam(value = "status", required = false, defaultValue = "0") Integer status) {
-
+        log.info("团长端-查询团购活动总数,cat:{},name:{},status:{}", catId, name, status);
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) {
@@ -286,6 +286,7 @@ public class LeaderGroupManageController {
         }
         // 查询总数
         long total = activityInfoService.getMiniLeaderGroupCount(leaderId, catId, name, Optional.ofNullable(status).orElse(0));
+        log.info("团长端-查询团购活动总数返回,leaderId:{},total:{}", leaderId, total);
         return JsonResult.success(total);
     }
 
@@ -509,6 +510,7 @@ public class LeaderGroupManageController {
 
         // 写入数据库
         Long groupId = activityInfoService.addMiniLeaderGroupInfo(leaderId, data);
+        log.info("团长端-添加团购活动完成,leaderId:{},groupId:{},goodsNum:{}", leaderId, groupId, lists.size());
         return JsonResult.success(groupId);
     }
 
@@ -748,8 +750,10 @@ public class LeaderGroupManageController {
         // 修改数据库
         boolean flag = activityInfoService.editMiniLeaderGroupInfo(leaderId, data);
         if (flag) {
+            log.info("团长端-修改团购活动完成,leaderId:{},groupId:{},goodsNum:{}", leaderId, request.getId(), lists.size());
             return JsonResult.success("修改成功");
         } else {
+            log.warn("团长端-修改团购活动失败,leaderId:{},groupId:{}", leaderId, request.getId());
             throw new BusinessException(GoodsErrorCodeEnum.UPDATE_FAILED);
         }
     }
@@ -816,6 +820,8 @@ public class LeaderGroupManageController {
         String key2 = RedisConstant.RedisGroupGoodsListKey + groupId;
         redisHelper.deleteObject(key2);
 
+        log.info("团长端-关闭/上线团购活动完成,leaderId:{},groupId:{},isClose:{}", leaderId, groupId, groupInfo.getIsClose() == 0 ? 1 : 0);
+
         // 清空团购商品库存缓存数据
         //List<GbGroupActivityGoods> goodsList = service.getGroupActivityGoodsList(groupId);
         //for(GbGroupActivityGoods item : goodsList){
@@ -830,23 +836,20 @@ public class LeaderGroupManageController {
     // 团购分类列表
     @GetMapping("/get/groupActivity/cat")
     public JsonResult groupCat() {
-
+        log.info("团长端-查询团购分类列表,开始");
         List<GbGroupCategoryInfo> result = categoryService.getMiniGroupCategoryList();
         List<GroupCatResponse> data = GroupCatResponse.getGroupCatResponseList(result);
+        log.info("团长端-查询团购分类列表返回,size:{}", data == null ? 0 : data.size());
         return JsonResult.success(data);
     }
 
     // 分享团购海报生成1
     @PostMapping("/share/groupActivity/poster")
     public JsonResult shareGroup(@RequestParam("groupId") Long groupId) {
-
+        log.info("分享团购海报生成 /share/groupActivity/poster groupId:{}",groupId);
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) throw new BusinessException(GoodsErrorCodeEnum.LEADER_NOT_EXIST);
-
-//        // 从请求头中获取员工id
-//        Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
-//        if (staffId == 0) return JsonResult.fail("sid不存在");
 
         // 查询团购详情
         GbGroupActivityInfo groupInfo = activityInfoService.getGroupInfo(groupId);
@@ -874,7 +877,7 @@ public class LeaderGroupManageController {
         try {
             bis = PosterUtils.generatePosterStream(dto);
         } catch (IOException e) {
-            e.printStackTrace();
+            log.error("团长端-生成团购海报图片流失败,groupId:{},goodsName:{}", groupId, goodsInfo.getGoodsName(), e);
         }
 
         // 判断本地上传还是云存储上传: # 1=本地上传, 2=云端上传
@@ -897,7 +900,7 @@ public class LeaderGroupManageController {
             try {
                 this.saveStreamToLocalFile(bis, rootPath + File.separator + obsKey);
             } catch (IOException e) {
-                e.printStackTrace();
+                log.error("团长端-团购海报保存本地失败,groupId:{},path:{}", groupId, rootPath + File.separator + obsKey, e);
             }
 
             // 本地访问路径
@@ -910,20 +913,17 @@ public class LeaderGroupManageController {
         }
 
         // 返回访问路径
+        log.info("团长端-生成团购海报完成,leaderId:{},groupId:{},uploadType:{},url:{}", leaderId, groupId, type, url);
         return JsonResult.success("查询成功", url);
     }
 
     // 分享团购活动海报（带有logo的海报）
     @PostMapping("/share/groupActivity/make/poster")
     public JsonResult makeShareGroupPoster(@RequestParam("groupId") Long groupId) {
-
+        log.info("分享团购活动海报 /share/groupActivity/make/poster groupId:{}",groupId);
         // 从请求头中获取团长id
         Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
         if (leaderId == 0) throw new BusinessException(GoodsErrorCodeEnum.LEADER_NOT_EXIST);
-
-        // 从请求头中获取员工id
-//        Long staffId = RequestParamsUtils.getRequestHeaderStaffId();
-//        if (staffId == 0) return JsonResult.fail("sid不存在");
 
         // 查询团购详情
         GbGroupActivityInfo groupInfo = activityInfoService.getGroupInfo(groupId);
@@ -963,6 +963,7 @@ public class LeaderGroupManageController {
 
             // 直接获取二维码文件流即可
             BufferedImage ercodeImage = WxMiniProgramHelper.getMiniProgramPageERcodeBufferedImage(accessToken, page, scene, wh);
+            log.info("团长端-海报二维码获取成功,groupId:{},scene:{}", groupId, scene);
             //File outFile = new File("E:/idea_workspace/GroupBuyApi/image/public/ercode.png");
             //ImageIO.write(ercodeImage, "png", outFile);
             //BufferedImage ercodeImage = ImageIO.read(outFile);
@@ -1006,10 +1007,11 @@ public class LeaderGroupManageController {
 
             // 获取图片访问路径
             String url = domain + "/" + obsKey;
+            log.info("团长端-生成带logo团购海报完成,leaderId:{},groupId:{},uploadType:{},url:{}", leaderId, groupId, type, url);
             return JsonResult.success("生成海报成功", url);
 
         } catch (IOException e) {
-            e.printStackTrace();
+            log.error("团长端-生成带logo团购海报失败,leaderId:{},groupId:{}", leaderId, groupId, e);
         }
 
         // 海报生成失败
