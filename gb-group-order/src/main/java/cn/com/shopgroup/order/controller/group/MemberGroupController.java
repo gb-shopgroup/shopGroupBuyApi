@@ -407,13 +407,15 @@ public class MemberGroupController {
     //orderNum 实际+虚拟 订单数
     private List<GroupLogs> getGroupList(Long groupId, int orderNum) {
         // 放入缓存
-        log.info("滚动日志生成groupId:{},orderNum:{}",groupId,orderNum);
+        log.info("滚动日志生成groupId:{},orderNum:{}", groupId, orderNum);
         String key = RedisConstant.RedisGroupLogsKey + groupId;
         if (redisHelper.hasKey(key) == false) {
             int total = 0;
-            if (10 > orderNum) {
+            if (12 >= orderNum) {
                 // orderNum 为 0 时(如缓存异常兜底返回0), total 钳位为 0, 避免负数传入 ArrayList 构造抛 Illegal Capacity
                 total = Math.max(orderNum - 2, 0);
+            } else if (12 > orderNum && 20 > orderNum) {
+                total = Math.max(orderNum - 5, 0);
             } else {
                 // 随机 [10,20] 之间的数字
                 total = ThreadLocalRandom.current().nextInt(10, 21);
@@ -454,8 +456,10 @@ public class MemberGroupController {
         if (redisHelper.hasKey(key) == false) {
             int total = 0;
             int orderTotal = getOrderNumByGroupId(groupId);
-            if (orderTotal < 10) {
-                total = orderTotal;
+            if (12 >= orderTotal) {
+                total = Math.max(orderTotal - 2, 0);
+            } else if (12 > orderTotal && 20 > orderTotal) {
+                total = Math.max(orderTotal - 5, 0);
             } else {
                 // 随机 [10,20] 之间的数字
                 total = ThreadLocalRandom.current().nextInt(10, 21);
