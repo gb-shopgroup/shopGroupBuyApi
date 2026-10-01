@@ -435,8 +435,8 @@ public class MemberGroupController {
             } else {
                 // 晚上的数据, 早上6点之前, 到晚上8点之后, 共计10个小时
                 data = this.getNightGroupLogs(total, groupId);
-                // 放入redis缓存中(10个小时)
-                long timeout = 10 * 60 * 60;
+                // 放入redis缓存中(1个小时)
+                long timeout = 1 * 60 * 60;
                 redisHelper.setCacheObject(key, data, timeout, TimeUnit.SECONDS);
             }
             return data;

@@ -1,6 +1,7 @@
 package cn.com.shopgroup.service;
 
 import cn.com.shopgroup.order.model.GbOrderBusinessInfo;
+
 import java.util.List;
 
 public interface BusinessOrderService {
@@ -45,4 +46,5 @@ public interface BusinessOrderService {
     // CAS: 仅未退款的订单更新成功, 保证重复触发时幂等
     boolean syncBusinessOrderRefundStatus(String orderNo);
 
+    List<GbOrderBusinessInfo> getUnCalledWxUploadShippingInfo(int endTime, int limit);
 }

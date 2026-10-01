@@ -44,9 +44,9 @@ public class RedisHelper {
         redisTemplate.opsForValue().set(key, value, timeout, timeUnit);
     }
 
-    // 判断缓存 key 是否存在
-    public Boolean hasKey(String key) {
-        return redisTemplate.hasKey(key);
+    // 判断缓存 key 是否存在(null安全: 连接异常等场景返回false)
+    public boolean hasKey(String key) {
+        return Boolean.TRUE.equals(redisTemplate.hasKey(key));
     }
 
     // 获得缓存的基本对象，先判断是否存在哦
@@ -55,9 +55,9 @@ public class RedisHelper {
         return operation.get(key);
     }
 
-    // 删除单个对象
+    // 删除单个对象(null安全)
     public boolean deleteObject(String key) {
-        return redisTemplate.delete(key);
+        return Boolean.TRUE.equals(redisTemplate.delete(key));
     }
 
     /**
@@ -114,9 +114,9 @@ public class RedisHelper {
         crossDbTemplates.clear();
     }
 
-    // 设置有效时间及其时间单位
+    // 设置有效时间及其时间单位(null安全)
     public boolean expire(String key, long timeout, TimeUnit unit) {
-        return redisTemplate.expire(key, timeout, unit);
+        return Boolean.TRUE.equals(redisTemplate.expire(key, timeout, unit));
     }
 
     // 通用设置有效时间方法（时间单位：秒）
@@ -124,15 +124,15 @@ public class RedisHelper {
         return expire(key, timeout, TimeUnit.SECONDS);
     }
 
-    // 通用设置有效时间方法（时间单位：天）
+    // 通用设置有效时间方法（时间单位：天）(null安全)
     public boolean expireByDay(String key, long timeout) {
-        return redisTemplate.expire(key, timeout, TimeUnit.DAYS);
+        return Boolean.TRUE.equals(redisTemplate.expire(key, timeout, TimeUnit.DAYS));
     }
 
-    // 获取缓存剩余时间，单位为秒，返回0代表为永久有效
-    // 如果key没有设置过期时间或键不存在，将返回 null 或 -1
+    // 获取缓存剩余时间，单位为秒：-1=永久有效, -2=键不存在(null安全, 取不到时返回-1)
     public long getExpire(String key) {
-        return redisTemplate.getExpire(key);
+        Long expire = redisTemplate.getExpire(key);
+        return expire == null ? -1 : expire;
     }
 
 
@@ -179,9 +179,10 @@ public class RedisHelper {
         return redisTemplate.opsForList().range(key, 0, length);
     }
 
-    // 获取List的长度
+    // 获取List的长度(null安全: key不存在或取不到时返回0)
     public long getCacheListSize(String key) {
-        return redisTemplate.opsForList().size(key);
+        Long size = redisTemplate.opsForList().size(key);
+        return size == null ? 0 : size;
     }
 
     // 获取List中左端一个数据，这个数据会被移除
@@ -196,52 +197,57 @@ public class RedisHelper {
         return operations.rightPop(key);
     }
 
-    // 删除List中的缓存数据
+    // 删除List中的缓存数据(null安全)
     public <T> boolean removeCacheListItem(String key, T value) {
-        return redisTemplate.opsForList().remove(key, 0, value) > 0;
+        Long removed = redisTemplate.opsForList().remove(key, 0, value);
+        return removed != null && removed > 0;
     }
 
 
     /***********************************************************************/
 
 
-    // 获取锁
+    // 获取锁(null安全)
     public boolean getLock(String lock) {
-        return redisTemplate.opsForValue().setIfAbsent(lock, "1");
+        return Boolean.TRUE.equals(redisTemplate.opsForValue().setIfAbsent(lock, "1"));
     }
 
-    // 获取指定时间的锁(单位是秒)
+    // 获取指定时间的锁(单位是秒)(null安全)
     public boolean getLock(String lock, long timeout) {
-        return redisTemplate.opsForValue().setIfAbsent(lock, "1", timeout, TimeUnit.SECONDS);
+        return Boolean.TRUE.equals(redisTemplate.opsForValue().setIfAbsent(lock, "1", timeout, TimeUnit.SECONDS));
     }
 
-    // 释放锁
+    // 释放锁(null安全)
     public boolean releaseLock(String lock) {
-        return redisTemplate.delete(lock);
+        return Boolean.TRUE.equals(redisTemplate.delete(lock));
     }
 
 
     /***********************************************************************/
 
 
-    // 计数器累加指定数值
+    // 计数器累加指定数值(null安全: 取不到返回值时返回0)
     public long increment(String key, long value) {
-        return redisTemplate.opsForValue().increment(key, value);
+        Long result = redisTemplate.opsForValue().increment(key, value);
+        return result == null ? 0 : result;
     }
 
-    // 计数器累加 1
+    // 计数器累加 1(null安全: 取不到返回值时返回0)
     public long increment(String key) {
-        return redisTemplate.opsForValue().increment(key);
+        Long result = redisTemplate.opsForValue().increment(key);
+        return result == null ? 0 : result;
     }
 
-    // 计数器减少指定数值
+    // 计数器减少指定数值(null安全: 取不到返回值时返回0)
     public long decrement(String key, long value) {
-        return redisTemplate.opsForValue().decrement(key, value);
+        Long result = redisTemplate.opsForValue().decrement(key, value);
+        return result == null ? 0 : result;
     }
 
-    // 计数器减少 1
+    // 计数器减少 1(null安全: 取不到返回值时返回0)
     public long decrement(String key) {
-        return redisTemplate.opsForValue().decrement(key);
+        Long result = redisTemplate.opsForValue().decrement(key);
+        return result == null ? 0 : result;
     }
 
 
@@ -267,26 +273,28 @@ public class RedisHelper {
         return score != null;
     }
 
-    // 添加ZSet内容
+    // 添加ZSet内容(null安全)
     public boolean addZSetItem(String zSetKey, Integer id, Integer val) {
 
-        return redisTemplate.opsForZSet().add(zSetKey, id, val);
+        return Boolean.TRUE.equals(redisTemplate.opsForZSet().add(zSetKey, id, val));
     }
 
-    // 去掉ZSet内容
+    // 去掉ZSet内容(null安全: 取不到返回值时返回0)
     public long removeZSetItem(String zSetKey, Integer id) {
 
-        return redisTemplate.opsForZSet().remove(zSetKey, id);
+        Long removed = redisTemplate.opsForZSet().remove(zSetKey, id);
+        return removed == null ? 0 : removed;
     }
 
-    // 增加Zset分值
+    // 增加Zset分值(null安全: 取不到返回值时返回0)
     public double incrementZSetItemScore(String zSetKey, Integer id, Integer val) {
 
-        return redisTemplate.opsForZSet().incrementScore(zSetKey, id, val);
+        Double score = redisTemplate.opsForZSet().incrementScore(zSetKey, id, val);
+        return score == null ? 0 : score;
     }
 
-    // 获取ZSet分值
-    public double getZSetItemScore(String zSetKey, Integer id) {
+    // 获取ZSet分值(member不存在时返回null, 避免拆箱NPE)
+    public Double getZSetItemScore(String zSetKey, Integer id) {
 
         return redisTemplate.opsForZSet().score(zSetKey, id);
     }

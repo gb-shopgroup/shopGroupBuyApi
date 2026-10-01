@@ -182,24 +182,50 @@ public class OrderPaymentController {
     /**
      * 排除受限账户
      *
-     * @param businessList
-     * @return
+     * <p>账户"累计收款金额 + 本次订单金额"超过设置的最高收款金额(limitAmount)时, 剔除该账户;
+     * 查不到商户缓存信息(MerchantInfo)的账户不做额度限制, 直接保留(与原逻辑一致)。
+     *
+     * @param businessList 团长的收款账户列表
+     * @param orderAmount  本次订单金额(单位: 元)
+     * @return 未受额度限制的可用账户列表
      */
     private List<GbOrgBusinessInfo> handleLimitAmount(List<GbOrgBusinessInfo> businessList, Double orderAmount) {
-        List<GbOrgBusinessInfo> list = new ArrayList<>();
-        //double (元-> 分)
+        log.info("支付时判断团长收款账户受限制情况,团长账户businessList:{}", JSON.toJSONString(businessList));
+        List<GbOrgBusinessInfo> list = new ArrayList<>(businessList.size());
+        // 订单金额(单位: 分)
         int orderFee = MoneyUtil.yuanToCent(orderAmount);
-        for (GbOrgBusinessInfo gbs : businessList) {
-            MerchantInfo meInfo = merchantService.getLeaderMerchantInfo(gbs.getLeaderId(), gbs.getBusId());
-            if (!ObjectUtils.isEmpty(meInfo)) {
-                //如果账户超过设置最高收款金额，剔除
-                if ((meInfo.getMoney() + orderFee) * 100 > gbs.getLimitAmount() * 10000) {
-                    continue;
-                }
+        for (GbOrgBusinessInfo business : businessList) {
+            MerchantInfo merchantInfo = merchantService.getLeaderMerchantInfo(business.getLeaderId(), business.getBusId());
+            if (!ObjectUtils.isEmpty(merchantInfo) && isOverLimitAmount(merchantInfo, business, orderFee)) {
+                // 超过最高收款金额, 剔除该账户
+                log.info("支付时判断团长收款账户受限制账户信息:{}", JSON.toJSONString(business));
+                continue;
             }
-            list.add(gbs);
+            list.add(business);
         }
+        log.info("支付时判断团长收款账户受限制情况,可用账户list:{}", JSON.toJSONString(list));
         return list;
+    }
+
+    /**
+     * 判断账户加上本次订单金额后是否超过最高收款额度
+     *
+     * <p>比较式(与原有逻辑保持一致): (累计收款[分] + 订单金额[分]) * 100 > limitAmount * 10000;
+     * 使用 long 运算, 避免商户累计收款金额较大时 int 溢出为负数, 导致受限账户被误放行。
+     *
+     * @param merchantInfo 商户缓存信息(累计收款金额, 单位: 分)
+     * @param business     收款账户(limitAmount 为最高收款金额, 单位: 万)
+     * @param orderFee     本次订单金额(单位: 分)
+     */
+    private boolean isOverLimitAmount(MerchantInfo merchantInfo, GbOrgBusinessInfo business, int orderFee) {
+        // 商户累计收款金额(单位: 分), 缓存未初始化时按 0 处理
+        int merchantMoney = merchantInfo.getMoney() == null ? 0 : merchantInfo.getMoney();
+        // 最高收款金额, 未设置(null)时视为不限额, 避免拆箱 NPE 导致支付接口异常
+        Integer limitAmount = business.getLimitAmount();
+        if (limitAmount == null || limitAmount <= 0) {
+            return false;
+        }
+        return (merchantMoney + orderFee) * 100L > limitAmount * 10000L;
     }
 
     // 支付回调
@@ -396,14 +422,8 @@ public class OrderPaymentController {
     // 新的轮询算法: 按照收款金额从小到大排列, 取第一个即可
     private MerchantInfo getLeaderMinMoneyMerchantInfo(Long leaderId, List<GbOrgBusinessInfo> businessInfoList) {
 
-        // 就一个收款账户, 直接返回
-        if (businessInfoList.size() == 1) {
-            Long tempId = businessInfoList.get(0).getBusId();
-            String tempNo = businessInfoList.get(0).getCheckCustId();
-            return new MerchantInfo(tempId, tempNo, 0);
-        }
-
-        // 初始化Redis信息
+        // 初始化Redis信息(必须在单账户早退之前执行: 收款金额ZSet按月生成key,
+        // 跨月后新ZSet为空, 若不初始化会导致商户收款金额不累计)
         for (GbOrgBusinessInfo item : businessInfoList) {
             if (item.getIsClose() == 0) {
                 // 初始化商户和收款金额
@@ -413,6 +433,13 @@ public class OrderPaymentController {
                 // 考虑关闭某个商户的情况
                 merchantService.removeMerchantMoney(leaderId, item.getBusId());
             }
+        }
+
+        // 就一个收款账户, 直接返回
+        if (businessInfoList.size() == 1) {
+            Long tempId = businessInfoList.get(0).getBusId();
+            String tempNo = businessInfoList.get(0).getCheckCustId();
+            return new MerchantInfo(tempId, tempNo, 0);
         }
 
         // 获取最小收款商户金额
