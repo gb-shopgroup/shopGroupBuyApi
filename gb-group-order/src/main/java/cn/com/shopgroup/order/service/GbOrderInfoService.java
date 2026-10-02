@@ -144,10 +144,10 @@ public interface GbOrderInfoService {
     List<Map<String, Object>> getSummaryPointOrderGoodsList(Long leaderId, Long pointId, Integer startTime, Integer endTime);
 
     // (团长端首页)商品统计汇总: 订单商品总件数 + 待核销总件数
-    Map<String, Object> getSummaryGoodsTotal(Long leaderId, Long groupId,Long pointId, String keyword);
+    Map<String, Object> getSummaryGoodsTotal(Long leaderId, Long groupId, Long pointId, String keyword);
 
     // (团长端首页)商品维度统计分页列表
-    List<Map<String, Object>> getSummaryGoodsPageList(Long leaderId, Long groupId,Long pointId, String keyword, int offset, int limit);
+    List<Map<String, Object>> getSummaryGoodsPageList(Long leaderId, Long groupId, Long pointId, String keyword, int offset, int limit);
 
     List<Map<String, Object>> getSummaryPointOrderGoodsSkuList(Long leaderId, Long pointId, Long goodsId, Integer startTime, Integer endTime);
 
@@ -282,4 +282,20 @@ public interface GbOrderInfoService {
      * @param keyword 手机号(纯数字)或商品名称, 空则不过滤
      */
     List<GbOrderInfo> getLeaderApplyRefundOrderPage(Long leaderId, String keyword, int page, int pageSize);
+
+    Long getRefundApplyCount(Long leaderId);
+
+    /**
+     * (团长端-批量退款列表 /leader/approve/list)待审核退款申请订单分页列表, 用于团长批量勾选后审核退款:
+     * 口径与 getLeaderApplyRefundOrderPage 一致(订单状态5售后 + 存在待审核(apply_refund=1)商品行),
+     * 额外支持按团购(groupId, 传0/不传则不限)与商品名称(goodsName, 空则不限)过滤;
+     * 由 SQL 先筛选"存在待审核商品行"的订单再分页, 每单回填该笔申请的整笔待审核商品行
+     * (商品行不按 goodsName 过滤, 避免团长审核时只处理部分商品行造成遗漏)
+     *
+     * @param groupId   团购活动id, 必填
+     * @param goodsName 商品名称, 模糊匹配
+     */
+    List<GbOrderInfo> getApproveList(Long leaderId, Long groupId, String goodsName, int page, int pageSize);
+
+    Boolean LeaderUpdateMiniLeaderRefundOrder(String orderNo);
 }

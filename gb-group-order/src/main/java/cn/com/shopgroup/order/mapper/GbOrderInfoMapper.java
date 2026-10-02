@@ -47,6 +47,24 @@ public interface GbOrderInfoMapper extends BaseMapper<GbOrderInfo> {
     List<String> getLeaderApplyRefundOrderNoList(@Param("leaderId") Long leaderId, @Param("keyword") String keyword,
                                                  @Param("offset") int offset, @Param("limit") int limit);
 
+    // (团长端-批量退款列表 /leader/approve/list)待收货申请订单号分页:
+    // 额外支持"团购(groupId) + 商品名称(goodsName)"过滤; 由 SQL 先筛选再分页, 避免每页条数不足/申请被漏查
+    @Select({
+            "SELECT o.`order_no`",
+            "FROM `gb_order_info` AS o",
+            "JOIN `gb_order_goods_info` AS g ON g.`order_no` = o.`order_no`",
+            "WHERE o.`leader_id` = #{leaderId}",
+            "  AND o.`status` in (1,2) ",
+            "  AND (IFNULL(#{groupId}, 0) = 0 OR o.`group_id` = #{groupId})",
+            "  AND (IFNULL(#{goodsName}, '') = '' OR g.`goods_name` LIKE CONCAT('%', #{goodsName}, '%'))",
+            "GROUP BY o.`order_no`",
+            "ORDER BY MAX(o.`id`) DESC",
+            "LIMIT #{offset}, #{limit}"
+    })
+    List<String> getApproveOrderNoList(@Param("leaderId") Long leaderId, @Param("groupId") Long groupId,
+                                       @Param("goodsName") String goodsName,
+                                       @Param("offset") int offset, @Param("limit") int limit);
+
     // (团长)汇总订单数量, 已支付(pay_time>0), 未退款(refund_time=0), 区分已核销(verify_time>0)/未核销的数量
     @Select({
             "SELECT (CASE WHEN `verify_time` > 0 THEN 1 ELSE 0 END) AS is_receipt, COUNT(*) AS num_total",
@@ -406,4 +424,5 @@ public interface GbOrderInfoMapper extends BaseMapper<GbOrderInfo> {
      * 用户端-统计某团购活动的跟团人数 未取消的去重用户数
      */
     Integer countGroupMemberNum(@Param("groupId") Long groupId);
+
 }

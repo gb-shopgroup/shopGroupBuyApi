@@ -743,7 +743,20 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
         LambdaUpdateWrapper<GbOrderInfo> updateWrapper = Wrappers.lambdaUpdate();
         updateWrapper.eq(GbOrderInfo::getOrderNo, orderNo);
         updateWrapper.set(GbOrderInfo::getStatus, 4); // 已退款
-        //updateWrapper.set(GbOrderInfo::getRefundTime, TimeUtils.getTimeStamp());
+        updateWrapper.set(GbOrderInfo::getRefundTime, TimeUtils.getTimeStamp());
+        int flag = mapper.update(updateWrapper);
+        return flag > 0 ? true : false;
+    }
+
+    @Override
+    public Boolean LeaderUpdateMiniLeaderRefundOrder(String orderNo) {
+
+        LambdaUpdateWrapper<GbOrderInfo> updateWrapper = Wrappers.lambdaUpdate();
+        updateWrapper.eq(GbOrderInfo::getOrderNo, orderNo);
+        updateWrapper.set(GbOrderInfo::getStatus, 4); // 已退款
+        updateWrapper.set(GbOrderInfo::getRemark, "缺货,团长主动退货");
+        updateWrapper.set(GbOrderInfo::getRefundReason, "缺货,团长主动退货");
+        updateWrapper.set(GbOrderInfo::getRefundTime, TimeUtils.getTimeStamp());
         int flag = mapper.update(updateWrapper);
         return flag > 0 ? true : false;
     }
@@ -1496,6 +1509,8 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
     private void appendOrderStatusCondition(LambdaQueryWrapper<GbOrderInfo> queryWrapper, Integer status) {
 
         if (status == null) {
+            // 不传 status(查全部)时过滤掉已取消(6)的订单; 前端需要单独查看已取消订单时显式传 status=6
+            queryWrapper.ne(GbOrderInfo::getStatus, OrderStatusEnum.CANCELED.getCode());
             return;
         }
         if (status == OrderStatusEnum.APPLY_REFUND.getCode()) {
@@ -1633,6 +1648,71 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
                 continue;
             }
             order.setGoodsInfoList(goodsMap.getOrDefault(orderNo, new ArrayList<>()));
+            result.add(order);
+        }
+        return result;
+    }
+
+    // (团长端-退款申请列表)待审核申请订单总数: 口径与 getLeaderApplyRefundOrderPage 一致(订单状态5售后, 存在待审核(apply_refund=1)商品行)
+    @Override
+    public Long getRefundApplyCount(Long leaderId) {
+        Long count = mapper.getLeaderApplyRefundOrderCount(leaderId, null);
+        return count == null ? 0L : count;
+    }
+
+    // (团长端-批量退款列表 /leader/approve/list)待审核退款申请订单分页列表:
+    // 与 getLeaderApplyRefundOrderPage 同一口径(订单状态5售后 + 存在待审核(apply_refund=1)商品行), 额外支持团购/商品名称过滤
+    @Override
+    public List<GbOrderInfo> getApproveList(Long leaderId, Long groupId, String goodsName, int page, int pageSize) {
+        // 参数防御: 避免 limit 偏移量出现负数, pageSize 限制上限
+        page = Math.max(page, 1);
+        pageSize = Math.min(Math.max(pageSize, 1), 20);
+        String trimGoodsName = StringUtils.isEmpty(goodsName) ? null : goodsName.trim();
+
+        // 1. 按统一口径分页取订单号(SQL 内完成"存在待审核商品行 + 团购/商品名称命中"筛选, 保证每页条数与口径匹配)
+        int offset = (page - 1) * pageSize;
+        List<String> orderNos = mapper.getApproveOrderNoList(leaderId, groupId, trimGoodsName, offset, pageSize);
+        if (CollectionUtils.isEmpty(orderNos)) {
+            return new ArrayList<>();
+        }
+
+        // 2. 批量查询本页订单
+        LambdaQueryWrapper<GbOrderInfo> orderWrapper = Wrappers.lambdaQuery();
+        orderWrapper.in(GbOrderInfo::getOrderNo, orderNos);
+        List<GbOrderInfo> orderList = mapper.selectList(orderWrapper);
+        if (CollectionUtils.isEmpty(orderList)) {
+            return new ArrayList<>();
+        }
+
+        // 3. 批量查询待审核商品行(整笔申请的待审核行全部返回, 不按 goodsName 过滤商品名, 避免团长审核时遗漏商品行)
+        LambdaQueryWrapper<GbOrderGoodsInfo> goodsWrapper = Wrappers.lambdaQuery();
+        goodsWrapper.in(GbOrderGoodsInfo::getOrderNo, orderNos);
+        goodsWrapper.orderByDesc(GbOrderGoodsInfo::getId);
+        List<GbOrderGoodsInfo> goodsList = goodsMapper.selectList(goodsWrapper);
+
+        Map<String, List<GbOrderGoodsInfo>> goodsMap = new HashMap<>();
+        if (!CollectionUtils.isEmpty(goodsList)) {
+            for (GbOrderGoodsInfo item : goodsList) {
+                goodsMap.computeIfAbsent(item.getOrderNo(), k -> new ArrayList<>()).add(item);
+            }
+        }
+
+        // 4. 按分页顺序(order id desc)组装返回, 丢弃无待审核商品行的订单(避免返回空行订单)
+        Map<String, GbOrderInfo> orderMap = new HashMap<>();
+        for (GbOrderInfo item : orderList) {
+            orderMap.put(item.getOrderNo(), item);
+        }
+        List<GbOrderInfo> result = new ArrayList<>();
+        for (String orderNo : orderNos) {
+            GbOrderInfo order = orderMap.get(orderNo);
+            if (order == null) {
+                continue;
+            }
+            List<GbOrderGoodsInfo> orderGoods = goodsMap.get(orderNo);
+            if (CollectionUtils.isEmpty(orderGoods)) {
+                continue;
+            }
+            order.setGoodsInfoList(orderGoods);
             result.add(order);
         }
         return result;

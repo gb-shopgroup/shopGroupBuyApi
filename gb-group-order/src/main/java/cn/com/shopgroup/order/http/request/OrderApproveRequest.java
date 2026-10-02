@@ -16,5 +16,8 @@ public class OrderApproveRequest {
     //审核结果 1 同意 2 拒绝
     @NotNull(message = "审核结果不能为空")
     private Integer status;
+    //审核原因
     private String reason;
+    //同意来源 1 批量退款
+    private Integer type;
 }

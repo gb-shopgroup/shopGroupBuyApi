@@ -22,7 +22,7 @@ import cn.com.shopgroup.order.utils.OrderNoGeneratorUtils;
 import cn.com.shopgroup.user.model.GbMemberInfo;
 import cn.com.shopgroup.user.model.GbOrgPointInfo;
 import cn.com.shopgroup.user.model.GbOrgShopInfo;
-import cn.com.shopgroup.user.service.GbMemberAddressInfoService;
+import cn.com.shopgroup.user.service.GbMemberBlackListService;
 import cn.com.shopgroup.user.service.GbMemberInfoService;
 import cn.com.shopgroup.user.service.GbOrgPointInfoService;
 import cn.com.shopgroup.user.service.GbOrgShopInfoService;
@@ -70,10 +70,10 @@ public class OrderServiceImpl implements OrderService {
     private GbMemberInfoService memberService;
 
     @Resource
-    private GbMemberAddressInfoService addressService;
+    private GbOrgShopInfoService shopService;
 
     @Resource
-    private GbOrgShopInfoService shopService;
+    private GbMemberBlackListService memberBlackListService;
 
     @Resource
     private RedisHelper redisHelper;
@@ -110,6 +110,14 @@ public class OrderServiceImpl implements OrderService {
             return result;
         }
         Long memberLeaderId = memberInfo.getLeaderId();
+        /**
+         * 判断当前用户是不是黑名单
+         */
+        Boolean isBlackMember = memberBlackListService.getMemberBlackById(memberLeaderId, memberId);
+        if (isBlackMember) {
+            result.put("msg", "很遗憾,当前团长已限制您的下单权限");
+            return result;
+        }
         //绑定关系判断
         if (memberLeaderId == null || memberLeaderId.intValue() <= 0) {
             //绑定这个用户的团长

@@ -13,12 +13,15 @@ import cn.com.shopgroup.goods.service.GbGoodsSkuInfoService;
 import cn.com.shopgroup.goods.service.GbGroupActivityInfoService;
 import cn.com.shopgroup.order.constants.PaymentStatusEnum;
 import cn.com.shopgroup.order.exception.OrderErrorCodeEnum;
+import cn.com.shopgroup.order.http.request.LeaderApproveListRequest;
 import cn.com.shopgroup.order.http.request.LeaderRefundApplyListRequest;
 import cn.com.shopgroup.order.http.request.OrderApproveRequest;
 import cn.com.shopgroup.order.http.request.OrderRefundGoodsRequest;
 import cn.com.shopgroup.order.http.request.OrderRefundInfoRequest;
+import cn.com.shopgroup.order.http.response.LeaderBatchOrderResponse;
 import cn.com.shopgroup.order.http.response.LeaderRefundApplyListResponse;
 import cn.com.shopgroup.order.http.response.LeaderRefundApplyResponse;
+import cn.com.shopgroup.order.http.response.OrderResponse;
 import cn.com.shopgroup.order.model.GbOrderGoodsInfo;
 import cn.com.shopgroup.order.model.GbOrderGoodsRefundRecord;
 import cn.com.shopgroup.order.model.GbOrderInfo;
@@ -104,6 +107,7 @@ public class OrderRefundController {
         return JsonResult.success(total);
     }
 
+    //------暂时废弃
     // 批量查询用户退款申请数据(团长端): 把用户申请退的数据按订单+商品行结构化展示,
     // 只查"待审核"申请(售后订单 status=5 + 商品行 apply_refund=1),
     // 关键字 keyword(商品名称/手机号) 过滤, 分页返回;
@@ -125,7 +129,7 @@ public class OrderRefundController {
 
         // 待审核申请订单总数(不受分页影响, 口径与列表一致: 售后订单(5)+商品行apply_refund=1)
         Long total = orderInfoService.getLeaderApplyRefundOrderCount(leaderId, request.getKeyword());
-        // 待审核申请订单分页列表: 与总数同一口径(先由 SQL 筛选"存在待审核商品行"的订单再分页), 每单带该笔申请的待审核商品行
+        // 待审核申请订单分页列表: 口径=订单状态5售后 + 存在待审核(apply_refund=1)商品行, 并限定团购/商品名称; 每单回填该笔申请的整笔待审核商品行(不按商品名称过滤商品行, 避免团长审核时遗漏商品)
         List<GbOrderInfo> orderList = orderInfoService.getLeaderApplyRefundOrderPage(leaderId,
                 request.getKeyword(), page, pageSize);
         // 组装: 订单 + 最近一笔申请记录(类型/原因/金额)
@@ -144,6 +148,44 @@ public class OrderRefundController {
         response.setList(list);
         log.info("团长端-批量查询退款申请数据, leaderId:{}, resp:{}", JSON.toJSONString(response));
         return JsonResult.success(response);
+    }
+
+    //团长端-批量退款列表: 查询指定团购下"存在待待核销商品申请的订单, 支持按商品名称模糊搜索, 分页返回订单+该笔申请的待审核商品行, 供团长批量勾选后调 /leader/refund/approve 审核(同意=发起退款)
+    @PostMapping("/leader/approve/list")
+    public JsonResult approveList(@Validated @RequestBody LeaderApproveListRequest request) {
+        log.info("团长端-批量查询退款申请数据 /leader/approve/list, 参数request:{}", JSON.toJSONString(request));
+        // 从请求头中获取团长id
+        Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
+        if (leaderId == 0) {
+            throw new BusinessException(OrderErrorCodeEnum.LEADER_NOT_EXIST);
+        }
+        // 请求参数矫正
+        int page = Optional.ofNullable(request.getPage()).orElse(1);
+        int pageSize = Optional.ofNullable(request.getPageSize())
+                .map(size -> Math.min(size, 20))
+                .orElse(10);
+
+        // 待收货申请订单分页列表: 并限定团购/商品名称; 每单回填该笔申请的整笔待审核商品行(不按商品名称过滤商品行, 避免团长审核时遗漏商品)
+        List<GbOrderInfo> result = orderInfoService.getApproveList(leaderId, request.getGroupId(), request.getGoodsName(), page, pageSize);
+        List<LeaderBatchOrderResponse> data = LeaderBatchOrderResponse.getOrderResponseList(result);
+        log.info("团长端-批量退款列表返回, leaderId:{}, groupId:{}, goodsName:{}, page:{}, size:{}, data:{}", leaderId, request.getGroupId(), request.getGoodsName(), page, JSON.toJSONString(data));
+        return JsonResult.success(data);
+    }
+
+
+    //团长端-团购订单上面展示售后订单数
+    @PostMapping("/leader/get/refund/count")
+    public JsonResult getRefundApplyCount() {
+        log.info("团长端-团购订单上面展示售后订单数...");
+        // 从请求头中获取团长id
+        Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
+        if (leaderId == 0) {
+            throw new BusinessException(OrderErrorCodeEnum.LEADER_NOT_EXIST);
+        }
+        // 待审核申请订单总数(不受分页影响, 口径与列表一致: 售后订单(5)+商品行apply_refund=1)
+        Long total = orderInfoService.getRefundApplyCount(leaderId);
+        log.info("团长端-团购订单上面展示售后订单数, leaderId:{}, count:{}", total);
+        return JsonResult.success(total);
     }
 
     // 取该订单最近一笔"用户申请"记录: 优先取待审核(is_agree=0)的申请记录;
@@ -253,10 +295,11 @@ public class OrderRefundController {
                 }
             }
 */
-
+            // 1 来源于批量退款处
+            Integer type = approveRequest.getType();
             //同意处理
             if (approveStatus == 1) {
-                int m = handleAgree(leaderId, opId, opName, orderInfo, refundInfoRequest, reason);
+                int m = handleAgree(leaderId, opId, opName, orderInfo, refundInfoRequest, reason, type);
                 if (m == 0) {
                     continue;
                 }
@@ -329,7 +372,7 @@ public class OrderRefundController {
 
     //同意退款处理: 按本次申请金额发起退款, 主表refund_fee留待退款回调成功后累加
     //防多退三道防线: 1)订单维度分布式锁拦截重复/并发提交 2)商品行须仍处于待审核(已审核过的重复请求拒绝) 3)累计退款金额不超过订单实付
-    public int handleAgree(Long leaderId, Long opId, String opName, GbOrderInfo orderInfo, OrderRefundInfoRequest request, String reason) {
+    public int handleAgree(Long leaderId, Long opId, String opName, GbOrderInfo orderInfo, OrderRefundInfoRequest request, String reason,Integer sourceType) {
         // 申请退款账户
         String merchantNo = orderInfo.getMerchantNo();
         String orderNo = orderInfo.getOrderNo();
@@ -466,7 +509,11 @@ public class OrderRefundController {
                 refundRecord.setAddTime(TimeUtils.getTimeStamp());
                 refundRecordService.addRefundRecord(refundRecord);
                 // 审核同意且退款受理成功后维护订单主状态: 订单商品全部退完 -> 已退款(4), 否则只要有未退完的 -> 售后(5)
-                orderInfoService.updateOrderStatusAfterRefundAgree(orderNo);
+                if(sourceType != null && sourceType.intValue() ==1){
+                    orderInfoService.LeaderUpdateMiniLeaderRefundOrder(orderNo);
+                }else{
+                    orderInfoService.updateOrderStatusAfterRefundAgree(orderNo);
+                }
                 // 添加日志, 消息类型: 1=系统消息2=内部消息3=业务消息
                 byte type = 2;
                 String opString = "通过了";

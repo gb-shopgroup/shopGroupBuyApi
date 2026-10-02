@@ -995,6 +995,31 @@ def render_amount_migration():
 
 
 # ============================================================
+# 接口行为变更记录（非金额类的行为/语义变更, 供接入方同步；稳定后可清空）
+# ============================================================
+BEHAVIOR_CHANGES = [
+    ("2026-10-02", "/order/group/order/list", "POST",
+     "status 不传（查全部）时不再返回已取消(6)的订单；需查看已取消订单须显式传 status=6"),
+    ("2026-10-02", "/order/leader/order/list", "POST",
+     "同上（status 不传时过滤已取消订单, 显式传 6 可查）"),
+]
+
+
+def render_behavior_changes():
+    """渲染接口行为变更记录（返回语义/过滤规则等非金额类变更, 需接入方同步）"""
+    if not BEHAVIOR_CHANGES:
+        return ""
+    parts = ["## 接口行为变更记录\n"]
+    parts.append("> 接口字段、返回语义（非金额类）的行为变更记录，接入方需关注。\n")
+    parts.append("| 日期 | 接口 | 方式 | 变更 |")
+    parts.append("| --- | --- | --- | --- |")
+    for date, path, method, note in BEHAVIOR_CHANGES:
+        parts.append("| %s | `%s` | %s | %s |" % (date, path, method, note))
+    parts.append("")
+    return "\n".join(parts)
+
+
+# ============================================================
 # README.md 接口清单同步
 # ============================================================
 def collect_recent_changes(limit=15, since_days=14):
@@ -1142,6 +1167,9 @@ def main():
 
     # 金额字段变更记录（破坏性变更提示, 由 AMOUNT_MIGRATION 维护）
     lines.append(render_amount_migration())
+
+    # 接口行为变更记录（非金额类的行为/语义变更, 由 BEHAVIOR_CHANGES 维护）
+    lines.append(render_behavior_changes())
 
     # 近期变更（从 git log 自动提取, 仅做接口变更追踪参考, 不替代人工 commit message）
     lines.append(render_recent_changes(collect_recent_changes()))
