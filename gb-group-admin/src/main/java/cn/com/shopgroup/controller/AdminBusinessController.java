@@ -1,12 +1,11 @@
 package cn.com.shopgroup.controller;
 
 import cn.com.shopgroup.common.exception.BusinessException;
-import cn.com.shopgroup.common.merchant.MerchantInfo;
-import cn.com.shopgroup.common.merchant.MerchantService;
 import cn.com.shopgroup.common.utils.JsonResult;
-import cn.com.shopgroup.common.utils.MoneyUtil;
 import cn.com.shopgroup.exception.AdminErrorCodeEnum;
 import cn.com.shopgroup.http.request.LeaderBusinessRequest;
+import cn.com.shopgroup.order.model.GbLeaderMerchantMonthlyAmount;
+import cn.com.shopgroup.order.service.GbLeaderMerchantMonthlyAmountService;
 import cn.com.shopgroup.user.model.GbOrgBusinessInfo;
 import cn.com.shopgroup.user.service.GbOrgBusinessInfoService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,6 +15,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.Resource;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @RestController
@@ -25,7 +27,7 @@ public class AdminBusinessController {
     private GbOrgBusinessInfoService service;
 
     @Resource
-    private MerchantService merchantService;
+    private GbLeaderMerchantMonthlyAmountService merchantMonthlyAmountService;
 
 
     // 分页查询团长收款账户列表(含累计额度)
@@ -37,10 +39,15 @@ public class AdminBusinessController {
         if (pageSize > 20) pageSize = 20;
         List<GbOrgBusinessInfo> data = service.getAdminBusinessList(leaderId, page, pageSize);
 
-        // 从Redis中获取累计额度
+        // 从商户月收入表获取当月累计收款额度(替代原 Redis 月度 ZSet)
+        String yearMonth = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
         for (GbOrgBusinessInfo item : data) {
-            MerchantInfo info = merchantService.getLeaderMerchantInfo(item.getLeaderId(), item.getBusId());
-            if (info != null) item.setBusBalance(MoneyUtil.centToYuan(info.getMoney()));
+            GbLeaderMerchantMonthlyAmount monthlyAmount =
+                    merchantMonthlyAmountService.getByMerchantAndYearMonth(item.getLeaderId(), item.getCheckCustId(), yearMonth);
+            if (monthlyAmount != null) {
+                BigDecimal total = monthlyAmount.getTotalAmount();
+                item.setBusBalance(total == null ? 0D : total.doubleValue());
+            }
         }
 
         // 返回

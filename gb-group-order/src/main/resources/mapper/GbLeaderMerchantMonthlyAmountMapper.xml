@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.shopgroup.order.mapper.GbLeaderMerchantMonthlyAmountMapper">
+
+    <!-- 团长下的每个收款账户月收入表 -->
+    <resultMap id="BaseResultMap" type="cn.com.shopgroup.order.model.GbLeaderMerchantMonthlyAmount">
+        <id column="id" property="id"/>
+        <result column="leader_id" property="leaderId"/>
+        <result column="bus_id" property="busId"/>
+        <result column="merchant_no" property="merchantNo"/>
+        <result column="order_year_month" property="yearMonth"/>
+        <result column="total_amount" property="totalAmount"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id
+        , `leader_id`, `bus_id`, `merchant_no`, `order_year_month`, `total_amount`
+    </sql>
+
+    <!-- 收款金额累计入库: 唯一键(merchant_no, order_year_month)冲突时按增量累加 -->
+    <insert id="upsertTotalAmount">
+        INSERT INTO gb_leader_merchant_monthly_amount
+        (`leader_id`, `bus_id`, `merchant_no`, `order_year_month`, `total_amount`)
+        VALUES (#{leaderId}, #{busId}, #{merchantNo}, #{yearMonth}, #{totalAmount}) ON DUPLICATE KEY
+        UPDATE total_amount = total_amount + #{totalAmount}
+    </insert>
+
+</mapper>

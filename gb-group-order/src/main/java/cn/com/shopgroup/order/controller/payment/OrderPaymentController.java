@@ -3,8 +3,6 @@ package cn.com.shopgroup.order.controller.payment;
 import cn.com.shopgroup.common.cache.RedisConstant;
 import cn.com.shopgroup.common.cache.RedisHelper;
 import cn.com.shopgroup.common.exception.BusinessException;
-import cn.com.shopgroup.common.merchant.MerchantInfo;
-import cn.com.shopgroup.common.merchant.MerchantService;
 import cn.com.shopgroup.common.utils.CustomIdGenerator;
 import cn.com.shopgroup.common.utils.IpUtils;
 import cn.com.shopgroup.common.utils.JsonResult;
@@ -16,9 +14,11 @@ import cn.com.shopgroup.goods.service.GbGroupActivityInfoService;
 import cn.com.shopgroup.order.constants.OrderStatusEnum;
 import cn.com.shopgroup.order.constants.PaymentStatusEnum;
 import cn.com.shopgroup.order.exception.OrderErrorCodeEnum;
+import cn.com.shopgroup.order.model.GbLeaderMerchantMonthlyAmount;
 import cn.com.shopgroup.order.model.GbOrderBusinessInfo;
 import cn.com.shopgroup.order.model.GbOrderInfo;
 import cn.com.shopgroup.order.model.OrderTransactionLog;
+import cn.com.shopgroup.order.service.GbLeaderMerchantMonthlyAmountService;
 import cn.com.shopgroup.order.service.GbOrderBusinessInfoService;
 import cn.com.shopgroup.order.service.GbOrderInfoService;
 import cn.com.shopgroup.order.service.OrderTransactionLogService;
@@ -44,10 +44,11 @@ import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -65,10 +66,6 @@ public class OrderPaymentController {
 
     @Resource
     private RedisHelper redisHelper;
-
-    @Resource
-    private MerchantService merchantService;
-
     @Resource
     private GbOrgBusinessInfoService businessService;
     @Resource
@@ -77,6 +74,8 @@ public class OrderPaymentController {
     private GbGroupActivityInfoService groupService;
     @Resource
     private OrderTransactionLogService transactionLogService;
+    @Resource
+    private GbLeaderMerchantMonthlyAmountService merchantMonthlyAmountService;
     @Resource
     private WxMiniAccessTokenHelper tokenHelper;
     //订单支付时间30分钟，900秒；
@@ -129,18 +128,12 @@ public class OrderPaymentController {
             throw new BusinessException(OrderErrorCodeEnum.LEADER_INFO_ERROR);
         }
         List<GbOrgBusinessInfo> businessList = businessService.getMiniBusinessList(leaderId);
+        log.info("支付时-查询团长下的账户信息,leaderId:{},businessList:{}", leaderId, JSON.toJSONString(businessList));
         if (CollectionUtils.isEmpty(businessList)) {
             throw new BusinessException(OrderErrorCodeEnum.LEADER_NO_ACCOUNT);
         }
-        /**
-         * 去掉账户限制最多收款额度
-         */
-        List<GbOrgBusinessInfo> businessInfoList = handleLimitAmount(businessList, orderAmount);
-        if (CollectionUtils.isEmpty(businessInfoList)) {
-            throw new BusinessException(OrderErrorCodeEnum.ACCOUNT_LIMIT_EXCEEDED);
-        }
         // 新算法
-        MerchantInfo merchantInfo = this.getLeaderMinMoneyMerchantInfo(leaderId, businessInfoList);
+        GbLeaderMerchantMonthlyAmount merchantInfo = this.getLeaderMinMoneyMerchantInfo(leaderId, businessList, orderAmount);
         Long busId = merchantInfo.getBusId();
         String merchantNo = merchantInfo.getMerchantNo();
 
@@ -182,26 +175,36 @@ public class OrderPaymentController {
     /**
      * 排除受限账户
      *
-     * <p>账户"累计收款金额 + 本次订单金额"超过设置的最高收款金额(limitAmount)时, 剔除该账户;
-     * 查不到商户缓存信息(MerchantInfo)的账户不做额度限制, 直接保留(与原逻辑一致)。
+     * <p>账户"当月累计收款金额 + 本次订单金额"超过设置的最高收款金额(limitAmount)时, 剔除该账户;
+     * 当月无收款记录的账户(新商户/跨月首笔)视为累计收款 0, 参与额度判断。
      *
      * @param businessList 团长的收款账户列表
      * @param orderAmount  本次订单金额(单位: 元)
-     * @return 未受额度限制的可用账户列表
+     * @return 未受额度限制的可用账户列表(每项含 leaderId / busId / merchantNo / totalAmount)
      */
-    private List<GbOrgBusinessInfo> handleLimitAmount(List<GbOrgBusinessInfo> businessList, Double orderAmount) {
+    private List<GbLeaderMerchantMonthlyAmount> handleLimitAmount(List<GbOrgBusinessInfo> businessList, Double orderAmount) {
         log.info("支付时判断团长收款账户受限制情况,团长账户businessList:{}", JSON.toJSONString(businessList));
-        List<GbOrgBusinessInfo> list = new ArrayList<>(businessList.size());
+        List<GbLeaderMerchantMonthlyAmount> list = new ArrayList<>(businessList.size());
         // 订单金额(单位: 分)
         int orderFee = MoneyUtil.yuanToCent(orderAmount);
+        String yearMonth = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
         for (GbOrgBusinessInfo business : businessList) {
-            MerchantInfo merchantInfo = merchantService.getLeaderMerchantInfo(business.getLeaderId(), business.getBusId());
-            if (!ObjectUtils.isEmpty(merchantInfo) && isOverLimitAmount(merchantInfo, business, orderFee)) {
+            GbLeaderMerchantMonthlyAmount merchantInfo = merchantMonthlyAmountService.getByMerchantAndYearMonth(business.getLeaderId(), business.getCheckCustId(), yearMonth);
+            if (ObjectUtils.isEmpty(merchantInfo)) {
+                // 当月无收款记录: 构造累计收款 0 的内存对象(不落库), 保证后续限额判断与最小值比较口径统一
+                merchantInfo = new GbLeaderMerchantMonthlyAmount();
+                merchantInfo.setLeaderId(business.getLeaderId());
+                merchantInfo.setBusId(business.getBusId());
+                merchantInfo.setMerchantNo(business.getCheckCustId());
+                merchantInfo.setYearMonth(yearMonth);
+                merchantInfo.setTotalAmount(BigDecimal.ZERO);
+            }
+            if (isOverLimitAmount(merchantInfo, business, orderFee)) {
                 // 超过最高收款金额, 剔除该账户
                 log.info("支付时判断团长收款账户受限制账户信息:{}", JSON.toJSONString(business));
                 continue;
             }
-            list.add(business);
+            list.add(merchantInfo);
         }
         log.info("支付时判断团长收款账户受限制情况,可用账户list:{}", JSON.toJSONString(list));
         return list;
@@ -210,19 +213,20 @@ public class OrderPaymentController {
     /**
      * 判断账户加上本次订单金额后是否超过最高收款额度
      *
-     * <p>比较式(与原有逻辑保持一致): (累计收款[分] + 订单金额[分]) * 100 > limitAmount * 10000;
+     * <p>比较式(与原有逻辑保持一致): (当月累计收款[分] + 订单金额[分]) * 100 > limitAmount * 10000;
      * 使用 long 运算, 避免商户累计收款金额较大时 int 溢出为负数, 导致受限账户被误放行。
      *
-     * @param merchantInfo 商户缓存信息(累计收款金额, 单位: 分)
+     * @param merchantInfo 商户月收入记录(totalAmount 为当月累计收款金额, 单位: 元)
      * @param business     收款账户(limitAmount 为最高收款金额, 单位: 万)
      * @param orderFee     本次订单金额(单位: 分)
      */
-    private boolean isOverLimitAmount(MerchantInfo merchantInfo, GbOrgBusinessInfo business, int orderFee) {
-        // 商户累计收款金额(单位: 分), 缓存未初始化时按 0 处理
-        int merchantMoney = merchantInfo.getMoney() == null ? 0 : merchantInfo.getMoney();
+    private boolean isOverLimitAmount(GbLeaderMerchantMonthlyAmount merchantInfo, GbOrgBusinessInfo business, int orderFee) {
+        // 商户当月累计收款金额: 数据库单位为元, 换算为分再参与比较; null 时按 0 处理
+        BigDecimal totalYuan = merchantInfo.getTotalAmount() == null ? BigDecimal.ZERO : merchantInfo.getTotalAmount();
+        int merchantMoney = totalYuan.movePointRight(2).setScale(0, RoundingMode.HALF_UP).intValue();
         // 最高收款金额, 未设置(null)时视为不限额, 避免拆箱 NPE 导致支付接口异常
         Integer limitAmount = business.getLimitAmount();
-        if (limitAmount == null || limitAmount <= 0) {
+        if (limitAmount == null || limitAmount < 0) {
             return false;
         }
         return (merchantMoney + orderFee) * 100L > limitAmount * 10000L;
@@ -353,9 +357,9 @@ public class OrderPaymentController {
         transactionLog.setAddTime(TimeUtils.getTimeStamp());
         transactionLog.setPayStatus(PaymentStatusEnum.SUCCESS.getCode());
         handleInsertTransaction(transactionLog);
-        // 累加商户收款金额
+        // 累加商户月收款金额(gb_leader_merchant_monthly_amount 表, 替代原 Redis 月度 ZSet)
         int merchantMoney = MoneyUtil.yuanToCent(orderInfo.getOrderPrice());
-        merchantService.addMerchantMoney(orderInfo.getLeaderId(), orderInfo.getBusId(), merchantMoney);
+        saveMerchantMonthlyAmount(orderInfo, merchantMoney);
         // 累加团购订单数量
         groupService.addGroupOrderNumber(orderInfo.getGroupId());
         delRedisKey(orderInfo.getGroupId());
@@ -363,6 +367,30 @@ public class OrderPaymentController {
         handleWxUploadShippingInfo(orderInfo, channelTrxId);
         // 返回
         return "success";
+    }
+
+    /**
+     * 商户月收款金额落库累计(gb_leader_merchant_monthly_amount 表)
+     *
+     * <p>替代原 Redis 月度 ZSet(merchantzset:{leaderId}:{yyyyMM}, 仅保留 30 天、跨月即清零)的商户月收款统计;
+     * ON DUPLICATE KEY UPDATE 原子累加, 并发回调安全; 落库失败仅记日志, 不影响支付回调主流程。
+     *
+     * @param orderInfo         已支付订单(取 leaderId/busId/merchantNo)
+     * @param merchantMoneyCent 本次收款金额(单位: 分)
+     */
+    private void saveMerchantMonthlyAmount(GbOrderInfo orderInfo, int merchantMoneyCent) {
+        if (StringUtils.isEmpty(orderInfo.getMerchantNo())) {
+            log.warn("商户月收款金额落库跳过, 订单缺少商户号, orderNo:{}", orderInfo.getOrderNo());
+            return;
+        }
+        try {
+            String yearMonth = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
+            BigDecimal amount = BigDecimal.valueOf(merchantMoneyCent).movePointLeft(2).setScale(2, RoundingMode.HALF_UP);
+            merchantMonthlyAmountService.addTotalAmount(orderInfo.getLeaderId(), orderInfo.getBusId(), orderInfo.getMerchantNo(), yearMonth, amount);
+        } catch (Exception e) {
+            log.error("商户月收款金额落库失败, orderNo:{}, merchantNo:{}, amountCent:{}",
+                    orderInfo.getOrderNo(), orderInfo.getMerchantNo(), merchantMoneyCent, e);
+        }
     }
 
     private void delRedisKey(Long groupId) {
@@ -419,31 +447,32 @@ public class OrderPaymentController {
         return WxMiniProgramHelper.uploadShippingInfo(accessToken, transactionId, orderInfo.getGroupName(), orderInfo.getOpenid());
     }
 
-    // 新的轮询算法: 按照收款金额从小到大排列, 取第一个即可
-    private MerchantInfo getLeaderMinMoneyMerchantInfo(Long leaderId, List<GbOrgBusinessInfo> businessInfoList) {
+    // 新的轮询算法: 先剔除超过最高收款额度的受限账户, 再取当月累计收款金额最小的账户
+    private GbLeaderMerchantMonthlyAmount getLeaderMinMoneyMerchantInfo(Long leaderId, List<GbOrgBusinessInfo> businessInfoList, Double orderAmount) {
 
-        // 初始化Redis信息(必须在单账户早退之前执行: 收款金额ZSet按月生成key,
-        // 跨月后新ZSet为空, 若不初始化会导致商户收款金额不累计)
-        for (GbOrgBusinessInfo item : businessInfoList) {
-            if (item.getIsClose() == 0) {
-                // 初始化商户和收款金额
-                merchantService.initMerchantInfo(item.getBusId(), item.getCheckCustId());
-                merchantService.initMerchantMoney(leaderId, item.getBusId(), 0);
-            } else {
-                // 考虑关闭某个商户的情况
-                merchantService.removeMerchantMoney(leaderId, item.getBusId());
+        if (CollectionUtils.isEmpty(businessInfoList)) {
+            throw new BusinessException(OrderErrorCodeEnum.LEADER_NO_ACCOUNT);
+        }
+        // 1. 剔除受限账户
+        List<GbLeaderMerchantMonthlyAmount> availableList = handleLimitAmount(businessInfoList, orderAmount);
+        if (CollectionUtils.isEmpty(availableList)) {
+            // 全部账户都超过最高收款额度, 暂时无法支付
+            throw new BusinessException(OrderErrorCodeEnum.ACCOUNT_LIMIT_EXCEEDED);
+        }
+
+        // 2. 取当月累计收款金额最小的账户(收款最少的优先收款, 各账户月收入趋于均衡; totalAmount 为 null 时按 0 处理)
+        GbLeaderMerchantMonthlyAmount minMerchant = null;
+        BigDecimal minTotal = null;
+        for (GbLeaderMerchantMonthlyAmount item : availableList) {
+            BigDecimal total = item.getTotalAmount() == null ? BigDecimal.ZERO : item.getTotalAmount();
+            if (minMerchant == null || total.compareTo(minTotal) < 0) {
+                minMerchant = item;
+                minTotal = total;
             }
         }
-
-        // 就一个收款账户, 直接返回
-        if (businessInfoList.size() == 1) {
-            Long tempId = businessInfoList.get(0).getBusId();
-            String tempNo = businessInfoList.get(0).getCheckCustId();
-            return new MerchantInfo(tempId, tempNo, 0);
-        }
-
-        // 获取最小收款商户金额
-        return merchantService.getLeaderMonthMinMoneyMerchantInfo(leaderId);
+        log.info("支付时选择当月收款金额最小的账户, leaderId:{}, busId:{}, merchantNo:{}, 当月累计收款:{}元",
+                leaderId, minMerchant.getBusId(), minMerchant.getMerchantNo(), minTotal);
+        return minMerchant;
     }
 
     // 计算订单分账金额算法
@@ -479,66 +508,5 @@ public class OrderPaymentController {
         if (busFee < 0) busFee = 0;
         orderBusinessInfo.setBusFee(busFee);
     }
-
-    // 测试分账算法和轮询算法
-    //@GetMapping("/order/order/test")
-    public String test() {
-
-        Long leaderId = 1l;
-        List<GbOrgBusinessInfo> businessInfoList = new ArrayList<>();
-        GbOrgBusinessInfo temp01 = new GbOrgBusinessInfo();
-        temp01.setBusId(10l);
-        temp01.setLeaderId(leaderId);
-        temp01.setCheckCustId("9001");
-        businessInfoList.add(temp01);
-        GbOrgBusinessInfo temp02 = new GbOrgBusinessInfo();
-        temp02.setBusId(11l);
-        temp02.setLeaderId(leaderId);
-        temp02.setCheckCustId("9002");
-        businessInfoList.add(temp02);
-        GbOrgBusinessInfo temp03 = new GbOrgBusinessInfo();
-        temp03.setBusId(12l);
-        temp03.setLeaderId(leaderId);
-        temp03.setCheckCustId("9003");
-        businessInfoList.add(temp03);
-
-        // 随机一个待支付金额
-        Random random = new Random();
-        double raw = 7 + random.nextDouble() * 2;
-        BigDecimal decimal = new BigDecimal(raw);
-        double orderPrice = decimal.setScale(2, RoundingMode.HALF_UP).doubleValue();
-        System.out.println("本次支付金额 orderPrice = " + orderPrice + " 元");
-
-        // 获取收款商户
-        MerchantInfo merchantInfo = this.getLeaderMinMoneyMerchantInfo(leaderId, businessInfoList);
-        System.out.println("本次收款账户 busId = " + merchantInfo.getBusId());
-        System.out.println("本次收款账户 merchantNo = " + merchantInfo.getMerchantNo());
-
-        // 计算分账金额
-        GbOrderBusinessInfo orderBusinessInfo = new GbOrderBusinessInfo();
-        orderBusinessInfo.setLeaderId(leaderId);
-        int payPrice = MoneyUtil.yuanToCent(orderPrice);
-        this.calculateOrderDivideMoney(orderBusinessInfo, orderPrice, payPrice);
-        System.out.println("计算分账金额--订单金额 orderFee = " + MoneyUtil.centToYuan(orderBusinessInfo.getOrderFee()) + " 元");
-        System.out.println("计算分账金额--实到金额 receivedFee = " + MoneyUtil.centToYuan(orderBusinessInfo.getReceivedFee()) + " 元");
-        System.out.println("计算分账金额--平台抽成 serviceFee = " + MoneyUtil.centToYuan(orderBusinessInfo.getServiceFee()) + " 元");
-        System.out.println("计算分账金额--商户分账 busFee = " + MoneyUtil.centToYuan(orderBusinessInfo.getBusFee()) + " 元");
-
-        // 累加商户收款金额
-        int merchantMoney = MoneyUtil.yuanToCent(orderPrice);
-        merchantService.addMerchantMoney(leaderId, merchantInfo.getBusId(), merchantMoney);
-
-        // 查询Redis缓存信息
-        for (GbOrgBusinessInfo temp : businessInfoList) {
-
-            MerchantInfo info = merchantService.getLeaderMerchantInfo(leaderId, temp.getBusId());
-            System.out.println("Redis缓存 busId = " + info.getBusId());
-            System.out.println("Redis缓存 merchantNo = " + info.getMerchantNo());
-            System.out.println("Redis缓存 busMoney = " + MoneyUtil.centToYuan(info.getMoney()) + " 元");
-        }
-
-        return "ok";
-    }
-
 
 }
