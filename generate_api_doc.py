@@ -1002,6 +1002,9 @@ BEHAVIOR_CHANGES = [
      "status 不传（查全部）时不再返回已取消(6)的订单；需查看已取消订单须显式传 status=6"),
     ("2026-10-02", "/order/leader/order/list", "POST",
      "同上（status 不传时过滤已取消订单, 显式传 6 可查）"),
+    ("2026-10-03", "/admin/business/list", "GET",
+     "busBalance 数据源由 Redis 月度缓存改为 gb_leader_merchant_monthly_amount 表，恒为当月累计收款（元）；"
+     "原 Redis 缓存跨月清零/30 天过期导致的归零问题不再出现"),
 ]
 
 

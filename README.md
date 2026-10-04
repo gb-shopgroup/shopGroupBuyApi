@@ -131,7 +131,7 @@ Maven 依赖仓库使用阿里云镜像（`https://maven.aliyun.com/repository/p
 
 ### 4.4 gb-group-goods — 商品 / 团购服务
 
-覆盖：商品（分类、图片、包装、规格、规格值、SKU、库存）、团长商品管理、团购活动查询等。**22 个接口**。
+覆盖：商品（分类、图片、包装、规格、规格值、SKU、库存）、团长商品管理、团购活动查询等。**23 个接口**。
 
 ### 4.5 gb-group-order — 订单 / 支付 / 分账服务
 
@@ -288,7 +288,7 @@ mvn -pl gb-group-task spring-boot:run
 | `page` / `pageSize` | 页码（从 1 开始）/ 每页条数 |
 | `start` / `end` | 开始时间 / 结束时间（如 yyyy-MM-dd） |
 
-- **接口数量统计**：user 47 个、order 49 个、goods 22 个、admin 29 个、task 8 个，合计 **155 个**。
+- **接口数量统计**：user 47 个、order 49 个、goods 23 个、admin 29 个、task 8 个，合计 **156 个**。
 - **详细版接口文档**（含每个接口的完整入参 / 出参字段说明，参数含义、必填、嵌套字段均已细化）见根目录 **`API接口文档.md`**，可通过 `python3 generate_api_doc.py` 扫描各模块 `*Controller.java` 重新生成。下方为接口总览清单。
 
 ### 8.2 接口清单
@@ -515,7 +515,7 @@ mvn -pl gb-group-task spring-boot:run
 | 1 | GET | `/order/payment/order/pay` | *支付（支付订单）* | **orderNo** (String); **openid** (String) |
 | 2 | POST | `/order/payment/order/notify` | *回调（支付订单）* | 无 |
 
-#### 8.2.3 gb-group-goods（商品/团购）— 22 个接口
+#### 8.2.3 gb-group-goods（商品/团购）— 23 个接口
 
 **GroupGoodsController**（`cn.com.shopgroup.goods.controller`）
 
@@ -553,6 +553,7 @@ mvn -pl gb-group-task spring-boot:run
 | 8 | GET | `/goods/Leader/get/groupActivity/cat` | *查询团长团购活动分类* | 无 |
 | 9 | POST | `/goods/Leader/share/groupActivity/poster` | *提交（团长分享团购活动海报）* | **groupId** (Long) |
 | 10 | POST | `/goods/Leader/share/groupActivity/make/poster` | *提交（团长分享团购活动海报）* | **groupId** (Long) |
+| 11 | POST | `/goods/Leader/share/groupActivity/goods/poster` | *提交（团长分享团购活动商品海报）* | **groupId** (Long); **goodsId** (Long) |
 
 #### 8.2.4 gb-group-admin（后台管理）— 29 个接口
 

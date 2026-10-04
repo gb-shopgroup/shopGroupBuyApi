@@ -1,6 +1,6 @@
 # ShopGroupBuyApi 接口文档（详细版）
 
-> 自动生成时间：2026-10-02 19:12:05
+> 自动生成时间：2026-10-04 09:26:46
 
 > 生成方式：扫描各模块 `*Controller.java` 源码（`python3 generate_api_doc.py` 可重新生成）
 
@@ -37,6 +37,7 @@
 | --- | --- | --- | --- |
 | 2026-10-02 | `/order/group/order/list` | POST | status 不传（查全部）时不再返回已取消(6)的订单；需查看已取消订单须显式传 status=6 |
 | 2026-10-02 | `/order/leader/order/list` | POST | 同上（status 不传时过滤已取消订单, 显式传 6 可查） |
+| 2026-10-03 | `/admin/business/list` | GET | busBalance 数据源由 Redis 月度缓存改为 gb_leader_merchant_monthly_amount 表，恒为当月累计收款（元）；原 Redis 缓存跨月清零/30 天过期导致的归零问题不再出现 |
 
 ## 近期变更
 
@@ -45,6 +46,9 @@
 
 | 日期 | 提交 | 摘要 | 涉及文件 |
 | --- | --- | --- | --- |
+| 2026-10-04 | `46519ab` | 分享团购商品 | LeaderGroupManageController.java |
+| 2026-10-03 | `7ecc33c` | 收款账户弃缓存-用DB。 | AdminBusinessController.java, OrderPaymentController.java |
+| 2026-10-02 | `b50b8fa` | 批量退款 | LeaderApproveListRequest.java, LeaderBatchOrderGoodsResponse.java, LeaderBatchOrderResponse.java, LeaderOrderListRequest.java, MemberOrderListRequest.java 等 |
 | 2026-10-01 | `529b050` | redis 取值null处理成0 | MemberGroupController.java, OrderPaymentController.java |
 | 2026-09-28 | `0cea9b7` | c端团购活动详情 | MemberGroupController.java |
 | 2026-09-28 | `97f155f` | c端团购活动详情 | MemberGroupController.java, OrderPaymentController.java |
@@ -57,15 +61,12 @@
 | 2026-09-24 | `5831cee` | prod  -mysql | OrderResponse.java |
 | 2026-09-22 | `8d59591` | 自提点修改 | LeaderPointController.java, OrderRequest.java |
 | 2026-09-22 | `190aeda` | 商品 | LeaderGoodsManageController.java, MemberHomeGroupActResponse.java, OrderRefundController.java, OrderRefundNotifyController.java |
-| 2026-09-21 | `28c884b` | 商品 | LeaderGoodsManageController.java |
-| 2026-09-21 | `c2d1be6` | 商品 | LeaderGoodsManageController.java, MemberGroupController.java, OrderPaymentController.java, OrderRefundController.java, TaskController.java |
-| 2026-09-21 | `44fd5de` | 先排训商品 | LeaderGroupManageController.java, MemberGroupController.java |
 
 ## 目录
 
 1. [**gb-group-user**（用户/团长/员工）](#1-gb-group-user用户团长员工) — 47 个接口
 2. [**gb-group-order**（订单/退款/分账）](#2-gb-group-order订单退款分账) — 49 个接口
-3. [**gb-group-goods**（商品/团购）](#3-gb-group-goods商品团购) — 22 个接口
+3. [**gb-group-goods**（商品/团购）](#3-gb-group-goods商品团购) — 23 个接口
 4. [**gb-group-admin**（后台管理）](#4-gb-group-admin后台管理) — 29 个接口
 5. [**gb-group-task**（定时任务）](#5-gb-group-task定时任务) — 8 个接口
 
@@ -73,7 +74,7 @@
 
 ## 接口总览索引
 
-> 共 155 个接口，按下表序号定位到下方各模块接口详情；「功能说明」列为 `—` 表示源码无方法注释，可按入参 / 出参字段推断用途。
+> 共 156 个接口，按下表序号定位到下方各模块接口详情；「功能说明」列为 `—` 表示源码无方法注释，可按入参 / 出参字段推断用途。
 
 | 序号 | 模块 | 方式 | 路径 | 功能说明 |
 | --- | --- | --- | --- | --- |
@@ -195,43 +196,44 @@
 | [116](#116-get-goodsleadergetgroupactivitycat) | goods | GET | `/goods/Leader/get/groupActivity/cat` | *查询团长团购活动分类* |
 | [117](#117-post-goodsleadersharegroupactivityposter) | goods | POST | `/goods/Leader/share/groupActivity/poster` | *提交（团长分享团购活动海报）* |
 | [118](#118-post-goodsleadersharegroupactivitymakeposter) | goods | POST | `/goods/Leader/share/groupActivity/make/poster` | *提交（团长分享团购活动海报）* |
-| [119](#119-get-adminbusinesslist) | admin | GET | `/admin/business/list` | *查询收款账户列表* |
-| [120](#120-get-adminbusinesscount) | admin | GET | `/admin/business/count` | *查询收款账户总数* |
-| [121](#121-get-adminbusinessinfo) | admin | GET | `/admin/business/info` | *查询收款账户详情* |
-| [122](#122-post-adminbusinessadd) | admin | POST | `/admin/business/add` | *新增收款账户* |
-| [123](#123-get-admingoodslist) | admin | GET | `/admin/goods/list` | *查询商品列表* |
-| [124](#124-get-admingoodscount) | admin | GET | `/admin/goods/count` | *查询商品总数* |
-| [125](#125-get-admingoodsinfo) | admin | GET | `/admin/goods/info` | *查询商品详情* |
-| [126](#126-get-admingoodsimg) | admin | GET | `/admin/goods/img` | *查询商品图片* |
-| [127](#127-get-admingrouplist) | admin | GET | `/admin/group/list` | *查询团购列表* |
-| [128](#128-get-admingroupcount) | admin | GET | `/admin/group/count` | *查询团购总数* |
-| [129](#129-get-admingroupinfo) | admin | GET | `/admin/group/info` | *查询团购详情* |
-| [130](#130-get-admintaglist) | admin | GET | `/admin/tag/list` | *查询标签列表* |
-| [131](#131-get-admintagcount) | admin | GET | `/admin/tag/count` | *查询标签总数* |
-| [132](#132-get-admintaginfo) | admin | GET | `/admin/tag/info` | *查询标签详情* |
-| [133](#133-post-admintagadd) | admin | POST | `/admin/tag/add` | *新增标签* |
-| [134](#134-post-admintagedit) | admin | POST | `/admin/tag/edit` | *修改标签* |
-| [135](#135-post-admintagdelete) | admin | POST | `/admin/tag/delete` | *删除标签* |
-| [136](#136-get-adminleaderlist) | admin | GET | `/admin/leader/list` | *查询团长列表* |
-| [137](#137-get-adminleadercount) | admin | GET | `/admin/leader/count` | *查询团长总数* |
-| [138](#138-post-adminleaderadd) | admin | POST | `/admin/leader/add` | *新增团长* |
-| [139](#139-get-adminleaderselect) | admin | GET | `/admin/leader/select` | *查询团长* |
-| [140](#140-get-adminloginkaptcha) | admin | GET | `/admin/login/kaptcha` | *查询验证码* |
-| [141](#141-post-adminloginsubmit) | admin | POST | `/admin/login/submit` | *提交* |
-| [142](#142-get-adminmemberlist) | admin | GET | `/admin/member/list` | *查询会员列表* |
-| [143](#143-get-adminmembercount) | admin | GET | `/admin/member/count` | *查询会员总数* |
-| [144](#144-get-adminorderbusinesslist) | admin | GET | `/admin/orderbusiness/list` | *查询订单收款账户列表* |
-| [145](#145-get-adminorderbusinesscount) | admin | GET | `/admin/orderbusiness/count` | *查询订单收款账户总数* |
-| [146](#146-get-adminorderlist) | admin | GET | `/admin/order/list` | *查询订单列表* |
-| [147](#147-get-adminordercount) | admin | GET | `/admin/order/count` | *查询订单总数* |
-| [148](#148-get-taskordersend) | task | GET | `/task/order/send` | *发送（订单）* |
-| [149](#149-get-taskorderdivide) | task | GET | `/task/order/divide` | *分账（订单）* |
-| [150](#150-get-taskorderquery) | task | GET | `/task/order/query` | *查询订单* |
-| [151](#151-get-taskorderrefund) | task | GET | `/task/order/refund` | *退款（订单）* |
-| [152](#152-get-taskordercash) | task | GET | `/task/order/cash` | *查询订单提现* |
-| [153](#153-get-taskorderverify) | task | GET | `/task/order/verify` | *核销（订单）* |
-| [154](#154-get-taskorderbackstock) | task | GET | `/task/order/backstock` | *回库（订单）* |
-| [155](#155-get-tasktestuser) | task | GET | `/task/test/user` | *查询测试用户* |
+| [119](#119-post-goodsleadersharegroupactivitygoodsposter) | goods | POST | `/goods/Leader/share/groupActivity/goods/poster` | *提交（团长分享团购活动商品海报）* |
+| [120](#120-get-adminbusinesslist) | admin | GET | `/admin/business/list` | *查询收款账户列表* |
+| [121](#121-get-adminbusinesscount) | admin | GET | `/admin/business/count` | *查询收款账户总数* |
+| [122](#122-get-adminbusinessinfo) | admin | GET | `/admin/business/info` | *查询收款账户详情* |
+| [123](#123-post-adminbusinessadd) | admin | POST | `/admin/business/add` | *新增收款账户* |
+| [124](#124-get-admingoodslist) | admin | GET | `/admin/goods/list` | *查询商品列表* |
+| [125](#125-get-admingoodscount) | admin | GET | `/admin/goods/count` | *查询商品总数* |
+| [126](#126-get-admingoodsinfo) | admin | GET | `/admin/goods/info` | *查询商品详情* |
+| [127](#127-get-admingoodsimg) | admin | GET | `/admin/goods/img` | *查询商品图片* |
+| [128](#128-get-admingrouplist) | admin | GET | `/admin/group/list` | *查询团购列表* |
+| [129](#129-get-admingroupcount) | admin | GET | `/admin/group/count` | *查询团购总数* |
+| [130](#130-get-admingroupinfo) | admin | GET | `/admin/group/info` | *查询团购详情* |
+| [131](#131-get-admintaglist) | admin | GET | `/admin/tag/list` | *查询标签列表* |
+| [132](#132-get-admintagcount) | admin | GET | `/admin/tag/count` | *查询标签总数* |
+| [133](#133-get-admintaginfo) | admin | GET | `/admin/tag/info` | *查询标签详情* |
+| [134](#134-post-admintagadd) | admin | POST | `/admin/tag/add` | *新增标签* |
+| [135](#135-post-admintagedit) | admin | POST | `/admin/tag/edit` | *修改标签* |
+| [136](#136-post-admintagdelete) | admin | POST | `/admin/tag/delete` | *删除标签* |
+| [137](#137-get-adminleaderlist) | admin | GET | `/admin/leader/list` | *查询团长列表* |
+| [138](#138-get-adminleadercount) | admin | GET | `/admin/leader/count` | *查询团长总数* |
+| [139](#139-post-adminleaderadd) | admin | POST | `/admin/leader/add` | *新增团长* |
+| [140](#140-get-adminleaderselect) | admin | GET | `/admin/leader/select` | *查询团长* |
+| [141](#141-get-adminloginkaptcha) | admin | GET | `/admin/login/kaptcha` | *查询验证码* |
+| [142](#142-post-adminloginsubmit) | admin | POST | `/admin/login/submit` | *提交* |
+| [143](#143-get-adminmemberlist) | admin | GET | `/admin/member/list` | *查询会员列表* |
+| [144](#144-get-adminmembercount) | admin | GET | `/admin/member/count` | *查询会员总数* |
+| [145](#145-get-adminorderbusinesslist) | admin | GET | `/admin/orderbusiness/list` | *查询订单收款账户列表* |
+| [146](#146-get-adminorderbusinesscount) | admin | GET | `/admin/orderbusiness/count` | *查询订单收款账户总数* |
+| [147](#147-get-adminorderlist) | admin | GET | `/admin/order/list` | *查询订单列表* |
+| [148](#148-get-adminordercount) | admin | GET | `/admin/order/count` | *查询订单总数* |
+| [149](#149-get-taskordersend) | task | GET | `/task/order/send` | *发送（订单）* |
+| [150](#150-get-taskorderdivide) | task | GET | `/task/order/divide` | *分账（订单）* |
+| [151](#151-get-taskorderquery) | task | GET | `/task/order/query` | *查询订单* |
+| [152](#152-get-taskorderrefund) | task | GET | `/task/order/refund` | *退款（订单）* |
+| [153](#153-get-taskordercash) | task | GET | `/task/order/cash` | *查询订单提现* |
+| [154](#154-get-taskorderverify) | task | GET | `/task/order/verify` | *核销（订单）* |
+| [155](#155-get-taskorderbackstock) | task | GET | `/task/order/backstock` | *回库（订单）* |
+| [156](#156-get-tasktestuser) | task | GET | `/task/test/user` | *查询测试用户* |
 
 ---
 
@@ -4524,7 +4526,7 @@ data 类型：无（接口仅返回操作结果，data 为 null）
 
 > 类路径：`cn.com.shopgroup.goods.controller.LeaderGroupManageController`
 
-> 接口数量：10
+> 接口数量：11
 
 #### 1. POST `/goods/Leader/get/groupActivity/list`
 
@@ -4955,6 +4957,27 @@ data 类型：`String`（基本类型，无子字段）
 
 data 类型：`String`（基本类型，无子字段）
 
+#### 11. POST `/goods/Leader/share/groupActivity/goods/poster`
+
+**功能说明**：*提交（团长分享团购活动商品海报）*（自动推断）
+
+**入参**
+
+| 参数 | 类型 | 位置 | 必填 | 说明 |
+| --- | --- | --- | --- | --- |
+| groupId | `Long` | Query 参数 | 是 | 团购活动 ID（<=0 或 null 时表示不过滤） |
+| goodsId | `Long` | Query 参数 | 是 | 商品 ID |
+
+**出参（JsonResult 统一返回体）**
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| code | `Integer` | 状态码：200=成功，300=失败，400=无权限，500=错误 |
+| msg | `String` | 提示信息 |
+| data | `Object` | 返回数据，类型：`String`（具体字段见下方表格） |
+
+data 类型：`String`（基本类型，无子字段）
+
 
 ## 4. gb-group-admin（后台管理）
 
@@ -5002,7 +5025,7 @@ data 类型：`List<GbOrgBusinessInfo>`（数组，元素类型 `GbOrgBusinessIn
 | licenseNo | `String` | 否 | 营业执照号 |
 | licenseFront | `String` | 否 | 营业执照正面 |
 | licenseBack | `String` | 否 | 营业执照反面 |
-| busBalance | `Double` | 否 | 账户余额 |
+| busBalance | `Double` | 否 | 当月累计收款金额(元), 查询时由商户月收入表填充, 非数据库存储值 |
 | limitAmount | `Integer` | 否 | 限制最高收款金额(万) |
 | taxLimit | `Integer` | 否 | 纳税额度,单位：万（收款提醒） |
 | isClose | `Byte` | 否 | 是否禁用 |
@@ -5063,7 +5086,7 @@ data 类型：`GbOrgBusinessInfo`（字段说明见下）
 | licenseNo | `String` | 否 | 营业执照号 |
 | licenseFront | `String` | 否 | 营业执照正面 |
 | licenseBack | `String` | 否 | 营业执照反面 |
-| busBalance | `Double` | 否 | 账户余额 |
+| busBalance | `Double` | 否 | 当月累计收款金额(元), 查询时由商户月收入表填充, 非数据库存储值 |
 | limitAmount | `Integer` | 否 | 限制最高收款金额(万) |
 | taxLimit | `Integer` | 否 | 纳税额度,单位：万（收款提醒） |
 | isClose | `Byte` | 否 | 是否禁用 |
