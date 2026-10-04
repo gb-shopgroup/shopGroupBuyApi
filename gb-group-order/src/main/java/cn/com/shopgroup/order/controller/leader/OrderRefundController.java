@@ -21,7 +21,6 @@ import cn.com.shopgroup.order.http.request.OrderRefundInfoRequest;
 import cn.com.shopgroup.order.http.response.LeaderBatchOrderResponse;
 import cn.com.shopgroup.order.http.response.LeaderRefundApplyListResponse;
 import cn.com.shopgroup.order.http.response.LeaderRefundApplyResponse;
-import cn.com.shopgroup.order.http.response.OrderResponse;
 import cn.com.shopgroup.order.model.GbOrderGoodsInfo;
 import cn.com.shopgroup.order.model.GbOrderGoodsRefundRecord;
 import cn.com.shopgroup.order.model.GbOrderInfo;
@@ -184,7 +183,7 @@ public class OrderRefundController {
         }
         // 待审核申请订单总数(不受分页影响, 口径与列表一致: 售后订单(5)+商品行apply_refund=1)
         Long total = orderInfoService.getRefundApplyCount(leaderId);
-        log.info("团长端-团购订单上面展示售后订单数, leaderId:{}, count:{}", total);
+        log.info("团长端-团购订单上面展示售后订单数, leaderId:{}, count:{}", leaderId, total);
         return JsonResult.success(total);
     }
 
@@ -372,7 +371,7 @@ public class OrderRefundController {
 
     //同意退款处理: 按本次申请金额发起退款, 主表refund_fee留待退款回调成功后累加
     //防多退三道防线: 1)订单维度分布式锁拦截重复/并发提交 2)商品行须仍处于待审核(已审核过的重复请求拒绝) 3)累计退款金额不超过订单实付
-    public int handleAgree(Long leaderId, Long opId, String opName, GbOrderInfo orderInfo, OrderRefundInfoRequest request, String reason,Integer sourceType) {
+    public int handleAgree(Long leaderId, Long opId, String opName, GbOrderInfo orderInfo, OrderRefundInfoRequest request, String reason, Integer sourceType) {
         // 申请退款账户
         String merchantNo = orderInfo.getMerchantNo();
         String orderNo = orderInfo.getOrderNo();
@@ -531,9 +530,9 @@ public class OrderRefundController {
                 // 审核同意且退款受理成功后维护订单主状态:
                 // 批量退款(团长主动退款, 订单可能不处于售后状态) -> 直接置已退款(4);
                 // 售后审核 -> 订单商品全部退完置已退款(4), 否则只要有未退完的保持售后(5)
-                if(sourceType != null && sourceType.intValue() ==1){
+                if (sourceType != null && sourceType.intValue() == 1) {
                     orderInfoService.LeaderUpdateMiniLeaderRefundOrder(orderNo);
-                }else{
+                } else {
                     orderInfoService.updateOrderStatusAfterRefundAgree(orderNo);
                 }
                 // 添加日志, 消息类型: 1=系统消息2=内部消息3=业务消息

@@ -24,6 +24,7 @@ import cn.com.shopgroup.order.service.GbGroupViewLogService;
 import cn.com.shopgroup.order.service.GbOrderBusinessInfoService;
 import cn.com.shopgroup.order.service.GbOrderInfoService;
 import cn.com.shopgroup.user.service.GbOrgMessageInfoService;
+import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -1596,6 +1597,7 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
         queryWrapper.orderByDesc(GbOrderInfo::getId);
         queryWrapper.last("limit " + (page - 1) * pageSize + "," + pageSize);
         List<GbOrderInfo> orderList = mapper.selectList(queryWrapper);
+        log.info("售后-查询订单列表 queryWrapper:{},orderList:{}",JSON.toJSONString(queryWrapper), JSON.toJSONString(orderList));
         if (CollectionUtils.isEmpty(orderList)) {
             return new ArrayList<>();
         }
@@ -1615,6 +1617,7 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
         }
         queryWrapper2.orderByDesc(GbOrderGoodsInfo::getId);
         List<GbOrderGoodsInfo> goodsList = goodsMapper.selectList(queryWrapper2);
+        log.info("售后-查询订单列表queryWrapper2:{},goodsList:{}",JSON.toJSONString(queryWrapper2), JSON.toJSONString(goodsList));
         if (CollectionUtils.isEmpty(goodsList)) {
             return new ArrayList<>();
         }
