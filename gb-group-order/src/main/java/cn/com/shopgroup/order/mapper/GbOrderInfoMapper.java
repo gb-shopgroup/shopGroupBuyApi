@@ -198,7 +198,7 @@ public interface GbOrderInfoMapper extends BaseMapper<GbOrderInfo> {
     // (groupId / pointId 为 0 或 null 时表示不过滤)
     @Select({
             "SELECT COALESCE(SUM(g.`goods_num` * g.`pack_num`), 0) AS goods_total,",
-            "       COALESCE(SUM(GREATEST(g.`goods_num` - IFNULL(g.`receipt_num`, 0) - IFNULL(g.`refund_num`, 0) , 0) * g.`pack_num`), 0) AS unverify_total",
+            "       COALESCE(SUM(GREATEST(CAST(g.`goods_num` AS SIGNED) - CAST(IFNULL(g.`receipt_num`, 0) AS SIGNED) - CAST(IFNULL(g.`refund_num`, 0) AS SIGNED), 0) * g.`pack_num`), 0) AS unverify_total",
             "FROM `gb_order_goods_info` AS g",
             "JOIN `gb_order_info` AS o ON g.`order_no` = o.`order_no`",
             "WHERE o.`leader_id` = #{leaderId}",
@@ -221,7 +221,7 @@ public interface GbOrderInfoMapper extends BaseMapper<GbOrderInfo> {
             "       GROUP_CONCAT(DISTINCT NULLIF(g.`sku_names`, '') SEPARATOR ',') AS sku_names,",
             "       COALESCE(SUM(g.`goods_num` * g.`pack_num`), 0) AS num_total,",
             "       COALESCE(SUM(IFNULL(g.`receipt_num`, 0) * g.`pack_num`), 0) AS receipt_total,",
-            "       COALESCE(SUM(GREATEST(g.`goods_num` - IFNULL(g.`receipt_num`, 0) - IFNULL(g.`refund_num`, 0), 0) * g.`pack_num`), 0) AS unverify_num",
+            "       COALESCE(SUM(GREATEST(CAST(g.`goods_num` AS SIGNED) - CAST(IFNULL(g.`receipt_num`, 0) AS SIGNED) - CAST(IFNULL(g.`refund_num`, 0) AS SIGNED), 0) * g.`pack_num`), 0) AS unverify_num",
             "FROM `gb_order_goods_info` AS g",
             "JOIN `gb_order_info` AS o ON g.`order_no` = o.`order_no`",
             "WHERE o.`leader_id` = #{leaderId}",

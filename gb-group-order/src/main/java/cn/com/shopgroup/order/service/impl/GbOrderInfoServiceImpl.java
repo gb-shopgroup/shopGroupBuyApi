@@ -1205,11 +1205,20 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
             }
             LambdaUpdateWrapper<GbOrderGoodsInfo> updateGoodsWrapper = Wrappers.lambdaUpdate();
             updateGoodsWrapper.eq(GbOrderGoodsInfo::getId, orderGoodsId);
-            // setSql 的 {0} 为 MyBatis Plus 参数化占位符(PreparedStatement 绑定, 非字符串拼接), 累加无负数风险
+            // setSql 的 {0} 为 MyBatis Plus 参数化占位符(PreparedStatement 绑定, 非字符串拼接)
+            // 数量上限语义(与统计口径 unverify = goods_num - receipt_num - refund_num 对齐):
+            // - refund_num(退未核销部分): 累计上限 goods_num - receipt_num, 防止超过后统计减法出现负数语义;
+            // - refund_goods_num(退已核销部分): 累计上限 receipt_num;
+            // - GREATEST(原值, ...) 保证只增不减(不因上限而回退已有累计);
+            // - CAST AS SIGNED: 列为 UNSIGNED, 减法下溢会直接报错, 转有符号运算保证安全
             if (isReturnGoods == 2) {
-                updateGoodsWrapper.setSql("refund_goods_num = refund_goods_num + {0}", refundNum);
+                updateGoodsWrapper.setSql(
+                        "refund_goods_num = GREATEST(refund_goods_num, LEAST(refund_goods_num + {0}, CAST(IFNULL(receipt_num, 0) AS SIGNED)))",
+                        refundNum);
             } else {
-                updateGoodsWrapper.setSql("refund_num = refund_num + {0}", refundNum);
+                updateGoodsWrapper.setSql(
+                        "refund_num = GREATEST(refund_num, LEAST(refund_num + {0}, CAST(goods_num AS SIGNED) - CAST(IFNULL(receipt_num, 0) AS SIGNED)))",
+                        refundNum);
             }
             affected += goodsMapper.update(updateGoodsWrapper);
         }
