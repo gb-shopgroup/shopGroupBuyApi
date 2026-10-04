@@ -1179,6 +1179,44 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
     }
 
     /**
+     * 批量退款(团长主动退款)时同步商品行退款/退货退款数量到订单商品表
+     * 正常售后流程数量在用户申请时占坑累计; 批量退款无申请环节, 在审核同意且退款受理成功后一次性累计,
+     * 保证商品行退款数据与实际退款一致(与 deductOrderGoodsRefundByOrderNo 拒绝回退互为逆操作)
+     *
+     * @param refundNumMap key=订单商品id, value=本次退款数量(审核请求回传)
+     * @param isReturnGoods 2=退货退款(累计refund_goods_num), 其他=退款(累计refund_num)
+     */
+    @Override
+    public int addOrderGoodsRefundByOrderNo(Map<Long, Integer> refundNumMap, int isReturnGoods) {
+        if (refundNumMap == null || refundNumMap.isEmpty()) {
+            return 0;
+        }
+        int affected = 0;
+        for (Map.Entry<Long, Integer> entry : refundNumMap.entrySet()) {
+            Long orderGoodsId = entry.getKey();
+            Integer rawValue = entry.getValue();
+            if (orderGoodsId == null || orderGoodsId <= 0L) {
+                continue;
+            }
+            // 边界保护: 非正数直接丢弃; 上限夹到 Integer.MAX_VALUE/2, 防御异常大数导致累计越界为负
+            int refundNum = (rawValue == null || rawValue <= 0) ? 0 : Math.min(rawValue, Integer.MAX_VALUE / 2);
+            if (refundNum <= 0) {
+                continue;
+            }
+            LambdaUpdateWrapper<GbOrderGoodsInfo> updateGoodsWrapper = Wrappers.lambdaUpdate();
+            updateGoodsWrapper.eq(GbOrderGoodsInfo::getId, orderGoodsId);
+            // setSql 的 {0} 为 MyBatis Plus 参数化占位符(PreparedStatement 绑定, 非字符串拼接), 累加无负数风险
+            if (isReturnGoods == 2) {
+                updateGoodsWrapper.setSql("refund_goods_num = refund_goods_num + {0}", refundNum);
+            } else {
+                updateGoodsWrapper.setSql("refund_num = refund_num + {0}", refundNum);
+            }
+            affected += goodsMapper.update(updateGoodsWrapper);
+        }
+        return affected > 0 ? 1 : 0;
+    }
+
+    /**
      * 审核同意某批退款后判断订单商品是否全部退款完成:
      * 每个商品行必须已同意(apply_refund=2)且 退款数量(refund_num) + 退货退款数量(refund_goods_num) >= 购买数量
      * 0=全部退完, 1=还有未退完/未同意的商品

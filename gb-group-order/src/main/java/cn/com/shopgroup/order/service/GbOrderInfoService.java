@@ -209,6 +209,16 @@ public interface GbOrderInfoService {
     int deductOrderGoodsRefundByOrderNo(Map<Long, Integer> refundNumMap, int isReturnGoods);
 
     /**
+     * 批量退款(团长主动退款)时同步商品行退款/退货退款数量到订单商品表
+     * 正常售后流程数量在用户申请时占坑累计; 批量退款无申请环节, 在审核同意且退款受理成功后一次性累计,
+     * 保证商品行退款数据与实际退款一致(退款数据落表)
+     *
+     * @param refundNumMap key=订单商品id, value=本次退款数量(审核请求回传)
+     * @param isReturnGoods 2=退货退款(累计refund_goods_num), 其他=退款(累计refund_num, 批量退款多为未收货缺货退款)
+     */
+    int addOrderGoodsRefundByOrderNo(Map<Long, Integer> refundNumMap, int isReturnGoods);
+
+    /**
      * 审核同意某批退款后判断订单商品是否全部退款完成:
      * 每个商品行必须已同意(apply_refund=2)且 退款数量(refund_num) + 退货退款数量(refund_goods_num) >= 购买数量
      * 0=全部退完, 1=还有未退完/未同意的商品

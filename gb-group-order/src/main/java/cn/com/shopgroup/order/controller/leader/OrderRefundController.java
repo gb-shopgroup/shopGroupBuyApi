@@ -383,8 +383,16 @@ public class OrderRefundController {
             return 0;
         }
         try {
-            // 本次审核同意的退款金额(单位:分): 优先取审核请求回传的本次申请金额, 团长端旧版本未回传时按最近一笔申请记录兜底
-            int agreeRefundCent = getApplyRefundCent(orderNo, request);
+            // 是否批量退款来源(type=1, 团长主动发起, 订单商品可能从未申请过售后, 金额由团长在请求中明确指定)
+            boolean batchRefund = sourceType != null && sourceType.intValue() == 1;
+            // 本次审核同意的退款金额(单位:分):
+            // 批量退款: 只取本次请求回传的金额(refundGoodsMap 各行 refundAmount 求和), 不做任何兜底, 缺失直接终止;
+            // 售后审核: 优先取审核请求回传的本次申请金额, 团长端旧版本未回传时按最近一笔申请记录兜底
+            int agreeRefundCent = batchRefund ? getRequestRefundCent(request) : getApplyRefundCent(orderNo, request);
+            if (batchRefund && agreeRefundCent <= 0) {
+                log.warn("批量退款发起终止: 订单{}本次请求未回传有效退款金额", orderNo);
+                return 0;
+            }
             // 按本次申请金额发起退款(支持部分退款); 申请金额缺失时退化为整单实付金额, 避免向易宝发起0元退款
             int requestRefundCent = agreeRefundCent > 0 ? agreeRefundCent
                     : (orderInfo.getPayFee() == null ? 0 : orderInfo.getPayFee());
@@ -395,7 +403,8 @@ public class OrderRefundController {
             // 查询订单商品(供待审核校验与库存回补共用)
             List<GbOrderGoodsInfo> goodsList = orderInfoService.getOrderGoodsList(orderNo);
             // 防线2: 本次审核的商品行中须仍有待审核(apply_refund=1)的行; 全部已处理过视为重复审核请求, 直接拒绝(防重复发起退款)
-            if (!hasPendingRefundGoods(goodsList, request.getRefundGoodsMap())) {
+            // 批量退款跳过该防线: 团长主动退款时商品行从未走过售后申请, apply_refund 恒为0, 不适用此校验
+            if (!batchRefund && !hasPendingRefundGoods(goodsList, request.getRefundGoodsMap())) {
                 log.warn("退款审核防重: 订单{}本次审核的商品行均已处理过(apply_refund!=1), 视为重复审核请求, 拒绝再次发起退款, 操作人:{}", orderNo, opName);
                 return 0;
             }
@@ -485,21 +494,32 @@ public class OrderRefundController {
                         redisHelper.deleteObject(RedisConstant.RedisGroupGoodsListKey + groupId);
                     }
                 }
-                //本次审核同意的商品行id集合
+                //本次审核同意的商品行id集合; 批量退款同时收集各商品行本次退款数量(供商品行数量占坑)
                 List<Long> orderGoodsIds = new ArrayList<>();
+                Map<Long, Integer> batchRefundNumMap = new HashMap<>();
                 for (Map.Entry<Long, OrderRefundGoodsRequest> entry : request.getRefundGoodsMap().entrySet()) {
                     Long orderGoodsId = entry.getKey();
                     orderGoodsIds.add(orderGoodsId);
+                    OrderRefundGoodsRequest refundGoods = entry.getValue();
+                    if (refundGoods != null && refundGoods.getRefundNum() != null && refundGoods.getRefundNum() > 0) {
+                        batchRefundNumMap.put(orderGoodsId, refundGoods.getRefundNum());
+                    }
                 }
                 //标识订单商品售后状态同意
                 orderInfoService.updateOrderGoodsApplyStatus(orderNo, orderGoodsIds, 2);
+                // 本次退款类型(优先取请求回传, 未回传时按最近一笔售后记录兜底): 供批量退款数量累计与退款记录共用
+                int refundFlag = resolveRefundFlag(orderNo, request);
+                // 批量退款无用户申请环节, 商品行退款/退货退款数量在此一次性累计同步到订单商品表
+                // (正常售后流程在用户申请时占坑, 此处不重复累加, 仅批量退款路径执行)
+                if (batchRefund && !batchRefundNumMap.isEmpty()) {
+                    orderInfoService.addOrderGoodsRefundByOrderNo(batchRefundNumMap, refundFlag);
+                }
                 //插入退货记录售后日志: 补齐本次退款金额/类型/易宝退款单号(旧逻辑未落这些字段, 导致无法与易宝对账、无法防超退校验)
                 GbOrderGoodsRefundRecord refundRecord = new GbOrderGoodsRefundRecord();
                 refundRecord.setOperateId(opId);
                 refundRecord.setOperateName(opName);
                 refundRecord.setIsAgree(1);//同意退款
                 refundRecord.setOrderNo(orderNo);
-                int refundFlag = resolveRefundFlag(orderNo, request);
                 if (refundFlag == 1 || refundFlag == 2) {
                     refundRecord.setRefundFlag(refundFlag);
                 }
@@ -508,7 +528,9 @@ public class OrderRefundController {
                 refundRecord.setActionReason(reason);
                 refundRecord.setAddTime(TimeUtils.getTimeStamp());
                 refundRecordService.addRefundRecord(refundRecord);
-                // 审核同意且退款受理成功后维护订单主状态: 订单商品全部退完 -> 已退款(4), 否则只要有未退完的 -> 售后(5)
+                // 审核同意且退款受理成功后维护订单主状态:
+                // 批量退款(团长主动退款, 订单可能不处于售后状态) -> 直接置已退款(4);
+                // 售后审核 -> 订单商品全部退完置已退款(4), 否则只要有未退完的保持售后(5)
                 if(sourceType != null && sourceType.intValue() ==1){
                     orderInfoService.LeaderUpdateMiniLeaderRefundOrder(orderNo);
                 }else{
@@ -560,6 +582,19 @@ public class OrderRefundController {
             }
         }
         return flag;
+    }
+
+    // 计算本次请求回传的退款金额合计(单位:分): 仅取 refundGoodsMap 各行 refundAmount 求和, 不做任何兜底(批量退款专用)
+    private int getRequestRefundCent(OrderRefundInfoRequest request) {
+        int refundCent = 0;
+        if (request != null && !CollectionUtils.isEmpty(request.getRefundGoodsMap())) {
+            for (OrderRefundGoodsRequest req : request.getRefundGoodsMap().values()) {
+                if (req.getRefundAmount() != null && req.getRefundAmount() > 0) {
+                    refundCent += MoneyUtil.yuanToCent(req.getRefundAmount());
+                }
+            }
+        }
+        return refundCent;
     }
 
     // 计算本次审核(同意)对应的申请退款金额(单位:分): 优先取审核请求回传的本次申请金额;
