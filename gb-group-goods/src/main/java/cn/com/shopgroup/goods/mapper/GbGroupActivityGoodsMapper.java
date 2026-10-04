@@ -33,6 +33,6 @@ public interface GbGroupActivityGoodsMapper extends BaseMapper<GbGroupActivityGo
     @Select("SELECT ag.* FROM `gb_group_activity_goods` AS ag JOIN `gb_group_activity_info` AS ai ON ag.`group_id` = ai.`group_id` AND ai.`is_check` = 1 AND ai.`is_close` = 0 AND ai.leader_id = #{leaderId} WHERE ag.`goods_id` = #{goodsId} ORDER BY ai.`group_id` DESC LIMIT 0, 1")
     GbGroupActivityGoods isGroupGoodsOnline(Long leaderId, Long goodsId);
 
-
-
+    @Select("SELECT a.* FROM `gb_group_activity_goods` AS a JOIN `gb_goods_info` AS g ON g.`goods_id` = a.`goods_id` WHERE a.`group_id` = #{groupId} AND a.`goods_id` = #{goodsId} AND g.`is_close` = 0 limit 1")
+    GbGroupActivityGoods getGroupActivityOnlineGoods(Long groupId, Long goodsId);
 }

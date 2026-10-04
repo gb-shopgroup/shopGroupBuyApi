@@ -80,4 +80,7 @@ public interface GbGroupActivityInfoService {
      * 查询商品参与的所有团购活动id(不过滤活动/商品状态), 用于商品上下架后清缓存等场景
      */
     List<Long> getGroupIdsByGoodsId(Long goodsId);
+
+    GbGroupActivityGoods getGroupActivityOnlineGoods(Long groupId, Long goodsId);
+
 }

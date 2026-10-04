@@ -166,6 +166,11 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
         return groupIds;
     }
 
+    @Override
+    public GbGroupActivityGoods getGroupActivityOnlineGoods(Long groupId, Long goodsId) {
+        return goodsMapper.getGroupActivityOnlineGoods(groupId,goodsId);
+    }
+
 
     public List<GbGroupActivityInfo> getMiniGroupActivityList(Long leaderId, Long catId, int page, int pageSize) {
 

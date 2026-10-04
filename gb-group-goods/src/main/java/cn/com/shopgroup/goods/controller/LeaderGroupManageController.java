@@ -1081,4 +1081,79 @@ public class LeaderGroupManageController {
         }
     }
 
+
+    // 团购端-分享团购-商品-海报生成
+    @PostMapping("/share/groupActivity/goods/poster")
+    public JsonResult shareGroup(@RequestParam("groupId") Long groupId, @RequestParam("goodsId") Long goodsId) {
+        log.info("团购端-分享团购-商品-海报生成 /share/groupActivity/goods/poster groupId:{},goodsId:{}", groupId, goodsId);
+        // 从请求头中获取团长id
+        Long leaderId = RequestParamsUtils.getRequestHeaderLeaderId();
+        if (leaderId == 0) {
+            throw new BusinessException(GoodsErrorCodeEnum.LEADER_NOT_EXIST);
+        }
+
+        // 查询团购详情
+        GbGroupActivityInfo groupInfo = activityInfoService.getGroupInfo(groupId);
+        if (ObjectUtils.isEmpty(groupInfo)) {
+            throw new BusinessException(GoodsErrorCodeEnum.GROUP_NOT_EXIST);
+        }
+
+        //仅在线is_close=0商品, 已关闭商品不用于海报展示
+        GbGroupActivityGoods goodsInfo = activityInfoService.getGroupActivityOnlineGoods(groupId, goodsId);
+        if (ObjectUtils.isEmpty(goodsInfo)) {
+            throw new BusinessException(GoodsErrorCodeEnum.GROUP_GOODS_NOT_EXIST);
+        }
+        // 构建分享海报信息
+        PosterDTO dto = new PosterDTO();
+        dto.setGoodsName(goodsInfo.getGoodsName()); // 商品名称
+        dto.setSaleText("已售" + (groupInfo.getVirtualOrder() + groupInfo.getOrderTotal()) + "单");
+        dto.setPriceText("￥" + goodsInfo.getGroupPrice());
+        dto.setBtnText("立即跟团");
+        dto.setImgUrl(goodsInfo.getGroupImg());
+
+        // 生成海报
+        ByteArrayInputStream bis = null;
+        try {
+            bis = PosterUtils.generatePosterStream(dto);
+        } catch (IOException e) {
+            log.error("团购端-分享团购-商品-海报生成图片流失败,groupId:{},goodsName:{}", groupId, goodsInfo.getGoodsName(), e);
+        }
+
+        // 判断本地上传还是云存储上传: # 1=本地上传, 2=云端上传
+        int type = uploadConfig.getType();
+        String domain = uploadConfig.getDomain();
+        String rootPath = uploadConfig.getPath();
+
+        // 文件名称和访问路径
+        String url = "";
+        String obsKey = "poster/" + TimeUtils.getTodayStr() + "/" + UUID.randomUUID() + ".png";
+
+        // 本地路径创建
+        if (type == 1) {
+
+            // 本地指定路径
+            File fileFolder = new File(rootPath + File.separator + "poster" + File.separator + TimeUtils.getTodayStr());
+            if (!fileFolder.exists()) fileFolder.mkdirs();
+
+            // 保存到本地指定路径
+            try {
+                this.saveStreamToLocalFile(bis, rootPath + File.separator + obsKey);
+            } catch (IOException e) {
+                log.error("团购端-分享团购-商品-海报生成保存本地失败,groupId:{},path:{}", groupId, rootPath + File.separator + obsKey, e);
+            }
+
+            // 本地访问路径
+            url = domain + "/" + obsKey;
+
+        } else {
+
+            // 上传到华为云OBS
+            url = HuaWeiOBS.upload(obsKey, bis);
+        }
+
+        // 返回访问路径
+        log.info("团购端-分享团购-商品-海报生成,leaderId:{},groupId:{},goodsId:{},uploadType:{},url:{}", leaderId, groupId, goodsId, type, url);
+        return JsonResult.success("查询成功", url);
+    }
+
 }
