@@ -173,31 +173,42 @@ public class MemberController {
         // 查询是否已经注册成功了
         String openid = request.getOpenid();
         Long leaderId = Optional.ofNullable(request.getLeaderId()).orElse(0L);
+        // 响应数据
+        LoginMemberResponse result = new LoginMemberResponse();
+
+        GbMemberInfo memberInfo = service.getMiniMemberByOpenId(openid);
+        log.info("更新用户最新团长id后用户信息memberInfo:{}", JSON.toJSONString(memberInfo));
+        if (ObjectUtils.isEmpty(memberInfo)) {
+            result.setName(null);
+            result.setAvatar(null);
+            result.setMobile(null);
+            result.setOpenid(openid);
+            result.setLeaderId(leaderId);
+            result.setToken(null);
+            log.info("更新用户最新团长id不成功-用户没有注册,返回result:{}", JSON.toJSONString(result));
+            return JsonResult.success(result);
+        }
         /**
          * 更新最新的团长id
          */
         if (leaderId.intValue() != 0) {
             service.updateMemberSwapLeaderId(openid, leaderId);
         }
-        GbMemberInfo memberInfo = service.getMiniMemberByOpenId(openid);
-        log.info("更新用户最新团长id后用户信息memberInfo:{}", JSON.toJSONString(memberInfo));
-        if (!ObjectUtils.isEmpty(memberInfo)) {
-            redisHelper.releaseLock(RedisConstant.RedisMemberTokenKey + memberInfo.getMemberId());
-        }
+        //释放后-再重新加入，避免空指针
+        redisHelper.releaseLock(RedisConstant.RedisMemberTokenKey + memberInfo.getMemberId());
         Long memberId = memberInfo.getMemberId();
         // 生成token
         String token = TokenUtils.createToken(String.valueOf(memberId));
         // 记录登录态到Redis(30天有效), 用于退出登录时清除
         redisHelper.setCacheObject(RedisConstant.RedisMemberTokenKey + memberId, token, RedisConstant.RedisMemberTokenExpired, TimeUnit.SECONDS);
 
-        // 响应数据
-        LoginMemberResponse result = new LoginMemberResponse();
         result.setName(memberInfo.getNickname());
         result.setAvatar(memberInfo.getAvatar());
         result.setMobile(memberInfo.getMobile());
         result.setOpenid(memberInfo.getOpenid());
         result.setLeaderId(memberInfo.getLeaderId());
         result.setToken(token);
+        log.info("更新用户最新团长id成功并返回loginMemberResponse:{}", JSON.toJSONString(result));
         return JsonResult.success(result);
     }
 
