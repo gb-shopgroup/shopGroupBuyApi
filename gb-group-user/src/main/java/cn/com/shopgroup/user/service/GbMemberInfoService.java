@@ -28,4 +28,7 @@ public interface GbMemberInfoService {
     int updateMemberBindLeader(Long memberId, Long leaderId);
 
     int updateMemberSwapLeaderId(String openid, Long leaderId);
+
+    GbMemberInfo getMemberInfoByLeaderId(Long memberId, Long leaderId);
+
 }

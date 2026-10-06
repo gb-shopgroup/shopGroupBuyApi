@@ -175,7 +175,6 @@ public class MemberController {
         Long leaderId = Optional.ofNullable(request.getLeaderId()).orElse(0L);
         // 响应数据
         LoginMemberResponse result = new LoginMemberResponse();
-
         GbMemberInfo memberInfo = service.getMiniMemberByOpenId(openid);
         log.info("更新用户最新团长id后用户信息memberInfo:{}", JSON.toJSONString(memberInfo));
         if (ObjectUtils.isEmpty(memberInfo)) {
@@ -189,10 +188,15 @@ public class MemberController {
             return JsonResult.success(result);
         }
         /**
-         * 更新最新的团长id
+         *  查询用户与团长是否存在绑定，绑定不处理
          */
         if (leaderId.intValue() != 0) {
-            service.updateMemberSwapLeaderId(openid, leaderId);
+            GbMemberInfo oldMemberInfo = service.getMemberInfoByLeaderId(memberInfo.getMemberId(), leaderId);
+            log.info("更新用户最新团长id时，获取当前绑定信息memberInfo:{}", JSON.toJSONString(oldMemberInfo));
+            if (ObjectUtils.isEmpty(oldMemberInfo)) {
+                log.info("更新用户最新团长id时，当前不存在绑定,执行更新绑定");
+                service.updateMemberSwapLeaderId(openid, leaderId);
+            }
         }
         //释放后-再重新加入，避免空指针
         redisHelper.releaseLock(RedisConstant.RedisMemberTokenKey + memberInfo.getMemberId());
@@ -206,7 +210,7 @@ public class MemberController {
         result.setAvatar(memberInfo.getAvatar());
         result.setMobile(memberInfo.getMobile());
         result.setOpenid(memberInfo.getOpenid());
-        result.setLeaderId(memberInfo.getLeaderId());
+        result.setLeaderId(leaderId);
         result.setToken(token);
         log.info("更新用户最新团长id成功并返回loginMemberResponse:{}", JSON.toJSONString(result));
         return JsonResult.success(result);

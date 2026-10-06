@@ -120,4 +120,21 @@ public class GbMemberInfoServiceImpl implements GbMemberInfoService {
         return mapper.update(updateWrapper);
     }
 
+    @Override
+    public GbMemberInfo getMemberInfoByLeaderId(Long memberId, Long leaderId) {
+        LambdaQueryWrapper<GbMemberInfo> queryWrapper = Wrappers.lambdaQuery();
+        queryWrapper.select(
+                GbMemberInfo::getMemberId,
+                GbMemberInfo::getNickname,
+                GbMemberInfo::getAvatar,
+                GbMemberInfo::getMobile,
+                GbMemberInfo::getOpenid,
+                GbMemberInfo::getLeaderId);
+        queryWrapper.eq(GbMemberInfo::getMemberId, memberId);
+        queryWrapper.eq(GbMemberInfo::getLeaderId, leaderId);
+        queryWrapper.orderByDesc(GbMemberInfo::getMemberId);
+        queryWrapper.last("limit 0, 1");
+        return mapper.selectOne(queryWrapper);
+    }
+
 }
