@@ -58,7 +58,7 @@
         </logger>
         <!-- 定义 mybatis mapper 日志输出级别为 DEBUG 级别 -->
         <!-- additivity="false": 阻止日志向上传递，避免重复记录 -->
-        <logger name="cn.com.shopgroup.mapper" level="DEBUG" additivity="false">
+        <logger name="cn.com.shopgroup.goods.mapper" level="DEBUG" additivity="false">
             <appender-ref ref="Console" />
         </logger>
     </springProfile>
@@ -71,7 +71,7 @@
         <logger name="cn.com.shopgroup" level="INFO" additivity="false">
             <appender-ref ref="RollingFile" />
         </logger>
-        <logger name="cn.com.shopgroup.mapper" level="INFO" additivity="false">
+        <logger name="cn.com.shopgroup.goods.mapper" level="DEBUG" additivity="false">
             <appender-ref ref="RollingFile" />
         </logger>
     </springProfile>
@@ -86,7 +86,7 @@
             <appender-ref ref="Console" />
             <appender-ref ref="RollingFile" />
         </logger>
-        <logger name="cn.com.shopgroup.mapper" level="INFO" additivity="false">
+        <logger name="cn.com.shopgroup.goods.mapper" level="DEBUG" additivity="false">
             <appender-ref ref="Console" />
             <appender-ref ref="RollingFile" />
         </logger>

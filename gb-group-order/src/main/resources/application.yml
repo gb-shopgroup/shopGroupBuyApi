@@ -35,7 +35,3 @@ logging:
     # 表为复合主键、实体无 @TableId，MyBatis-Plus 启动提示非错误，调低级别消除
     com.baomidou.mybatisplus.core.injector.DefaultSqlInjector: error
 
-# mybatis输出sql日志
-mybatis:
-  configuration:
-    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl

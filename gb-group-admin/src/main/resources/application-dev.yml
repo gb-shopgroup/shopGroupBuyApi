@@ -45,6 +45,8 @@ spring:
       test-on-borrow: false
       # 归还连接时不校验（影响性能，默认false）
       test-on-return: false
+      # 连接保活(true): 空闲连接定期发送validation心跳校验, 防止被MySQL wait_timeout/网络设备静默断开, 消除discard long time none received告警
+      keep-alive: true
       # 初始化连接数（默认0）
       initial-size: 100
       # 最小空闲连接数（默认5）

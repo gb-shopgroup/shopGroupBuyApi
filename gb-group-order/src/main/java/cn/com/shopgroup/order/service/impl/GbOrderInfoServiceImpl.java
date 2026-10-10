@@ -1184,7 +1184,7 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
      * 正常售后流程数量在用户申请时占坑累计; 批量退款无申请环节, 在审核同意且退款受理成功后一次性累计,
      * 保证商品行退款数据与实际退款一致(与 deductOrderGoodsRefundByOrderNo 拒绝回退互为逆操作)
      *
-     * @param refundNumMap key=订单商品id, value=本次退款数量(审核请求回传)
+     * @param refundNumMap  key=订单商品id, value=本次退款数量(审核请求回传)
      * @param isReturnGoods 2=退货退款(累计refund_goods_num), 其他=退款(累计refund_num)
      */
     @Override
@@ -1597,7 +1597,7 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
         queryWrapper.orderByDesc(GbOrderInfo::getId);
         queryWrapper.last("limit " + (page - 1) * pageSize + "," + pageSize);
         List<GbOrderInfo> orderList = mapper.selectList(queryWrapper);
-        log.info("售后-查询订单列表 queryWrapper:{},orderList:{}",JSON.toJSONString(queryWrapper), JSON.toJSONString(orderList));
+        log.info("售后-查询订单列表,orderList:{}", JSON.toJSONString(orderList));
         if (CollectionUtils.isEmpty(orderList)) {
             return new ArrayList<>();
         }
@@ -1617,7 +1617,7 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
         }
         queryWrapper2.orderByDesc(GbOrderGoodsInfo::getId);
         List<GbOrderGoodsInfo> goodsList = goodsMapper.selectList(queryWrapper2);
-        log.info("售后-查询订单列表queryWrapper2:{},goodsList:{}",JSON.toJSONString(queryWrapper2), JSON.toJSONString(goodsList));
+        log.info("售后-查询订单列表,goodsList:{}", JSON.toJSONString(goodsList));
         if (CollectionUtils.isEmpty(goodsList)) {
             return new ArrayList<>();
         }

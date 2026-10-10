@@ -7,6 +7,10 @@ spring:
     username: group_purchase
     password: zK75tPdzX3fitMrx
     type: com.alibaba.druid.pool.DruidDataSource
+    # Druid 连接池核心配置
+    druid:
+      # 连接保活(true): 空闲连接定期发送validation心跳校验, 防止被MySQL wait_timeout/网络设备静默断开, 消除discard long time none received告警
+      keep-alive: true
   redis:
     host: 127.0.0.1
     port: 6379
