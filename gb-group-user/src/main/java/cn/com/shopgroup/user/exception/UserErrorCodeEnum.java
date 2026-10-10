@@ -26,7 +26,7 @@ public enum UserErrorCodeEnum implements IErrorCode {
     TOKEN_NOT_EXIST(300101, "token不存在"),
 
     //团长/会员用户不存在
-    USER_NOT_EXIST(300102, "用户不存在"),
+    USER_NOT_EXIST(300102, "您的账号信息未找到，请重新登录"),
 
     /**
      * 员工不存在(sid 查不到)
@@ -88,7 +88,7 @@ public enum UserErrorCodeEnum implements IErrorCode {
      */
     DATA_NOT_FOUND(300114, "未查到到相关信息"),
     //自己不能操作自己
-    OPERATION_NOT_SELF(300114, "自己不能操作自己"),
+    OPERATION_NOT_SELF(300114, "您无法将本人添加为员工"),
 
     /**
      * 数据保存/更新失败(通用)

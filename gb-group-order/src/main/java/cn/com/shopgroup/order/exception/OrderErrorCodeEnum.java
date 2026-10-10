@@ -26,7 +26,7 @@ public enum OrderErrorCodeEnum implements IErrorCode {
     /**
      * 会员用户不存在
      */
-    USER_NOT_EXIST(300302, "用户不存在"),
+    USER_NOT_EXIST(300302, "您的账号信息未找到，请重新登录"),
 
     /**
      * 请求头中解析不到团长id
