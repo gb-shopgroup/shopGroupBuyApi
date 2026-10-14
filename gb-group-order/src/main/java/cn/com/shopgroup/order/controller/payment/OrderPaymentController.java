@@ -226,10 +226,10 @@ public class OrderPaymentController {
         int merchantMoney = totalYuan.movePointRight(2).setScale(0, RoundingMode.HALF_UP).intValue();
         // 最高收款金额, 未设置(null)时视为不限额, 避免拆箱 NPE 导致支付接口异常
         Integer limitAmount = business.getLimitAmount();
-        if (limitAmount == null || limitAmount < 0) {
+        if (limitAmount == null || limitAmount <= 0) {
             return false;
         }
-        return (merchantMoney + orderFee) * 100L > limitAmount * 10000L;
+        return (merchantMoney + orderFee) > (limitAmount * 10000L) * 100;
     }
 
     // 支付回调
