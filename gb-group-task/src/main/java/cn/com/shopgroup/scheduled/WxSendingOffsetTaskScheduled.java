@@ -11,7 +11,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 //补偿，支付时未执行调用微信发货录取信息，再次调用
 @Component
@@ -46,10 +48,22 @@ public class WxSendingOffsetTaskScheduled {
         int endTime = TimeUtils.getTimeStamp() - 48 * 60 * 60;
         // 查询未发货的订单列表, 每次 limit 条记录
         List<GbOrderBusinessInfo> dataList = businessOrderService.getUnCalledWxUploadShippingInfo(endTime, limit);
+        if (dataList == null || dataList.isEmpty()) {
+            return;
+        }
 
         // 当前时间
         int nowTime = TimeUtils.getTimeStamp();
         int cha = 45 * 60 * 60; // 47小时的时间间隔
+
+        // 批量组装订单商品名称(该订单涉及的所有商品名称用逗号组装, 无商品行时兜底用团购名称)
+        List<String> orderNos = new ArrayList<>(dataList.size());
+        for (GbOrderBusinessInfo item : dataList) {
+            if (item.getOrderNo() != null) {
+                orderNos.add(item.getOrderNo());
+            }
+        }
+        Map<String, String> goodsNamesMap = orderInfoService.getOrderGoodsNamesMap(orderNos);
 
         // 循环发货
         for (GbOrderBusinessInfo item : dataList) {
@@ -60,7 +74,7 @@ public class WxSendingOffsetTaskScheduled {
 
             // 订单发货
             String transactionId = item.getTransactionId();
-            String goodsName = item.getGroupName();
+            String goodsName = goodsNamesMap.getOrDefault(item.getOrderNo(), item.getGroupName());
             String openid = item.getOpenid();
             int isSuccess = WxMiniProgramHelper.uploadShippingInfo(accessToken, transactionId, goodsName, openid);
             if (isSuccess == 1) {

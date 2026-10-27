@@ -24,6 +24,8 @@ public class GroupActGoodsResponse {
     private Double price2;
     // 库存(商品数量+单位, 如 100斤)
     private String stock;
+    //后加 0 上架 1 下架
+    private Byte isClose;
 
     // 商品规格列表(包含规格值, 不含禁用规格/规格值); 调用方需按 goodsId 填充
     private List<GroupSpecResponse> specList = new ArrayList<>();
@@ -41,6 +43,7 @@ public class GroupActGoodsResponse {
         this.price = info.getSalesPrice();
         this.price2 = info.getMarketPrice();
         this.stock = (info.getGoodsNum() == null ? "" : info.getGoodsNum()) + (info.getGoodsUnit() == null ? "" : info.getGoodsUnit());
+        this.isClose = info.getIsClose();
     }
 
     /**
@@ -59,6 +62,7 @@ public class GroupActGoodsResponse {
         Integer num = goodsInfo == null ? null : goodsInfo.getGoodsNum();
         String unit = goodsInfo == null ? null : goodsInfo.getGoodsUnit();
         this.stock = (num == null ? "" : num) + (unit == null ? "" : unit);
+        this.isClose = goods.getIsClose();
     }
 
     // 列表转换

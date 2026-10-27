@@ -125,4 +125,17 @@ public class GbGoodsSkuInfoServiceImpl implements GbGoodsSkuInfoService {
         return flag > 0 ? true : false;
     }
 
+
+    public Boolean updateSkuGoodsNum(Long skuId, Integer goodsNum) {
+        // 参数防御: skuId 非法或库存为负数时直接拒绝, 不产生任何SQL
+        if (skuId == null || skuId <= 0L || goodsNum == null || goodsNum < 0) {
+            return false;
+        }
+        LambdaUpdateWrapper<GbGoodsSkuInfo> updateWrapper = Wrappers.lambdaUpdate();
+        updateWrapper.set(GbGoodsSkuInfo::getGoodsNum, goodsNum);
+        updateWrapper.eq(GbGoodsSkuInfo::getSkuId, skuId);
+        int flag = mapper.update(updateWrapper);
+        return flag > 0 ? true : false;
+    }
+
 }

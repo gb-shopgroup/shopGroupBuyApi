@@ -32,4 +32,7 @@ public class GbGroupActivityGoods {
     @TableField("market_price")
     private Double marketPrice;
 
+    // 是否禁用,0上线1下线
+    @TableField("is_close")
+    private Byte isClose;
 }

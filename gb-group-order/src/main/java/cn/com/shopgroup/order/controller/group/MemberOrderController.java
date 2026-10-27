@@ -497,15 +497,17 @@ public class MemberOrderController {
             log.warn("[核销微信发货]未获取到微信单号, orderNo:{}", orderNo);
             return;
         }
+        // 微信发货商品描述: 该订单中涉及的所有商品名称用逗号组装(无商品行时兜底用团购名称)
+        String goodsNames = orderInfoService.getOrderGoodsNames(orderNo, orderInfo.getGroupName());
         // 微信发货失败不影响核销主流程(核销已完成), 仅记录日志, 由后续自动发货任务兜底重试
         try {
             // 首次调用(使用缓存access_token)
-            int wxFlag = callWxUploadShippingInfo(orderNo, transactionId, orderInfo.getGroupName(), orderInfo.getOpenid(), false);
+            int wxFlag = callWxUploadShippingInfo(orderNo, transactionId, goodsNames, orderInfo.getOpenid(), false);
             // access_token失效(微信返回40001/42001, 对应-1)时, 清除缓存并强制刷新后重试一次
             if (wxFlag == -1) {
                 wxAccessTokenHelper.removeAccessToken();
                 log.warn("[核销微信发货]access_token失效, 清除缓存并强制刷新后重试, orderNo:{}", orderNo);
-                wxFlag = callWxUploadShippingInfo(orderNo, transactionId, orderInfo.getGroupName(), orderInfo.getOpenid(), true);
+                wxFlag = callWxUploadShippingInfo(orderNo, transactionId, goodsNames, orderInfo.getOpenid(), true);
             }
             // 1=微信发货成功
             if (wxFlag == 1) {
@@ -523,14 +525,14 @@ public class MemberOrderController {
     }
 
     // 调用微信发货信息录入(可强制刷新access_token), 返回: 1=成功, 0=业务失败, -1=access_token失效(40001/42001)
-    private int callWxUploadShippingInfo(String orderNo, String transactionId, String groupName, String openid, boolean forceRefreshToken) {
+    private int callWxUploadShippingInfo(String orderNo, String transactionId, String goodsNames, String openid, boolean forceRefreshToken) {
         // forceRefreshToken=true 时忽略Redis缓存, 强制向微信重新获取access_token
         String accessToken = wxAccessTokenHelper.getAccessToken(forceRefreshToken);
         if (StringUtils.isEmpty(accessToken)) {
             log.warn("[核销微信发货]获取access_token失败, orderNo:{}", orderNo);
             return -1;
         }
-        return WxMiniProgramHelper.uploadShippingInfo(accessToken, transactionId, groupName, openid);
+        return WxMiniProgramHelper.uploadShippingInfo(accessToken, transactionId, goodsNames, openid);
     }
 
     // 从请求头token中解析当前登录用户id

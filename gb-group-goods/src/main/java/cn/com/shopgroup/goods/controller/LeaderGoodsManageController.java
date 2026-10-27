@@ -11,6 +11,8 @@ import cn.com.shopgroup.goods.http.request.leader.LeaderAddSpecRequest;
 import cn.com.shopgroup.goods.http.request.leader.LeaderAddSpecValRequest;
 import cn.com.shopgroup.goods.http.request.leader.LeaderGoodsRequest;
 import cn.com.shopgroup.goods.http.request.leader.LeaderSkuRequest;
+import cn.com.shopgroup.goods.http.request.leader.LeaderUpdateSkuStockRequest;
+import cn.com.shopgroup.goods.http.request.leader.UpdateSkuStockRequest;
 import cn.com.shopgroup.goods.http.response.GoodsCategoryResponse;
 import cn.com.shopgroup.goods.http.response.leader.GoodsDetailResponse;
 import cn.com.shopgroup.goods.http.response.leader.LeaderGoodsResponse;
@@ -21,6 +23,7 @@ import cn.com.shopgroup.goods.model.GbGoodsInfo;
 import cn.com.shopgroup.goods.model.GbGoodsSkuInfo;
 import cn.com.shopgroup.goods.model.GbGoodsSpecInfo;
 import cn.com.shopgroup.goods.model.GbGoodsSpecValue;
+import cn.com.shopgroup.goods.model.GbGroupActivityGoods;
 import cn.com.shopgroup.goods.service.GbGoodsCategoryInfoService;
 import cn.com.shopgroup.goods.service.GbGoodsInfoService;
 import cn.com.shopgroup.goods.service.GbGoodsSkuInfoService;
@@ -29,6 +32,7 @@ import cn.com.shopgroup.goods.service.GbGoodsSpecValueService;
 import cn.com.shopgroup.goods.service.GbGroupActivityInfoService;
 import cn.com.shopgroup.goods.utils.SkuGenerateUtils;
 import cn.com.shopgroup.user.utils.RequestParamsUtils;
+import com.alibaba.fastjson2.JSON;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -222,7 +226,7 @@ public class LeaderGoodsManageController {
         return JsonResult.success("添加成功", goodsId);
     }
 
-    // 修改商品, 如果该商品正在团购中, 则不允许修改
+    // 修改商品
     @PostMapping("/leader/goods/edit")
     @Transactional(rollbackFor = Exception.class)
     public JsonResult editGoods(@Validated @RequestBody LeaderGoodsRequest request) {
@@ -377,6 +381,118 @@ public class LeaderGoodsManageController {
 
         // 先删除后添加(未提交SKU时自动生成, 保持原行为)
         saveGoodsSku(leaderId, goodsId, requestList, true);
+        return JsonResult.success();
+    }
+
+    /**
+     * 团长端修改商品库存(按SKU维度修改为指定库存, 商品主表库存按各SKU库存之和同步)
+     */
+    @PostMapping("/leader/update/sku/stock")
+    @Transactional(rollbackFor = Exception.class)
+    public JsonResult updateSkuStock(@Validated @RequestBody LeaderUpdateSkuStockRequest request) {
+        log.info("团长端-修改商品库存:/goods//leader/update/sku/stock request:{}", JSON.toJSONString(request));
+        Long leaderId = getLeaderId();
+
+        Long goodsId = request.getGoodsId();
+        if (goodsId == null || goodsId <= 0) {
+            throw new BusinessException(GoodsErrorCodeEnum.REQUEST_ID_THAN_ZERO);
+        }
+        if (CollectionUtils.isEmpty(request.getSkuStockRequestList())) {
+            throw new BusinessException(GoodsErrorCodeEnum.SKU_REQUIRED);
+        }
+
+        // 商品存在性 + 归属校验(只能修改自己名下的商品库存)
+        GbGoodsInfo goodsInfo = goodsService.getGoodsInfo(goodsId);
+        if (ObjectUtils.isEmpty(goodsInfo)) {
+            throw new BusinessException(GoodsErrorCodeEnum.GOODS_NOT_EXIST);
+        }
+        if (goodsInfo.getLeaderId() == null || goodsInfo.getLeaderId().longValue() != leaderId.longValue()) {
+            throw new BusinessException(GoodsErrorCodeEnum.GOODS_NOT_EXIST);
+        }
+
+        // 逐个修改SKU库存(提交值即最终库存, 绝对值覆盖), 并记录是否发生实际变动
+        boolean changed = false;
+        for (UpdateSkuStockRequest item : request.getSkuStockRequestList()) {
+            Long skuId = item.getSkuId();
+            Integer num = item.getNum();
+            if (skuId == null || skuId <= 0) {
+                throw new BusinessException(GoodsErrorCodeEnum.REQUEST_ID_THAN_ZERO);
+            }
+            if (num == null || num < 0) {
+                throw new BusinessException(GoodsErrorCodeEnum.STOCK_INVALID);
+            }
+            // SKU必须存在且属于该商品(防止传入其他商品的skuId越权改库存)
+            GbGoodsSkuInfo skuInfo = skuService.getGoodsSkuInfo(skuId);
+            if (ObjectUtils.isEmpty(skuInfo) || skuInfo.getGoodsId() == null
+                    || skuInfo.getGoodsId().longValue() != goodsId.longValue()) {
+                throw new BusinessException(GoodsErrorCodeEnum.SKU_NOT_EXIST);
+            }
+            // 库存未变动则跳过写库
+            if (skuInfo.getGoodsNum() != null && skuInfo.getGoodsNum().intValue() == num.intValue()) {
+                continue;
+            }
+            boolean flag = skuService.updateSkuGoodsNum(skuId, num);
+            if (!flag) {
+                // 写入失败(参数非法/记录不存在)时回滚整批修改, 避免部分SKU生效导致库存错乱
+                throw new BusinessException(GoodsErrorCodeEnum.UPDATE_FAILED);
+            }
+            changed = true;
+        }
+        if (!changed) {
+            return JsonResult.success();
+        }
+
+        // 如果当前sku有库存变动，相应的goods基本信息的库存也要跟着变动:
+        // 主表库存按该商品下所有SKU库存之和回填, 保证主表库存与SKU实际库存一致(支持只提交部分SKU的场景)
+        List<GbGoodsSkuInfo> skuList = skuService.getMiniGoodsSkuList(goodsId);
+        if (!CollectionUtils.isEmpty(skuList)) {
+            int totalNum = 0;
+            for (GbGoodsSkuInfo item : skuList) {
+                totalNum += item.getGoodsNum() == null ? 0 : item.getGoodsNum().intValue();
+            }
+            goodsService.updateGoodsNum(goodsId, totalNum);
+            log.info("团长端-修改商品库存: 商品{} 主表库存按SKU之和同步为{}", goodsId, totalNum);
+        }
+
+        // 清除该商品参与活动的团购商品列表缓存(C端 /goods/group/goods/list 展示库存, 修改后需立即失效)
+        List<Long> groupIds = groupActivityInfoService.getGroupIdsByGoodsId(goodsId);
+        if (groupIds != null) {
+            for (Long groupId : groupIds) {
+                redisHelper.deleteObject(RedisConstant.RedisGroupGoodsListKey + groupId);
+            }
+        }
+
+        return JsonResult.success();
+    }
+
+    /**
+     * 团购活动详情中-商品上下架(按团购商品行自身 is_close 取反切换; 商品表已下架或活动不属于当前团长时抛错)
+     */
+    @GetMapping("/leader/activity/goods/close")
+    public JsonResult closeActivityGoods(@RequestParam("goodsId") Long goodsId, @RequestParam("groupId") Long groupId) {
+        Long leaderId = getLeaderId();
+
+        // 商品必须存在
+        GbGoodsInfo goodsInfo = goodsService.getGoodsInfo(goodsId);
+        if (ObjectUtils.isEmpty(goodsInfo)) {
+            throw new BusinessException(GoodsErrorCodeEnum.GOODS_NOT_EXIST);
+        }
+        // 团购活动内的商品行(商品表已下架时查不到, 需判空, 避免空指针)
+        GbGroupActivityGoods activityGoods = groupActivityInfoService.getGroupActivityOnlineGoods(groupId, goodsId);
+        if (ObjectUtils.isEmpty(activityGoods)) {
+            throw new BusinessException(GoodsErrorCodeEnum.GROUP_GOODS_NOT_EXIST);
+        }
+        // 当前上下架状态: is_close 为空时按上架(0)处理, 避免空指针; 再取反切换状态
+        int curStatus = activityGoods.getIsClose() == null ? 0 : activityGoods.getIsClose().intValue();
+        int status = curStatus == 0 ? 1 : 0;
+        int rows = groupActivityInfoService.closeLeaderActivityGoodsInfo(leaderId, groupId, goodsId, status);
+        // 影响行数0: 团购活动不存在或不属于当前团长, 未做任何修改
+        if (rows <= 0) {
+            log.warn("团购活动详情中-商品上下架失败(活动不存在或不属于该团长),leaderId:{},groupId:{},goodsId:{}", leaderId, groupId, goodsId);
+            throw new BusinessException(GoodsErrorCodeEnum.GROUP_NOT_EXIST);
+        }
+        // 清除该商品参与活动的团购商品列表缓存(C端 /goods/group/goods/list 仅展示在线商品, 上下架后需立即失效)
+        redisHelper.deleteObject(RedisConstant.RedisGroupGoodsListKey + groupId);
         return JsonResult.success();
     }
 

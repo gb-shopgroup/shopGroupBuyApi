@@ -10,7 +10,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Component
 @Slf4j
@@ -43,10 +45,22 @@ public class WxSendGoodsTaskScheduled {
 
         // 查询未发货的订单列表, 每次 limit 条记录
         List<GbOrderBusinessInfo> dataList = service.getUnSendBusinessOrderList(limit);
+        if (dataList == null || dataList.isEmpty()) {
+            return;
+        }
 
         // 当前时间
         int nowTime = TimeUtils.getTimeStamp();
         int cha = 15 * 60; // 15分钟的时间间隔
+
+        // 批量组装订单商品名称(该订单涉及的所有商品名称用逗号组装, 无商品行时兜底用团购名称)
+        List<String> orderNos = new ArrayList<>(dataList.size());
+        for (GbOrderBusinessInfo item : dataList) {
+            if (item.getOrderNo() != null) {
+                orderNos.add(item.getOrderNo());
+            }
+        }
+        Map<String, String> goodsNamesMap = orderInfoService.getOrderGoodsNamesMap(orderNos);
 
         // 循环发货
         for (GbOrderBusinessInfo item : dataList) {
@@ -57,7 +71,7 @@ public class WxSendGoodsTaskScheduled {
 
             // 订单发货
             String transactionId = item.getTransactionId();
-            String goodsName = item.getGroupName();
+            String goodsName = goodsNamesMap.getOrDefault(item.getOrderNo(), item.getGroupName());
             String openid = item.getOpenid();
             int isSuccess = WxMiniProgramHelper.uploadShippingInfo(accessToken, transactionId, goodsName, openid);
             if (isSuccess == 1) {

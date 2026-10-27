@@ -211,14 +211,16 @@ public interface GbOrderInfoMapper extends BaseMapper<GbOrderInfo> {
                                              @Param("pointId") Long pointId, @Param("keyword") String keyword);
 
 
-    // (团长端首页)商品维度统计分页列表: 每商品总件数(num_total)/已核销件数(receipt_total)/
+    // (团长端首页)商品维度统计分页列表(按"商品+规格"拆行, 前端逐行展示如"花生+500g: 共55件, 待核销26件"):
+    // 每行(商品,规格) 总件数(num_total)/已核销件数(receipt_total)/
     // 待核销件数(unverify_num = goods_num - receipt_num - refund_num, 已退款部分不计入待核销, 支持部分核销),
     // 已支付(pay_time>0), 按 团购活动 group_id / 自提点 pointId / 关键字 goods_name 过滤,
     // (groupId / pointId 为 0 或 null 时表示不过滤), 分页;
-    // sku_names: 该商品下所有订单行的规格(GROUP_CONCAT 去重, 逗号拼接, 空规格行自动忽略)
+    // 无规格商品 sku_ids 统一归一为 '0'(空串/null), sku_names 取该规格名(无规格为 null)
     @Select({
             "SELECT g.`goods_id`, g.`goods_name`, g.`goods_unit`,",
-            "       GROUP_CONCAT(DISTINCT NULLIF(g.`sku_names`, '') SEPARATOR ',') AS sku_names,",
+            "       COALESCE(NULLIF(g.`sku_ids`, ''), '0') AS sku_ids,",
+            "       MAX(g.`sku_names`) AS sku_names,",
             "       COALESCE(SUM(g.`goods_num` * g.`pack_num`), 0) AS num_total,",
             "       COALESCE(SUM(IFNULL(g.`receipt_num`, 0) * g.`pack_num`), 0) AS receipt_total,",
             "       COALESCE(SUM(GREATEST(CAST(g.`goods_num` AS SIGNED) - CAST(IFNULL(g.`receipt_num`, 0) AS SIGNED) - CAST(IFNULL(g.`refund_num`, 0) AS SIGNED), 0) * g.`pack_num`), 0) AS unverify_num",
@@ -229,8 +231,8 @@ public interface GbOrderInfoMapper extends BaseMapper<GbOrderInfo> {
             "AND (o.`point_id` = #{pointId} OR IFNULL(#{pointId}, 0) <= 0)",
             "  AND o.`pay_time` > 0",
             "  AND g.`goods_name` LIKE CONCAT('%', IFNULL(#{keyword}, ''), '%')",
-            "GROUP BY g.`goods_id`, g.`goods_name`, g.`goods_unit`",
-            "ORDER BY g.`goods_id` ASC",
+            "GROUP BY g.`goods_id`, g.`goods_name`, g.`goods_unit`, COALESCE(NULLIF(g.`sku_ids`, ''), '0')",
+            "ORDER BY g.`goods_id` ASC, COALESCE(NULLIF(g.`sku_ids`, ''), '0') ASC",
             "LIMIT #{offset}, #{limit}"
     })
     List<Map<String, Object>> getSummaryPointGoodsPageList(@Param("leaderId") Long leaderId, @Param("groupId") Long groupId,

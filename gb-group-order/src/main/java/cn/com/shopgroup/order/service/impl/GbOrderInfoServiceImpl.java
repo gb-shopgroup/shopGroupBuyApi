@@ -49,6 +49,7 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -58,6 +59,9 @@ import java.util.stream.Collectors;
 @Service
 @Slf4j
 public class GbOrderInfoServiceImpl implements GbOrderInfoService {
+
+    // 微信发货商品描述(item_desc)中多个商品名称的分隔符
+    private static final String GOODS_NAME_SEPARATOR = ",";
 
     @Resource
     private GbOrderInfoMapper mapper;
@@ -113,6 +117,68 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
         queryWrapper.orderByAsc(GbOrderGoodsInfo::getId);
         List<GbOrderGoodsInfo> results = goodsMapper.selectList(queryWrapper);
         return results == null ? new ArrayList<>() : results;
+    }
+
+
+    @Override
+    public String getOrderGoodsNames(String orderNo, String fallbackName) {
+        String goodsNames = joinGoodsNames(getOrderGoodsList(orderNo));
+        if (!goodsNames.isEmpty()) {
+            return goodsNames;
+        }
+        return fallbackName == null ? "" : fallbackName;
+    }
+
+
+    @Override
+    public Map<String, String> getOrderGoodsNamesMap(List<String> orderNos) {
+        Map<String, String> result = new HashMap<>();
+        if (CollectionUtils.isEmpty(orderNos)) {
+            return result;
+        }
+        LambdaQueryWrapper<GbOrderGoodsInfo> queryWrapper = Wrappers.lambdaQuery();
+        queryWrapper.in(GbOrderGoodsInfo::getOrderNo, orderNos);
+        queryWrapper.orderByAsc(GbOrderGoodsInfo::getOrderNo, GbOrderGoodsInfo::getId);
+        List<GbOrderGoodsInfo> goodsList = goodsMapper.selectList(queryWrapper);
+        if (CollectionUtils.isEmpty(goodsList)) {
+            return result;
+        }
+        // 按订单号归集商品名称(保持商品行顺序, 同一商品名称去重)
+        Map<String, LinkedHashSet<String>> nameMap = new LinkedHashMap<>();
+        for (GbOrderGoodsInfo goods : goodsList) {
+            if (goods == null || StringUtils.isEmpty(goods.getOrderNo())) {
+                continue;
+            }
+            String goodsName = goods.getGoodsName() == null ? "" : goods.getGoodsName().trim();
+            if (goodsName.isEmpty()) {
+                continue;
+            }
+            nameMap.computeIfAbsent(goods.getOrderNo(), k -> new LinkedHashSet<>()).add(goodsName);
+        }
+        for (Map.Entry<String, LinkedHashSet<String>> entry : nameMap.entrySet()) {
+            result.put(entry.getKey(), String.join(GOODS_NAME_SEPARATOR, entry.getValue()));
+        }
+        return result;
+    }
+
+
+    // 把订单商品行的商品名称按商品行顺序去重后用逗号组装(空商品行返回空字符串)
+    private String joinGoodsNames(List<GbOrderGoodsInfo> goodsList) {
+        if (CollectionUtils.isEmpty(goodsList)) {
+            return "";
+        }
+        LinkedHashSet<String> names = new LinkedHashSet<>();
+        for (GbOrderGoodsInfo goods : goodsList) {
+            if (goods == null) {
+                continue;
+            }
+            String goodsName = goods.getGoodsName() == null ? "" : goods.getGoodsName().trim();
+            if (goodsName.isEmpty()) {
+                continue;
+            }
+            names.add(goodsName);
+        }
+        return String.join(GOODS_NAME_SEPARATOR, names);
     }
 
 

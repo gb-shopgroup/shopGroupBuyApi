@@ -1005,6 +1005,21 @@ BEHAVIOR_CHANGES = [
     ("2026-10-03", "/admin/business/list", "GET",
      "busBalance 数据源由 Redis 月度缓存改为 gb_leader_merchant_monthly_amount 表，恒为当月累计收款（元）；"
      "原 Redis 缓存跨月清零/30 天过期导致的归零问题不再出现"),
+    ("2026-10-27", "/task/order/send", "GET",
+     "微信发货录入的商品描述（goodsName）由团购名称改为：该订单涉及的所有商品名称按商品行顺序去重后逗号拼接；"
+     "订单无商品行时仍兜底使用团购名称"),
+    ("2026-10-27", "/order/leader/order/send", "GET",
+     "同上（团长端手动发货场景，微信发货商品描述取订单商品名称拼接）"),
+    ("2026-10-27", "/order/group/order/confirmShipping", "POST",
+     "同上（确认发货 / 部分核销触发的微信发货，商品描述取订单商品名称拼接）"),
+    ("2026-10-27", "/order/leader/order/writeOff", "POST",
+     "同上（核销时补调用微信发货，商品描述取订单商品名称拼接）"),
+    ("2026-10-27", "/order/payment/order/notify", "POST",
+     "同上（支付回调延迟 10 分钟触发的微信发货，商品描述取订单商品名称拼接）"),
+    ("2026-10-27", "/goods/leader/activity/goods/close", "GET",
+     "团购活动内商品上下架：切换状态改为按团购商品行自身 is_close 取反"
+     "（修复原逻辑取商品表状态导致恒为下架、无法重新上架）；商品表已下架返回 300204、"
+     "活动不存在或不属于当前团长返回 300203，未实际更新时不再返回成功（原为 500 空指针）"),
 ]
 
 

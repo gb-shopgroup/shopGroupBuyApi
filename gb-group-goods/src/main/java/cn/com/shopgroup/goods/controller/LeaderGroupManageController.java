@@ -61,11 +61,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -526,8 +528,7 @@ public class LeaderGroupManageController {
         if (ObjectUtils.isEmpty(groupInfo)) {
             throw new BusinessException(GoodsErrorCodeEnum.GROUP_NOT_EXIST);
         }
-        // 团购商品列表(冗余表, 含团购价/市场价/商品名称/主图): 仅在线(is_close=0)商品, 已关闭商品不展示
-        List<GbGroupActivityGoods> activityGoodsList = activityInfoService.getGroupActivityOnlineGoodsList(groupId);
+        List<GbGroupActivityGoods> activityGoodsList = activityInfoService.getGroupActivityGoodsList(groupId);
         if (CollectionUtils.isEmpty(activityGoodsList)) {
             throw new BusinessException(GoodsErrorCodeEnum.GROUP_GOODS_NOT_EXIST);
         }
@@ -582,16 +583,7 @@ public class LeaderGroupManageController {
         GbOrgStaffInfo staffInfo = new GbOrgStaffInfo();
         // 重构数据
         GbGroupActivityInfo data = new GbGroupActivityInfo();
-        if (staffId != 0) {
-            staffInfo = staffService.getStaffInfo(staffId);
-            log.info("添加团购活动时，stfInfo:{}", JSON.toJSONString(staffInfo));
-            if (ObjectUtils.isEmpty(staffInfo)) {
-                throw new BusinessException(GoodsErrorCodeEnum.STAFF_NOT_EXIST);
-            }
-            // 修改人员姓名
-            data.setStaffName(staffInfo.getStaffName());
-        }
-        Long uptateId = leaderId;
+        Long updateId = leaderId;
         String updateName = Optional.ofNullable(leaderInfo.getLeaderName()).orElse("团长");
         if (staffId != 0) {
             staffInfo = staffService.getStaffInfo(staffId);
@@ -599,11 +591,11 @@ public class LeaderGroupManageController {
             if (ObjectUtils.isEmpty(staffInfo)) {
                 throw new BusinessException(GoodsErrorCodeEnum.STAFF_NOT_EXIST);
             }
-            uptateId = staffId;
+            updateId = staffId;
             updateName = staffInfo.getStaffName();
         }
         // 添加人员id
-        data.setStaffId(uptateId);
+        data.setStaffId(updateId);
         // 添加人员姓名
         data.setStaffName(updateName);
 
@@ -1110,6 +1102,8 @@ public class LeaderGroupManageController {
         dto.setPriceText("￥" + goodsInfo.getGroupPrice());
         dto.setBtnText("立即跟团");
         dto.setImgUrl(goodsInfo.getGroupImg());
+        // 团长店铺二维码: 一起合成到海报右下角(获取失败不阻断海报生成)
+        dto.setQrCodeImage(getLeaderShopQrCodeImage(leaderId));
 
         // 生成海报
         ByteArrayInputStream bis = null;
@@ -1154,6 +1148,50 @@ public class LeaderGroupManageController {
         // 返回访问路径
         log.info("团购端-分享团购-商品-海报生成,leaderId:{},groupId:{},goodsId:{},uploadType:{},url:{}", leaderId, groupId, goodsId, type, url);
         return JsonResult.success("查询成功", url);
+    }
+
+    /**
+     * 团长店铺二维码(店铺小程序码)图片, 用于合成到分享海报上
+     * 优先复用店铺已生成的小程序码图片(小程序码永久有效, 避免重复调用微信接口);
+     * 未生成时按 /leader/shop/makeQrCode 同口径(page=pages/order/verify, scene=shopId=xx)现场生成
+     *
+     * @param leaderId 团长id
+     * @return 店铺小程序码图片, 获取失败返回 null(不阻断海报生成)
+     */
+    private BufferedImage getLeaderShopQrCodeImage(Long leaderId) {
+
+        GbOrgShopInfo shopInfo = shopService.getMiniLeaderShop(leaderId);
+        if (ObjectUtils.isEmpty(shopInfo)) {
+            log.warn("团购端-分享团购-商品-海报:未查询到团长店铺信息,leaderId:{}", leaderId);
+            return null;
+        }
+        // 已生成过店铺码: 直接复用图片URL
+        String shopCodeUrl = shopInfo.getShopCodeUrl();
+        if (shopCodeUrl != null && shopCodeUrl.length() > 0) {
+            try {
+                BufferedImage qrImg = ImageIO.read(new URL(shopCodeUrl));
+                if (qrImg != null) {
+                    return qrImg;
+                }
+            } catch (Exception e) {
+                log.warn("团购端-分享团购-商品-海报:读取店铺码图片失败,leaderId:{},shopCodeUrl:{}", leaderId, shopCodeUrl, e);
+            }
+        }
+        // 兜底: 现场生成店铺小程序码(access_token失效自动强刷重试一次)
+        String page = "pages/order/verify";
+        String scene = "shopId=" + shopInfo.getId();
+        int wh = 280; // 图片像素(最高1280像素)
+        byte[] qrBytes = helper.getWxaCodeUnlimitWithRetry(page, scene, wh);
+        if (qrBytes == null || qrBytes.length == 0) {
+            log.warn("团购端-分享团购-商品-海报:生成店铺小程序码失败,leaderId:{},shopId:{}", leaderId, shopInfo.getId());
+            return null;
+        }
+        try {
+            return ImageIO.read(new ByteArrayInputStream(qrBytes));
+        } catch (IOException e) {
+            log.warn("团购端-分享团购-商品-海报:解析店铺小程序码失败,leaderId:{}", leaderId, e);
+            return null;
+        }
     }
 
 }

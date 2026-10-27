@@ -127,11 +127,11 @@ Maven 依赖仓库使用阿里云镜像（`https://maven.aliyun.com/repository/p
 
 ### 4.3 gb-group-user — 用户 / 团长 / 员工服务
 
-覆盖：会员登录注册（微信 openid / 手机号）、用户信息、团长店铺管理、自提点管理、员工管理、黑名单、消息、图片上传、文章与轮播图等。**47 个接口**。
+覆盖：会员登录注册（微信 openid / 手机号）、用户信息、团长店铺管理、自提点管理、员工管理、黑名单、消息、图片上传、文章与轮播图等。**48 个接口**。
 
 ### 4.4 gb-group-goods — 商品 / 团购服务
 
-覆盖：商品（分类、图片、包装、规格、规格值、SKU、库存）、团长商品管理、团购活动查询等。**23 个接口**。
+覆盖：商品（分类、图片、包装、规格、规格值、SKU、库存）、团长商品管理、团购活动查询等。**25 个接口**。
 
 ### 4.5 gb-group-order — 订单 / 支付 / 分账服务
 
@@ -288,14 +288,14 @@ mvn -pl gb-group-task spring-boot:run
 | `page` / `pageSize` | 页码（从 1 开始）/ 每页条数 |
 | `start` / `end` | 开始时间 / 结束时间（如 yyyy-MM-dd） |
 
-- **接口数量统计**：user 47 个、order 49 个、goods 23 个、admin 29 个、task 8 个，合计 **156 个**。
+- **接口数量统计**：user 48 个、order 49 个、goods 25 个、admin 29 个、task 8 个，合计 **159 个**。
 - **详细版接口文档**（含每个接口的完整入参 / 出参字段说明，参数含义、必填、嵌套字段均已细化）见根目录 **`API接口文档.md`**，可通过 `python3 generate_api_doc.py` 扫描各模块 `*Controller.java` 重新生成。下方为接口总览清单。
 
 ### 8.2 接口清单
 
 > 功能说明优先取源码方法注释；*斜体* 为脚本依据路径与出入参自动推断（仅供参考），字段级说明见 [`API接口文档.md`](API接口文档.md)。
 
-#### 8.2.1 gb-group-user（用户/团长/员工）— 47 个接口
+#### 8.2.1 gb-group-user（用户/团长/员工）— 48 个接口
 
 **ImageSourceController**（`cn.com.shopgroup.user.controller`）
 
@@ -385,6 +385,12 @@ mvn -pl gb-group-task spring-boot:run
 | 3 | POST | `/user/leader/staff/edit` | *修改团长员工* | Body: **request** (StaffRequest, JSON) |
 | 4 | POST | `/user/leader/staff/close` | *启用/关闭团长员工* | **id** (Long) |
 | 5 | POST | `/user/leader/staff/remove` | *删除团长员工* | **staffId** (Long) |
+
+**ApplyLeaderController**（`cn.com.shopgroup.user.controller.member`）
+
+| 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
+| --- | --- | --- | --- | --- |
+| 1 | POST | `/user/apply/become/leader` | 申请团长(会员端提交申请记录) | Body: **request** (ApplyLeaderRequest, JSON) |
 
 **LoginController**（`cn.com.shopgroup.user.controller.member`）
 
@@ -515,7 +521,7 @@ mvn -pl gb-group-task spring-boot:run
 | 1 | GET | `/order/payment/order/pay` | *支付（支付订单）* | **orderNo** (String); **openid** (String) |
 | 2 | POST | `/order/payment/order/notify` | *回调（支付订单）* | 无 |
 
-#### 8.2.3 gb-group-goods（商品/团购）— 23 个接口
+#### 8.2.3 gb-group-goods（商品/团购）— 25 个接口
 
 **GroupGoodsController**（`cn.com.shopgroup.goods.controller`）
 
@@ -538,6 +544,8 @@ mvn -pl gb-group-task spring-boot:run
 | 8 | GET | `/goods/leader/goods/close` | *启用/关闭团长商品* | **id** (Long) |
 | 9 | GET | `/goods/leader/goods/sku/spec` | *查询团长商品SKU规格* | **id** (Long) |
 | 10 | POST | `/goods/leader/goods/sku/save` | *保存团长商品SKU* | Body: **requestList** (List<LeaderSkuRequest>, JSON) |
+| 11 | POST | `/goods/leader/update/sku/stock` | 团长端修改商品库存(按SKU维度修改为指定库存, 商品主表库存按各SKU库存之和同步) | Body: **request** (LeaderUpdateSkuStockRequest, JSON) |
+| 12 | GET | `/goods/leader/activity/goods/close` | 团购活动详情中-商品上下架(按团购商品行自身 is_close 取反切换; 商品表已下架或活动不属于当前团长时抛错) | **goodsId** (Long); **groupId** (Long) |
 
 **LeaderGroupManageController**（`cn.com.shopgroup.goods.controller`）
 

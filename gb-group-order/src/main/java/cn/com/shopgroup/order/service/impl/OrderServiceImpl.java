@@ -136,6 +136,12 @@ public class OrderServiceImpl implements OrderService {
         }
         // 团长id
         Long leaderId = groupInfo.getLeaderId();
+        // 团长门店信息
+        GbOrgShopInfo shopInfo = shopService.getMiniLeaderShop(leaderId);
+        if (ObjectUtils.isEmpty(shopInfo)) {
+            result.put("msg", "查询不到团长门店信息");
+            return result;
+        }
         Long pointId = request.getPointId();
         GbOrgPointInfo pointInfo = pointService.getPointInfo(pointId);
         if (ObjectUtils.isEmpty(pointInfo)) {
@@ -305,12 +311,6 @@ public class OrderServiceImpl implements OrderService {
             return result;
         }
 
-        // 团长门店信息
-        GbOrgShopInfo shopInfo = shopService.getMiniLeaderShop(leaderId);
-        if (ObjectUtils.isEmpty(shopInfo)) {
-            result.put("msg", "查询不到团长门店信息");
-            return result;
-        }
         String shopName = shopInfo.getShopName();
 
         // 构建订单数据

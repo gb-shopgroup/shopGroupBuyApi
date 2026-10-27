@@ -171,6 +171,11 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
         return goodsMapper.getGroupActivityOnlineGoods(groupId,goodsId);
     }
 
+    @Override
+    public int closeLeaderActivityGoodsInfo(Long leaderId, Long groupId, Long goodsId, int status) {
+        return goodsMapper.closeLeaderActivityGoodsInfo(leaderId,groupId,goodsId,status);
+    }
+
 
     public List<GbGroupActivityInfo> getMiniGroupActivityList(Long leaderId, Long catId, int page, int pageSize) {
 

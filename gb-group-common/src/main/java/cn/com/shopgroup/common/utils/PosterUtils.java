@@ -19,6 +19,11 @@ public class PosterUtils {
     private static final int ROUND_RADIUS = 12;
     private static final int TOP_TEXT_AREA_HEIGHT = 40;
     private static final int PRICE_BTN_GAP = 20;
+    // 右下角店铺二维码尺寸/间距/提示语
+    private static final int QR_CODE_SIZE = 110;
+    private static final int QR_CODE_GAP = 8;
+    private static final int QR_TIP_FONT_SIZE = 14;
+    private static final String QR_TIP_TEXT = "长按识别进店";
 
 
     // 生成海报，返回 ByteArrayInputStream
@@ -45,8 +50,8 @@ public class PosterUtils {
         // 绘制顶部文字区域（高度40px，文字垂直居中）
         drawTopTextArea(g2d, dto.getGoodsName(), dto.getSaleText());
 
-        // 绘制底部白色圆角商品容器
-        drawBottomGoodsArea(g2d, goodsImg, dto.getPriceText(), dto.getBtnText());
+        // 绘制底部白色圆角商品容器(含右下角团长店铺二维码)
+        drawBottomGoodsArea(g2d, goodsImg, dto.getPriceText(), dto.getBtnText(), dto.getQrCodeImage());
 
         // 销毁GD
         g2d.dispose();
@@ -86,8 +91,9 @@ public class PosterUtils {
     /**
      * 底部白色圆角容器：320*320商品图
      * 右侧价格+按钮整体垂直居中，两者间距20px
+     * qrCodeImage 非空时：右下角绘制团长店铺二维码+提示语，价格/按钮在二维码上方剩余区域垂直居中
      */
-    private static void drawBottomGoodsArea(Graphics2D g2d, BufferedImage goodsImg, String priceText, String btnText) {
+    private static void drawBottomGoodsArea(Graphics2D g2d, BufferedImage goodsImg, String priceText, String btnText, BufferedImage qrCodeImage) {
 
         // 底部容器坐标
         int containerX = PADDING;
@@ -120,7 +126,6 @@ public class PosterUtils {
         // 容器内有效绘图区域（扣除上下padding）
         int innerTop = containerY + PADDING;
         int innerBottom = containerY + containerH - PADDING;
-        int innerHeight = innerBottom - innerTop;
 
         // 价格字体
         Font priceFont = getOsAutoFont(Font.BOLD, 28);
@@ -131,8 +136,33 @@ public class PosterUtils {
         int btnTotalH = 46; // 按钮固定高度
         int totalBlockHeight = priceTextH + PRICE_BTN_GAP + btnTotalH;
 
+        // 价格/按钮可用区域的底部(有店铺二维码时收缩到二维码提示语之上)
+        int blockAreaBottom = innerBottom;
+
+        // 右下角团长店铺二维码(缩放至110*110) + 上方提示语
+        if (qrCodeImage != null) {
+            int qrX = containerX + containerW - PADDING - QR_CODE_SIZE;
+            int qrY = innerBottom - QR_CODE_SIZE;
+
+            // 提示语: 二维码正上方居中
+            Font tipFont = getOsAutoFont(Font.PLAIN, QR_TIP_FONT_SIZE);
+            FontMetrics tipFm = g2d.getFontMetrics(tipFont);
+            g2d.setFont(tipFont);
+            g2d.setColor(Color.DARK_GRAY);
+            int tipW = tipFm.stringWidth(QR_TIP_TEXT);
+            int tipBaseline = qrY - QR_CODE_GAP;
+            g2d.drawString(QR_TIP_TEXT, qrX + (QR_CODE_SIZE - tipW) / 2, tipBaseline);
+
+            // 白底打底保证识别率, 再绘制二维码
+            g2d.setColor(Color.WHITE);
+            g2d.fillRect(qrX, qrY, QR_CODE_SIZE, QR_CODE_SIZE);
+            g2d.drawImage(scaleQrCodeImage(qrCodeImage, QR_CODE_SIZE), qrX, qrY, null);
+
+            blockAreaBottom = tipBaseline - tipFm.getAscent() - QR_CODE_GAP;
+        }
+
         // 整体垂直居中起始Y
-        int blockStartY = innerTop + (innerHeight - totalBlockHeight) / 2;
+        int blockStartY = innerTop + (blockAreaBottom - innerTop - totalBlockHeight) / 2;
 
         // 绘制价格文字
         g2d.setFont(priceFont);
@@ -161,6 +191,20 @@ public class PosterUtils {
         int textOffX = (btnW - btnTextW) / 2;
         int textOffY = btnH / 2 + btnFm.getAscent() / 2 - 4;
         g2d.drawString(btnText, rightX + textOffX, btnY + textOffY);
+    }
+
+    // 缩放店铺二维码至固定尺寸; 保留透明通道(ARGB), 避免透明背景在海报上被填充成黑块
+    private static BufferedImage scaleQrCodeImage(BufferedImage qrImg, int size) {
+
+        Image scaleImg = qrImg.getScaledInstance(size, size, Image.SCALE_SMOOTH);
+        BufferedImage fixedImg = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+        Graphics imgG = fixedImg.createGraphics();
+        try {
+            imgG.drawImage(scaleImg, 0, 0, null);
+        } finally {
+            imgG.dispose();
+        }
+        return fixedImg;
     }
 
     // 下载网络图片，返回图片字节数组（无本地文件）

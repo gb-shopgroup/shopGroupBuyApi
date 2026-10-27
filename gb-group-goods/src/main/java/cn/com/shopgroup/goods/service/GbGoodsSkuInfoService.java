@@ -31,5 +31,9 @@ public interface GbGoodsSkuInfoService {
    Boolean increaseGoodsStock(Long skuId, Integer goodsNum);
 
 
+   // 直接覆盖SKU库存(绝对值, 非增减): 团长端修改库存使用, num<0 视为非法
+   Boolean updateSkuGoodsNum(Long skuId, Integer goodsNum);
+
+
 
 }

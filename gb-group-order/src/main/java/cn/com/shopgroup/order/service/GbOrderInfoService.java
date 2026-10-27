@@ -22,6 +22,23 @@ public interface GbOrderInfoService {
 
     List<GbOrderGoodsInfo> getOrderGoodsList(String orderNo);
 
+    /**
+     * 组装订单中涉及的所有商品名称(按商品行顺序去重、逗号分隔), 用于微信发货信息录入的 goodsName(商品描述) 参数
+     *
+     * @param orderNo      订单号
+     * @param fallbackName 订单无商品行时的兜底名称(一般传团购名称), 可为空
+     * @return 逗号组装的商品名称; 无商品行且兜底为空时返回空字符串
+     */
+    String getOrderGoodsNames(String orderNo, String fallbackName);
+
+    /**
+     * 批量组装订单商品名称(逗号分隔), 避免按订单循环查询(定时任务批量发货场景)
+     *
+     * @param orderNos 订单号列表
+     * @return key=订单号, value=逗号组装的商品名称; 无商品行的订单不出现在结果中
+     */
+    Map<String, String> getOrderGoodsNamesMap(List<String> orderNos);
+
     Long getMiniOrderSalesCount(Long groupId);
 
     /**
@@ -146,7 +163,7 @@ public interface GbOrderInfoService {
     // (团长端首页)商品统计汇总: 订单商品总件数 + 待核销总件数
     Map<String, Object> getSummaryGoodsTotal(Long leaderId, Long groupId, Long pointId, String keyword);
 
-    // (团长端首页)商品维度统计分页列表
+    // (团长端首页)商品维度统计分页列表(按"商品+规格"拆行, 每行含总件数/已核销/待核销)
     List<Map<String, Object>> getSummaryGoodsPageList(Long leaderId, Long groupId, Long pointId, String keyword, int offset, int limit);
 
     List<Map<String, Object>> getSummaryPointOrderGoodsSkuList(Long leaderId, Long pointId, Long goodsId, Integer startTime, Integer endTime);

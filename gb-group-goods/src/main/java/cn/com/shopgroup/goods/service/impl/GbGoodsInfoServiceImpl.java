@@ -59,7 +59,7 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
         }
         LambdaQueryWrapper<GbGoodsInfo> queryWrapper = Wrappers.lambdaQuery();
         queryWrapper.in(GbGoodsInfo::getGoodsId, goodsIds);
-        queryWrapper.eq(GbGoodsInfo::getIsClose, (byte) 0);
+        //queryWrapper.eq(GbGoodsInfo::getIsClose, (byte) 0);
         List<GbGoodsInfo> results = mapper.selectList(queryWrapper);
         return results == null ? new ArrayList<>() : results;
     }
@@ -297,6 +297,19 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
 
         LambdaUpdateWrapper<GbGoodsInfo> updateWrapper = Wrappers.lambdaUpdate();
         updateWrapper.setSql("goods_num = goods_num + {0}", Math.abs(goodsNum));
+        updateWrapper.eq(GbGoodsInfo::getGoodsId, goodsId);
+        int flag = mapper.update(updateWrapper);
+        return flag > 0 ? true : false;
+    }
+
+
+    public Boolean updateGoodsNum(Long goodsId, Integer goodsNum) {
+        // 参数防御: goodsId 非法或库存为负数时直接拒绝, 不产生任何SQL
+        if (goodsId == null || goodsId <= 0L || goodsNum == null || goodsNum < 0) {
+            return false;
+        }
+        LambdaUpdateWrapper<GbGoodsInfo> updateWrapper = Wrappers.lambdaUpdate();
+        updateWrapper.set(GbGoodsInfo::getGoodsNum, goodsNum);
         updateWrapper.eq(GbGoodsInfo::getGoodsId, goodsId);
         int flag = mapper.update(updateWrapper);
         return flag > 0 ? true : false;

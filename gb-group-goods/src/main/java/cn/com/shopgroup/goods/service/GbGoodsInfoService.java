@@ -76,6 +76,9 @@ public interface GbGoodsInfoService {
 
     Boolean increaseGoodsStock(Long goodsId, int goodsNum);
 
+    // 直接覆盖商品总库存(绝对值, 非增减): SKU库存变动后按各SKU库存之和回填, num<0 视为非法
+    Boolean updateGoodsNum(Long goodsId, Integer goodsNum);
+
 
     Map<Long, Integer> getGoodsStock(List<Long> goodsIdList);
 }

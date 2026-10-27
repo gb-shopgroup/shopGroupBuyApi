@@ -401,15 +401,17 @@ public class OrderController {
             log.warn("[核销微信发货]未获取到微信单号, orderNo:{}", orderNo);
             return;
         }
+        // 微信发货商品描述: 该订单中涉及的所有商品名称用逗号组装(无商品行时兜底用团购名称)
+        String goodsNames = orderInfoService.getOrderGoodsNames(orderNo, orderInfo.getGroupName());
         // 微信发货失败不影响核销主流程(核销已完成), 仅记录日志, 由后续自动发货任务兜底重试
         try {
             // 首次调用(使用缓存access_token)
-            int wxFlag = callWxUploadShippingInfo(orderNo, transactionId, orderInfo.getGroupName(), orderInfo.getOpenid(), false);
+            int wxFlag = callWxUploadShippingInfo(orderNo, transactionId, goodsNames, orderInfo.getOpenid(), false);
             // access_token失效(微信返回40001/42001, 对应-1)时, 清除缓存并强制刷新后重试一次
             if (wxFlag == -1) {
                 wxAccessTokenHelper.removeAccessToken();
                 log.warn("[核销微信发货]access_token失效, 清除缓存并强制刷新后重试, orderNo:{}", orderNo);
-                wxFlag = callWxUploadShippingInfo(orderNo, transactionId, orderInfo.getGroupName(), orderInfo.getOpenid(), true);
+                wxFlag = callWxUploadShippingInfo(orderNo, transactionId, goodsNames, orderInfo.getOpenid(), true);
             }
             // 1=微信发货成功
             if (wxFlag == 1) {
@@ -427,14 +429,14 @@ public class OrderController {
     }
 
     // 调用微信发货信息录入(可强制刷新access_token), 返回: 1=成功, 0=业务失败, -1=access_token失效(40001/42001)
-    private int callWxUploadShippingInfo(String orderNo, String transactionId, String groupName, String openid, boolean forceRefreshToken) {
+    private int callWxUploadShippingInfo(String orderNo, String transactionId, String goodsNames, String openid, boolean forceRefreshToken) {
         // forceRefreshToken=true 时忽略Redis缓存, 强制向微信重新获取access_token
         String accessToken = wxAccessTokenHelper.getAccessToken(forceRefreshToken);
         if (StringUtils.isEmpty(accessToken)) {
             log.warn("[核销微信发货]获取access_token失败, orderNo:{}", orderNo);
             return -1;
         }
-        return WxMiniProgramHelper.uploadShippingInfo(accessToken, transactionId, groupName, openid);
+        return WxMiniProgramHelper.uploadShippingInfo(accessToken, transactionId, goodsNames, openid);
     }
 
     // 团长端-查询微信发货
@@ -459,7 +461,8 @@ public class OrderController {
         String accessToken = wxAccessTokenHelper.getAccessToken(false);
         // 订单发货参数
         String transactionId = orderInfo.getTransactionId();
-        String goodsName = orderInfo.getGroupName();
+        // 微信发货商品描述: 该订单中涉及的所有商品名称用逗号组装(无商品行时兜底用团购名称)
+        String goodsName = orderInfoService.getOrderGoodsNames(orderInfo.getOrderNo(), orderInfo.getGroupName());
         String openid = orderInfo.getOpenid();
         // 请求发货
         int isSendOK = WxMiniProgramHelper.uploadShippingInfo(accessToken, transactionId, goodsName, openid);
@@ -540,7 +543,8 @@ public class OrderController {
             unVerifyTotal = totalMap.get("unverify_total") == null ? 0L : ((Number) totalMap.get("unverify_total")).longValue();
         }
 
-        // 商品维度统计列表(分页)
+        // 商品+规格维度统计列表(分页): 每个商品的每种规格一行(如"花生+500g"),
+        // 前端按 name+skuNames 逐行展示"共X件, 待核销Y件"; 无规格商品 skuNames 为 null
         List<Map<String, Object>> results = orderInfoService.getSummaryGoodsPageList(leaderId, groupId, pointId, keyword, offset, size);
         List<SummaryOrderGoodsResponse> itemList = new ArrayList<>();
         if (results != null) {
@@ -549,13 +553,13 @@ public class OrderController {
                 resp.setId(((Number) item.get("goods_id")).longValue());
                 resp.setName((String) item.get("goods_name"));
                 resp.setUnit((String) item.get("goods_unit"));
-                resp.setSkuNames((String) item.get("sku_names")); // 商品规格(去重拼接)
+                resp.setSkuNames((String) item.get("sku_names")); // 本行规格名(无规格商品为 null)
                 long numTotal = ((Number) item.get("num_total")).longValue();
                 long receiptTotal = item.get("receipt_total") == null ? 0L : ((Number) item.get("receipt_total")).longValue();
                 long unVerifyNum = ((Number) item.get("unverify_num")).longValue();
-                resp.setTotal(numTotal);          // 总件数
-                resp.setNum1(receiptTotal);       // 已核销件数(商品行 receipt_num 汇总)
-                resp.setNum2(unVerifyNum);        // 待核销件数(已扣除退款数量)
+                resp.setTotal(numTotal);          // 该规格总件数
+                resp.setNum1(receiptTotal);       // 该规格已核销件数(商品行 receipt_num 汇总)
+                resp.setNum2(unVerifyNum);        // 该规格待核销件数(已扣除退款数量)
                 itemList.add(resp);
             }
         }

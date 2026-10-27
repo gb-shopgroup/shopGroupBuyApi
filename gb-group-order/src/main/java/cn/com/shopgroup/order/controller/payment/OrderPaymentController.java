@@ -405,7 +405,8 @@ public class OrderPaymentController {
         if (ObjectUtils.isEmpty(leaderInfo)) {
             return;
         }
-        int type = leaderInfo.getCashType().intValue();
+        // 结算到账方式为空时按0(支付时延迟到账型)处理, 避免空指针
+        int type = leaderInfo.getCashType() == null ? 0 : leaderInfo.getCashType().intValue();
         // 团长结算到账方式: 0=支付时延迟到账型, 1=核销时延迟到账型
         // type=0 时延迟15秒再调用微信发货(上传发货信息+标记已调用微信发货), 等微信侧发货状态生效, 同时避免阻塞易宝支付回调请求
         if (type == 0) {
@@ -444,7 +445,9 @@ public class OrderPaymentController {
             log.warn("[微信发货]获取access_token失败, orderNo:{}", orderInfo.getOrderNo());
             return -1;
         }
-        return WxMiniProgramHelper.uploadShippingInfo(accessToken, transactionId, orderInfo.getGroupName(), orderInfo.getOpenid());
+        // 微信发货商品描述: 该订单中涉及的所有商品名称用逗号组装(无商品行时兜底用团购名称)
+        String goodsNames = orderInfoService.getOrderGoodsNames(orderInfo.getOrderNo(), orderInfo.getGroupName());
+        return WxMiniProgramHelper.uploadShippingInfo(accessToken, transactionId, goodsNames, orderInfo.getOpenid());
     }
 
     // 新的轮询算法: 先剔除超过最高收款额度的受限账户, 再取当月累计收款金额最小的账户

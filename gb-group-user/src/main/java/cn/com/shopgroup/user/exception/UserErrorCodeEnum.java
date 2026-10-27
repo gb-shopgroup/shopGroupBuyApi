@@ -93,7 +93,7 @@ public enum UserErrorCodeEnum implements IErrorCode {
     /**
      * 数据保存/更新失败(通用)
      */
-    UPDATE_FAILED(300115, "操作失败"),
+    UPDATE_FAILED(300115, "操作失败,请重试后确认联系客服"),
 
     REQUEST_PARAM_ILLEGAL(300116, "请求参数非法"),
 
@@ -142,6 +142,11 @@ public enum UserErrorCodeEnum implements IErrorCode {
     LEADER_INFO_NOT_FIND(300126, "查询不到团长信息"),
 
     NOT_SUPPORT_DELETE_ACTION(300127, "暂不支持删除操作"),
+
+    /**
+     * 该手机号已提交过团长申请(mobile 唯一键冲突)
+     */
+    APPLY_LEADER_EXISTED(300128, "该手机号已提交过申请, 请勿重复提交"),
     ;
 
     /**

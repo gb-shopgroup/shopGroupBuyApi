@@ -5,7 +5,9 @@ import cn.com.shopgroup.goods.model.GbGroupActivityGoods;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -35,4 +37,27 @@ public interface GbGroupActivityGoodsMapper extends BaseMapper<GbGroupActivityGo
 
     @Select("SELECT a.* FROM `gb_group_activity_goods` AS a JOIN `gb_goods_info` AS g ON g.`goods_id` = a.`goods_id` WHERE a.`group_id` = #{groupId} AND a.`goods_id` = #{goodsId} AND g.`is_close` = 0 limit 1")
     GbGroupActivityGoods getGroupActivityOnlineGoods(Long groupId, Long goodsId);
+
+    /**
+     * 团购活动内商品上下架(团长端): 修改团购商品表 gb_group_activity_goods 的 is_close(0=上架, 1=下架)
+     *
+     * <p>只改"该团购活动"下的"该商品"行, 且通过 JOIN 团购活动表校验该活动属于当前团长(ai.leader_id),
+     * 防止团长越权修改他人团购活动的商品状态; 活动或商品不存在时影响行数为 0。
+     *
+     * @param leaderId 团长id(活动归属校验)
+     * @param groupId  团购活动id
+     * @param goodsId  商品id
+     * @param status   目标状态: 0=上架, 1=下架
+     * @return 影响行数(1=更新成功, 0=活动/商品不存在或不属于该团长)
+     */
+    @Update({
+            "UPDATE `gb_group_activity_goods` AS ag",
+            "JOIN `gb_group_activity_info` AS ai ON ag.`group_id` = ai.`group_id`",
+            "SET ag.`is_close` = #{status}",
+            "WHERE ag.`group_id` = #{groupId}",
+            "  AND ag.`goods_id` = #{goodsId}",
+            "  AND ai.`leader_id` = #{leaderId}"
+    })
+    int closeLeaderActivityGoodsInfo(@Param("leaderId") Long leaderId, @Param("groupId") Long groupId,
+                                     @Param("goodsId") Long goodsId, @Param("status") int status);
 }

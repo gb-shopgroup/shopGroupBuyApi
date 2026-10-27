@@ -83,4 +83,5 @@ public interface GbGroupActivityInfoService {
 
     GbGroupActivityGoods getGroupActivityOnlineGoods(Long groupId, Long goodsId);
 
+    int closeLeaderActivityGoodsInfo(Long leaderId, Long groupId, Long goodsId, int status);
 }

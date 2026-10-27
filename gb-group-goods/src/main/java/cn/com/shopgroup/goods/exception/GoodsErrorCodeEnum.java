@@ -100,6 +100,16 @@ public enum GoodsErrorCodeEnum implements IErrorCode {
     UNDER_LINE_NOT_ON(300219, "在活动中下线过的商品不能再上线，如需要请重新添加商品"),
     //已下架的商品不能添加到团购
     GROUP_GOODS_OFFLINE(300220, "已下架的商品不能添加到团购"),
+
+    /**
+     * SKU不存在 / 不属于该商品
+     */
+    SKU_NOT_EXIST(300221, "SKU信息不存在"),
+
+    /**
+     * 库存数量非法(负数)
+     */
+    STOCK_INVALID(300222, "库存数量不能小于0"),
     ;
 
     /**

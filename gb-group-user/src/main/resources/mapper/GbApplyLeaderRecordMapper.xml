@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.shopgroup.user.mapper.GbApplyLeaderRecordMapper">
+
+    <!-- 申请团长记录信息表 -->
+    <resultMap id="BaseResultMap" type="cn.com.shopgroup.user.model.GbApplyLeaderRecord">
+        <id column="id" property="id"/>
+        <result column="name" property="name"/>
+        <result column="mobile" property="mobile"/>
+        <result column="apply_status" property="applyStatus"/>
+        <result column="add_time" property="addTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+       id, name, mobile, apply_status, add_time, update_time
+    </sql>
+
+</mapper>

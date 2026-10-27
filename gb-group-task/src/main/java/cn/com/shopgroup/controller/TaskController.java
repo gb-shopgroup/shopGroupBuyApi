@@ -79,7 +79,8 @@ public class TaskController {
 
         // 订单发货参数
         String transactionId = orderInfo.getTransactionId();
-        String goodsName = orderInfo.getGroupName();
+        // 微信发货商品描述: 该订单中涉及的所有商品名称用逗号组装(无商品行时兜底用团购名称)
+        String goodsName = orderInfoService.getOrderGoodsNames(orderNo, orderInfo.getGroupName());
         String openid = orderInfo.getOpenid();
 
         // 请求发货
