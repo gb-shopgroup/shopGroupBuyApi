@@ -83,5 +83,15 @@ public interface GbGroupActivityInfoService {
 
     GbGroupActivityGoods getGroupActivityOnlineGoods(Long groupId, Long goodsId);
 
+    /**
+     * 查询团购活动内的商品行(不过滤商品表/团购内上下架状态), 用于团长端切换团购内商品上下架时读取当前状态。
+     * 团购内已下架(is_close=1)的商品行也能查到, 否则无法再切换回上架。
+     *
+     * @param groupId 团购活动id
+     * @param goodsId 商品id
+     * @return 团购商品行; 该团购未添加该商品时返回 null
+     */
+    GbGroupActivityGoods getGroupActivityGoods(Long groupId, Long goodsId);
+
     int closeLeaderActivityGoodsInfo(Long leaderId, Long groupId, Long goodsId, int status);
 }

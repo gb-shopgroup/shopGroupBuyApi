@@ -658,6 +658,48 @@ def infer_return_data(method_body, param_types):
     return out, hints
 
 
+SEPARATOR_CHARS = set("-=*#_~`+. ")
+
+# 索引/清单表格中「功能说明」列的最大字数：源码注释较长时截断, 完整说明见接口详情
+DESC_CLIP_LIMIT = 60
+
+
+def clip_desc(text, limit=DESC_CLIP_LIMIT):
+    """索引类表格中的说明截断(完整说明保留在各接口详情的「功能说明」处)"""
+    t = (text or "").strip()
+    if len(t) <= limit:
+        return t
+    return t[:limit].rstrip() + "…"
+
+
+def extract_line_comment_desc(lines):
+    """从 Mapping 注解上方的行列表中提取紧邻的 // 行注释作为接口功能说明
+
+    规则（从 Mapping 行往上扫描）:
+      - 空行、注解行(@Transactional 等)跳过, 继续向上
+      - 连续的 // 行注释按自然顺序拼接(支持多行注释)
+      - 遇到代码行(如 } / 方法声明)即终止, 避免串取上一个方法体内部的注释
+      - 纯分隔线(//------- 等)视为无效, 直接终止
+    """
+    collected = []
+    for line in reversed(lines):
+        s = line.strip()
+        if not s:
+            continue
+        if s.startswith("@"):
+            continue
+        if s.startswith("//"):
+            content = s.lstrip("/").strip()
+            if not content or set(content) <= SEPARATOR_CHARS:
+                break
+            collected.append(content)
+            continue
+        break
+    if not collected:
+        return ""
+    return " ".join(reversed(collected))
+
+
 def parse_file(path):
     with open(path, "r", encoding="utf-8", errors="ignore") as f:
         src = f.read()
@@ -777,6 +819,13 @@ def parse_file(path):
             if not desc and javadoc_lines:
                 # 反转得到自然顺序, 多段以 <br> 在 markdown 中渲染为换行
                 desc = " ".join(reversed(javadoc_lines)).replace(" <BR> ", "<br>").replace("<BR> ", "<br>")
+
+        # 未取到 @ApiOperation / Javadoc 时, 向上查找紧邻方法的 // 行注释作为功能说明
+        # (项目内大量接口方法以 // 单行注释描述用途, 优先于按路径自动推断)
+        if not desc:
+            line_desc = extract_line_comment_desc(lines)
+            if line_desc:
+                desc = line_desc
 
         # 返回 data 类型推断（仅针对 JsonResult 统一返回体）
         is_json_result = ret_raw == "JsonResult" or ret_raw.startswith("JsonResult<")
@@ -1020,6 +1069,17 @@ BEHAVIOR_CHANGES = [
      "团购活动内商品上下架：切换状态改为按团购商品行自身 is_close 取反"
      "（修复原逻辑取商品表状态导致恒为下架、无法重新上架）；商品表已下架返回 300204、"
      "活动不存在或不属于当前团长返回 300203，未实际更新时不再返回成功（原为 500 空指针）"),
+    ("2026-10-28", "/goods/group/goods/list", "GET",
+     "团购活动内被团长下架的商品（团购商品行 is_close=1）不再返回；团长在团购活动内重新上架后，"
+     "上下架接口会清除该团购的商品列表缓存，C端即时恢复展示并可购买"),
+    ("2026-10-28", "/order/member/groupActivity/list", "POST",
+     "团购活动列表回填的商品同步过滤团购内已下架商品（与 C端团购商品列表口径一致，含商品表已下线商品）"),
+    ("2026-10-28", "/order/group/add", "POST",
+     "下单新增团购活动内上下架校验：该商品在当前团购活动内被下架（或不属于该团购）时拒绝下单，"
+     "返回「xx已下架, 无法购买」（原仅校验商品表状态，用户端缓存的旧列表可绕过）"),
+    ("2026-10-28", "/goods/Leader/get/groupActivity/list", "POST",
+     "团长端团购活动列表的商品改为返回全部状态（含团购活动内已下架、商品表已下线的商品），"
+     "便于团长查看已下架商品并重新上架；团购详情 /goods/Leader/get/groupActivity/info 同步补齐已下线商品的库存/单位"),
 ]
 
 
@@ -1125,7 +1185,7 @@ def render_readme_params(itf):
 def render_readme_api_section(module_datas):
     """生成 README 8.2 接口清单（按 Controller 分组）"""
     parts = ["### 8.2 接口清单\n"]
-    parts.append("> 功能说明优先取源码方法注释；*斜体* 为脚本依据路径与出入参自动推断（仅供参考），"
+    parts.append("> 功能说明取自源码方法注释（Javadoc 或紧邻方法的 `//` 行注释）；*斜体* 为源码无注释时脚本依据路径与出入参自动推断（仅供参考），"
                  "字段级说明见 [`API接口文档.md`](API接口文档.md)。\n")
     for n, (mod, label, total, ctrl_summary) in enumerate(module_datas, 1):
         parts.append("#### 8.2.%d %s（%s）— %d 个接口\n" % (n, mod, label, total))
@@ -1136,7 +1196,9 @@ def render_readme_api_section(module_datas):
             for i, itf in enumerate(res, 1):
                 desc = (itf["desc"] or "—").strip().replace("|", "\\|") or "—"
                 if itf.get("desc_inferred"):
-                    desc = "*%s*" % desc
+                    desc = "*%s*" % clip_desc(desc)
+                else:
+                    desc = clip_desc(desc)
                 parts.append("| %d | %s | `%s` | %s | %s |"
                               % (i, itf["method"], itf["path"], desc, render_readme_params(itf)))
             parts.append("")
@@ -1181,7 +1243,7 @@ def main():
     lines.append("> 分页约定：列表类接口一般通过 `page`（页码，从 1 开始）/ `pageSize`（每页条数）分页，配套 `count` 接口获取总数\n")
     lines.append("> 统一出参：所有接口返回 `JsonResult`（`code` 状态码 / `msg` 提示信息 / `data` 业务数据），`data` 字段说明见各接口；嵌套对象字段以 `→` 前缀递进展开\n")
     lines.append("> 金额约定：接口返回的金额字段统一为 `Double`，单位「元」（最多 2 位小数）；字段名含 `fee` / `amount` / `price` / `money` / `balance` 的均为金额。数据库实体（`model` 包）内部仍以「分」存储，由 Response 层经 `MoneyUtil.centToYuan` 转换后返回，接口不暴露「分」\n")
-    lines.append("> 功能说明：优先取源码方法注释；源码无注释时由脚本依据路径、入参与出参自动推断（表格中显示为 *斜体*，仅供参考）；入参「位置」为 Query 参数 / Body（`@RequestBody` 对象）/ 请求头\n")
+    lines.append("> 功能说明：优先取源码方法注释（Javadoc 或紧邻方法的 `//` 行注释）；源码无注释时由脚本依据路径、入参与出参自动推断（显示为 *斜体*，仅供参考）；入参「位置」为 Query 参数 / Body（`@RequestBody` 对象）/ 请求头\n")
 
     # 金额字段变更记录（破坏性变更提示, 由 AMOUNT_MIGRATION 维护）
     lines.append(render_amount_migration())
@@ -1217,6 +1279,7 @@ def main():
                 blocks.append(render_interface(i, itf))
                 idx_global += 1
                 desc = (itf["desc"] or "—").strip().replace("|", "\\|") or "—"
+                desc = clip_desc(desc)
                 if itf.get("desc_inferred"):
                     desc = "*%s*" % desc
                 anchor = slugify("%d. %s %s" % (idx_global, itf["method"], itf["path"]))
@@ -1237,7 +1300,9 @@ def main():
 
     # 接口总览索引表
     lines.append("## 接口总览索引\n")
-    lines.append("> 共 %d 个接口，按下表序号定位到下方各模块接口详情；「功能说明」列为 `—` 表示源码无方法注释，可按入参 / 出参字段推断用途。\n" % idx_global)
+    lines.append("> 共 %d 个接口，按下表序号定位到下方各模块接口详情；「功能说明」列取自源码方法注释，"
+                 "超过 %d 字在本表中截断显示（完整说明见各接口详情的「功能说明」），列值为 `—` 表示源码无方法注释，可按入参 / 出参字段推断用途。\n"
+                 % (idx_global, DESC_CLIP_LIMIT))
     lines.append("| 序号 | 模块 | 方式 | 路径 | 功能说明 |")
     lines.append("| --- | --- | --- | --- | --- |")
     lines.extend(index_rows)

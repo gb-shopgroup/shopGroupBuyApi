@@ -293,7 +293,7 @@ mvn -pl gb-group-task spring-boot:run
 
 ### 8.2 接口清单
 
-> 功能说明优先取源码方法注释；*斜体* 为脚本依据路径与出入参自动推断（仅供参考），字段级说明见 [`API接口文档.md`](API接口文档.md)。
+> 功能说明取自源码方法注释（Javadoc 或紧邻方法的 `//` 行注释）；*斜体* 为源码无注释时脚本依据路径与出入参自动推断（仅供参考），字段级说明见 [`API接口文档.md`](API接口文档.md)。
 
 #### 8.2.1 gb-group-user（用户/团长/员工）— 48 个接口
 
@@ -301,40 +301,40 @@ mvn -pl gb-group-task spring-boot:run
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | POST | `/user/image/upload/avatar` | *上传头像文件* | 无 |
-| 2 | POST | `/user/image/upload/goods` | *上传商品文件* | 无 |
-| 3 | POST | `/user/image/upload/banner` | *上传轮播图文件* | 无 |
-| 4 | GET | `/user/image/access/{*file}` | *访问图片（静态资源）* | **file** (String) |
+| 1 | POST | `/user/image/upload/avatar` | 上传用户头像 | 无 |
+| 2 | POST | `/user/image/upload/goods` | 上传商品图片(尺寸400*400) | 无 |
+| 3 | POST | `/user/image/upload/banner` | 上传店铺banner(尺寸750*250) | 无 |
+| 4 | GET | `/user/image/access/{*file}` | 查看私有图片 | **file** (String) |
 
 **BlackController**（`cn.com.shopgroup.user.controller.group`）
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/user/group/black` | *查询团购黑名单* | **lid** (Long) |
+| 1 | GET | `/user/group/black` | 登录查询是否是（leaderId）团长下的黑名单 | **lid** (Long) |
 
 **GroupPointController**（`cn.com.shopgroup.user.controller.group`）
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/user/group/point` | *查询团购自提点* | **id** (Long) |
+| 1 | GET | `/user/group/point` | 自提点列表 | **id** (Long) |
 
 **ShowsPageController**（`cn.com.shopgroup.user.controller.group`）
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/user/article/info` | *查询文章详情* | **id** (Long) |
-| 2 | GET | `/user/focus` | *查询关注* | 无 |
+| 1 | GET | `/user/article/info` | 文章详情 | **id** (Long) |
+| 2 | GET | `/user/focus` | 轮播图列表 | 无 |
 
 **LeaderBlackController**（`cn.com.shopgroup.user.controller.leader`）
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/user/leader/member/mobile` | *查询团长会员手机号* | **mobile** (String) |
-| 2 | POST | `/user/leader/add/black` | *提交（团长黑名单）* | **memberId** (Long) |
-| 3 | GET | `/user/leader/black/mobile` | *查询团长黑名单手机号* | **mobile** (String) |
-| 4 | POST | `/user/leader/member/black/remove` | *删除团长会员黑名单* | **memberId** (Long) |
-| 5 | GET | `/user/leader/black/list` | *查询团长黑名单列表* | **page** (int); **pageSize** (int) |
-| 6 | GET | `/user/leader/black/count` | *查询团长黑名单总数* | 无 |
+| 1 | GET | `/user/leader/member/mobile` | 根据手机号查询用户 | **mobile** (String) |
+| 2 | POST | `/user/leader/add/black` | 加入黑名单 | **memberId** (Long) |
+| 3 | GET | `/user/leader/black/mobile` | 根据手机号查询黑名单用户 | **mobile** (String) |
+| 4 | POST | `/user/leader/member/black/remove` | 解除黑名单 | **memberId** (Long) |
+| 5 | GET | `/user/leader/black/list` | 黑名单列表 | **page** (int); **pageSize** (int) |
+| 6 | GET | `/user/leader/black/count` | 黑名单总数 | 无 |
 
 **LeaderBusinessController**（`cn.com.shopgroup.user.controller.leader`）
 
@@ -349,42 +349,42 @@ mvn -pl gb-group-task spring-boot:run
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/user/leader/point/list` | *查询团长自提点列表* | **name** (String) |
-| 2 | GET | `/user/leader/point/addGroup/list` | *查询团长自提点团购列表* | 无 |
-| 3 | POST | `/user/leader/point/add` | *新增团长自提点* | Body: **request** (PointRequest, JSON) |
-| 4 | POST | `/user/leader/point/edit` | *修改团长自提点* | Body: **request** (PointRequest, JSON) |
-| 5 | GET | `/user/leader/point/close` | *启用/关闭团长自提点* | **id** (Long) |
-| 6 | GET | `/user/leader/point/info` | *查询团长自提点详情* | **pointId** (Long) |
-| 7 | GET | `/user/leader/point/ercode` | *查询团长自提点二维码* | **id** (Long) |
+| 1 | GET | `/user/leader/point/list` | 团长端-查询提货点列表 | **name** (String) |
+| 2 | GET | `/user/leader/point/addGroup/list` | 添加团购活动时，调用查询提货点列表 | 无 |
+| 3 | POST | `/user/leader/point/add` | 添加提货点 | Body: **request** (PointRequest, JSON) |
+| 4 | POST | `/user/leader/point/edit` | 修改提货点 | Body: **request** (PointRequest, JSON) |
+| 5 | GET | `/user/leader/point/close` | 作废/恢复 提货点 | **id** (Long) |
+| 6 | GET | `/user/leader/point/info` | 查询提货点详情 | **pointId** (Long) |
+| 7 | GET | `/user/leader/point/ercode` | 提货点二维码 | **id** (Long) |
 
 **LeaderShopController**（`cn.com.shopgroup.user.controller.leader`）
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
 | 1 | GET | `/user/leader/shop/info` | 查看店铺信息 | 无 |
-| 2 | POST | `/user/leader/shop/save` | *保存团长店铺* | Body: **request** (ShopRequest, JSON) |
-| 3 | POST | `/user/leader/shop/update` | *修改团长店铺* | Body: **request** (ShopErCodeRequest, JSON) |
-| 4 | GET | `/user/leader/getGroup/shop` | *查询团长团购店铺* | **leaderId** (Long) |
-| 5 | POST | `/user/leader/shop/makeQrCode` | *生成二维码（团长店铺）* | **shopId** (Long) |
+| 2 | POST | `/user/leader/shop/save` | 修改/保存-店铺信息 | Body: **request** (ShopRequest, JSON) |
+| 3 | POST | `/user/leader/shop/update` | 更新店铺码图片地址（保存店铺二维码上传后的访问URL） | Body: **request** (ShopErCodeRequest, JSON) |
+| 4 | GET | `/user/leader/getGroup/shop` | 通过leaderId团长店铺详情 | **leaderId** (Long) |
+| 5 | POST | `/user/leader/shop/makeQrCode` | 团长-我的店铺小程序码(微信小程序码,page=pages/order/index,scene=shopId=xx),上… | **shopId** (Long) |
 
 **MessageController**（`cn.com.shopgroup.user.controller.leader`）
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/user/leader/message/list` | *查询团长消息列表* | **type** (Integer); **page** (int); **pageSize** (int) |
-| 2 | GET | `/user/leader/message/count` | *查询团长消息总数* | **type** (Integer) |
-| 3 | GET | `/user/leader/message/unread` | *查询团长消息未读* | **type** (Integer) |
-| 4 | GET | `/user/leader/message/read` | *标记已读（团长消息）* | **id** (Long) |
+| 1 | GET | `/user/leader/message/list` | 消息列表(团长查看所有消息) | **type** (Integer); **page** (int); **pageSize** (int) |
+| 2 | GET | `/user/leader/message/count` | 消息列表总数量(团长查看所有消息) | **type** (Integer) |
+| 3 | GET | `/user/leader/message/unread` | 未读消息总数量(团长查看所有消息) | **type** (Integer) |
+| 4 | GET | `/user/leader/message/read` | 阅读消息 | **id** (Long) |
 
 **StaffController**（`cn.com.shopgroup.user.controller.leader`）
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/user/leader/staff/list` | *查询团长员工列表* | 无 |
-| 2 | POST | `/user/leader/staff/add` | *新增团长员工* | Body: **request** (StaffRequest, JSON) |
-| 3 | POST | `/user/leader/staff/edit` | *修改团长员工* | Body: **request** (StaffRequest, JSON) |
-| 4 | POST | `/user/leader/staff/close` | *启用/关闭团长员工* | **id** (Long) |
-| 5 | POST | `/user/leader/staff/remove` | *删除团长员工* | **staffId** (Long) |
+| 1 | GET | `/user/leader/staff/list` | 查询当前团长员工列表(不含超级团长) | 无 |
+| 2 | POST | `/user/leader/staff/add` | 添加员工(校验用户存在且未绑定, 绑定提货点) | Body: **request** (StaffRequest, JSON) |
+| 3 | POST | `/user/leader/staff/edit` | 修改员工信息(支持更换员工及提货点) | Body: **request** (StaffRequest, JSON) |
+| 4 | POST | `/user/leader/staff/close` | 关闭/启用员工账号(不能操作自己) | **id** (Long) |
+| 5 | POST | `/user/leader/staff/remove` | 删除员工(不能删除自己) | **staffId** (Long) |
 
 **ApplyLeaderController**（`cn.com.shopgroup.user.controller.member`）
 
@@ -396,19 +396,19 @@ mvn -pl gb-group-task spring-boot:run
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/user/phone` | *查询手机号* | **code** (String) |
-| 2 | GET | `/user/openid` | *查询openid* | **code** (String) |
-| 3 | GET | `/user/login` | *登录* | **openid** (String) |
-| 4 | POST | `/user/reg` | *注册* | Body: **request** (MemberRequest, JSON) |
-| 5 | POST | `/user/logout` | *退出登录* | 无 |
+| 1 | GET | `/user/phone` | 根据code获取手机号 | **code** (String) |
+| 2 | GET | `/user/openid` | 根据code获取openid | **code** (String) |
+| 3 | GET | `/user/login` | openid自动登录 | **openid** (String) |
+| 4 | POST | `/user/reg` | 注册新用户 | Body: **request** (MemberRequest, JSON) |
+| 5 | POST | `/user/logout` | 退出登录(小程序调用): 清除服务端登录态, 小程序端需同步删除本地token | 无 |
 
 **MemberController**（`cn.com.shopgroup.user.controller.member`）
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/user/member/info` | *查询会员详情* | 无 |
-| 2 | GET | `/user/member/isleader` | *查询会员是否为团长* | 无 |
-| 3 | POST | `/user/member/swap/getInfo` | *查询会员swap详情* | Body: **request** (MemberSwapLeaderRequest, JSON) |
+| 1 | GET | `/user/member/info` | 根据 token 获取用户信息 | 无 |
+| 2 | GET | `/user/member/isleader` | 是否团长身份 | 无 |
+| 3 | POST | `/user/member/swap/getInfo` | 登录用户获取最新团长id | Body: **request** (MemberSwapLeaderRequest, JSON) |
 
 #### 8.2.2 gb-group-order（订单/退款/分账）— 49 个接口
 
@@ -416,51 +416,51 @@ mvn -pl gb-group-task spring-boot:run
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/order/orderbusiness/list` | *查询订单收款账户列表* | **page** (int); **pageSize** (int) |
-| 2 | GET | `/order/orderbusiness/count` | *查询订单收款账户总数* | 无 |
+| 1 | GET | `/order/orderbusiness/list` | 分页查询订单列表 | **page** (int); **pageSize** (int) |
+| 2 | GET | `/order/orderbusiness/count` | 查询订单总数 | 无 |
 
 **GroupOrderController**（`cn.com.shopgroup.order.controller.group`）
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | POST | `/order/group/add` | *新增团购* | Body: **request** (OrderRequest, JSON) |
+| 1 | POST | `/order/group/add` | 用户下单: 下单前校验商品/SKU库存与限购(限购商品按「当前用户 + 当前团购活动 + 该商品」维度校验, 该团购活动… | Body: **request** (OrderRequest, JSON) |
 
 **MemberGroupController**（`cn.com.shopgroup.order.controller.group`）
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/order/group/groupActivity/cat` | *查询团购活动分类* | 无 |
-| 2 | POST | `/order/member/groupActivity/list` | *查询会员团购活动列表* | Body: **request** (MemberGroupActListRequest, JSON) |
-| 3 | GET | `/order/group/groupActivity/info` | *查询团购活动详情* | **groupId** (Long) |
-| 4 | POST | `/order/group/groupActivity/view` | *查看（团购活动）* | Body: **request** (MemberGroupViewRequest, JSON) |
-| 5 | GET | `/order/group/groupActivity/shop` | *查询团购活动店铺* | **leaderId** (Long) |
-| 6 | GET | `/order/group/groupActivity/logs` | *查询团购活动日志* | **groupId** (Long) |
-| 7 | GET | `/order/group/groupActivity/logs2` | *查询团购活动日志* | **id** (Long) |
+| 1 | GET | `/order/group/groupActivity/cat` | 团购分类列表（首页） | 无 |
+| 2 | POST | `/order/member/groupActivity/list` | 用户查询所有在线的团购活动列表[新用户未绑定团长时leaderId=0]: 仅返回未下线(isClose=0)且当前时间… | Body: **request** (MemberGroupActListRequest, JSON) |
+| 3 | GET | `/order/group/groupActivity/info` | 团购数量（首页） 团购详情(团长分享页面)---用户首页：团长更多好货也用 | **groupId** (Long) |
+| 4 | POST | `/order/group/groupActivity/view` | 用户查看团购详情-显式埋点上报(分享等场景前端调用; 首页进入详情会自动埋点, 可不上报) | Body: **request** (MemberGroupViewRequest, JSON) |
+| 5 | GET | `/order/group/groupActivity/shop` | 团长店铺详情 | **leaderId** (Long) |
+| 6 | GET | `/order/group/groupActivity/logs` | 团购记录(跟团记录) 早上6点到晚上8点之间，每个小时生成一批跟团记录（固定部分+滚动部分）， 固定部分打开页面就显示，… | **groupId** (Long) |
+| 7 | GET | `/order/group/groupActivity/logs2` | 团购记录(跟团记录), 滚动部分 | **id** (Long) |
 | 8 | GET | `/order/group/order/records` | 真实跟团记录：基于支付成功订单数据 | **groupId** (Long); **limit** (Integer) |
 
 **MemberOrderController**（`cn.com.shopgroup.order.controller.group`）
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | POST | `/order/group/order/list` | *查询团购订单列表* | Body: **request** (MemberOrderListRequest, JSON) |
-| 2 | POST | `/order/group/order/applyRefundList` | *查询团购订单退款申请列表* | Body: **request** (MemberOrderRefundListRequest, JSON) |
-| 3 | GET | `/order/group/order/count` | *查询团购订单总数* | **pid** (Long) |
-| 4 | GET | `/order/group/order/info` | *查询团购订单详情* | **orderNo** (String) |
-| 5 | GET | `/order/group/order/makeErcode` | *生成二维码（团购订单）* | **orderNo** (String) |
-| 6 | GET | `/order/group/order/receipt` | *提货（团购订单）* | **orderNo** (String); **point** (Long) |
-| 7 | POST | `/order/group/order/part/receipt` | *提货（团购订单）* | Body: **request** (MemberOrderReceiptRequest, JSON) |
-| 8 | POST | `/order/group/order/apply/refund` | *退款（团购订单）* | Body: **refundApplyRequest** (OrderRefundApplyRequest, JSON) |
-| 9 | GET | `/order/group/order/refund/reasonList` | *查询团购订单退款原因列表* | 无 |
-| 10 | GET | `/order/group/order/refund/recodes` | *查询团购订单退款记录* | **orderNo** (String) |
-| 11 | GET | `/order/group/order/notAllReceiptList` | *查询团购订单未全部提货列表* | **shopId** (Long) |
-| 12 | POST | `/order/group/order/confirmShipping` | *确认发货（团购订单）* | **orderNo** (String) |
-| 13 | POST | `/order/group/order/applyRefund/orderInfo` | *查询团购订单退款申请订单详情* | Body: **request** (MemberOrderRefundRequest, JSON) |
+| 1 | POST | `/order/group/order/list` | 用户订单列表（按订单状态/商品名称筛选, 分页查询） | Body: **request** (MemberOrderListRequest, JSON) |
+| 2 | POST | `/order/group/order/applyRefundList` | 用户售后订单列表(支持按商品名称/售后审核状态筛选; 同一订单的商品可能处于不同售后状态, 按(订单,审核状态)拆分为多… | Body: **request** (MemberOrderRefundListRequest, JSON) |
+| 3 | GET | `/order/group/order/count` | 用户订单数量 | **pid** (Long) |
+| 4 | GET | `/order/group/order/info` | 用户订单详情 | **orderNo** (String) |
+| 5 | GET | `/order/group/order/makeErcode` | 用户订单小程序码(微信小程序码, 扫码进入C端小程序对应订单页面) | **orderNo** (String) |
+| 6 | GET | `/order/group/order/receipt` | 用户扫码核销-整单核销(GET): 核销订单全部剩余可核销商品(购买数-已核销-已退) | **orderNo** (String); **point** (Long) |
+| 7 | POST | `/order/group/order/part/receipt` | 用户扫码核销-整单/部分核销(POST): goodsList 为空 = 整单核销(等同 GET /group/orde… | Body: **request** (MemberOrderReceiptRequest, JSON) |
+| 8 | POST | `/order/group/order/apply/refund` | 用户申请订单退款。refundFlag: 1=退款(退"待收货"部分, 可退量=购买数-收货数-已申请退款数), 2=退… | Body: **refundApplyRequest** (OrderRefundApplyRequest, JSON) |
+| 9 | GET | `/order/group/order/refund/reasonList` | 用户退款原因下拉列表(申请退款时"选择退款原因") | 无 |
+| 10 | GET | `/order/group/order/refund/recodes` | 售后记录查询 | **orderNo** (String) |
+| 11 | GET | `/order/group/order/notAllReceiptList` | 用户端-查询还有商品未全部收货的订单列表(用户id+团长id查询, 状态1待收货/2部分收货/5售后; 5售后时商品行还… | **shopId** (Long) |
+| 12 | POST | `/order/group/order/confirmShipping` | 用户点击确认收货组件后调用接口，更新订单已经操作按钮 | **orderNo** (String) |
+| 13 | POST | `/order/group/order/applyRefund/orderInfo` | 用户点击申请退货后调用接口 | Body: **request** (MemberOrderRefundRequest, JSON) |
 
 **WxOrderController**（`cn.com.shopgroup.order.controller.group`）
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/order/group/wx/order` | *查询团购微信订单* | **orderNo** (String) |
+| 1 | GET | `/order/group/wx/order` | 查询微信订单发货状态（查询订单状态枚举：(1) 待发货；(2) 已发货；(3) 确认收货；(4) 交易完成；(5) 已退… | **orderNo** (String) |
 
 **LeaderBillController**（`cn.com.shopgroup.order.controller.leader`）
 
@@ -472,7 +472,7 @@ mvn -pl gb-group-task spring-boot:run
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/order/leader/activity/list` | 团长端-团购活动查询  提供团长端活动下拉/选择所需的接口；活动主数据在商品域(goods), 本控制器通过 goods 模块的 {@link GbGroupActivityInfoService} 跨模块调用，避免在 order 模块重复建表/写 SQL。 | 无 |
+| 1 | GET | `/order/leader/activity/list` | 团长端-团购活动查询  提供团长端活动下拉/选择所需的接口；活动主数据在商品域(goods), 本控制器通过 goods… | 无 |
 
 **LeaderMemberController**（`cn.com.shopgroup.order.controller.leader`）
 
@@ -485,41 +485,41 @@ mvn -pl gb-group-task spring-boot:run
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | POST | `/order/leader/order/list` | *查询团长订单列表* | Body: **request** (LeaderOrderListRequest, JSON) |
-| 2 | POST | `/order/leader/apply/refundList` | *查询团长退款列表* | Body: **request** (LeaderOrderApplyRefundRequest, JSON) |
-| 3 | GET | `/order/leader/order/count` | *查询团长订单总数* | **gid** (Long); **pid** (Long) |
-| 4 | GET | `/order/leader/order/status` | *查询团长订单状态* | **gid** (Long); **pid** (Long) |
-| 5 | POST | `/order/leader/order/scanQRCode` | *扫码核销（团长订单）* | Body: **request** (ScanQRCodeRequest, JSON) |
-| 6 | GET | `/order/leader/order/query` | *查询团长订单* | **orderNo** (String) |
-| 7 | POST | `/order/leader/order/writeOff` | *核销（团长订单）* | **orderNo** (String); **pid** (Long) |
-| 8 | POST | `/order/leader/order/partWriteOff` | *部分核销（团长订单）* | Body: **request** (OrderVerifyRequest, JSON) |
-| 9 | GET | `/order/leader/order/send` | *发送（团长订单）* | **orderNo** (String) |
-| 10 | GET | `/order/leader/home/show/orders` | *查询团长首页展示订单* | **groupId** (Long); **pointId** (Long) |
-| 11 | GET | `/order/leader/home/order/goodsSummary` | *查询团长首页订单商品* | **groupId** (Long); **pointId** (Long); **keyword** (String); **page** (Integer); **pageSize** (Integer) |
-| 12 | POST | `/order/get/groupActivity/totalOrder` | *提交（团购活动汇总订单）* | **groupId** (Long) |
+| 1 | POST | `/order/leader/order/list` | 团长订单列表（按团活动/订单状态/关键字筛选, 关键字支持商品名称或手机号, 分页查询） 团购详情调用必须传groupI… | Body: **request** (LeaderOrderListRequest, JSON) |
+| 2 | POST | `/order/leader/apply/refundList` | 团长售后订单列表（按团活动/审核状态/关键字筛选, 关键字支持商品名称或手机号, 分页查询） | Body: **request** (LeaderOrderApplyRefundRequest, JSON) |
+| 3 | GET | `/order/leader/order/count` | 查询订单总数(待核销), 考虑提货点 | **gid** (Long); **pid** (Long) |
+| 4 | GET | `/order/leader/order/status` | 查询订单状态数量 | **gid** (Long); **pid** (Long) |
+| 5 | POST | `/order/leader/order/scanQRCode` | 团长扫用户订单码接口 | Body: **request** (ScanQRCodeRequest, JSON) |
+| 6 | GET | `/order/leader/order/query` | 根据订单号查询订单 | **orderNo** (String) |
+| 7 | POST | `/order/leader/order/writeOff` | 核销（整单核销） | **orderNo** (String); **pid** (Long) |
+| 8 | POST | `/order/leader/order/partWriteOff` | 部分核销订单 | Body: **request** (OrderVerifyRequest, JSON) |
+| 9 | GET | `/order/leader/order/send` | 团长端-查询微信发货 | **orderNo** (String) |
+| 10 | GET | `/order/leader/home/show/orders` | 团长首页订单汇总(head部分): 返回有效订单总数/订单总金额/退款总金额;groupId必传， pointId 传… | **groupId** (Long); **pointId** (Long) |
+| 11 | GET | `/order/leader/home/order/goodsSummary` | 团长端订单-商品统计: 返回订单商品总件数/待核销总件数 + 每个商品的总件数/待核销件数, 支持按团购活动groupI… | **groupId** (Long); **pointId** (Long); **keyword** (String); **page** (Integer); **pageSize** (Integer) |
+| 12 | POST | `/order/get/groupActivity/totalOrder` | 根据团购活动id统计订单数（实时统计，团长端有需求时使用） | **groupId** (Long) |
 
 **OrderRefundController**（`cn.com.shopgroup.order.controller.leader`）
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/order/leader/refund/count` | *查询团长退款总数* | **gid** (Long); **pid** (Long) |
-| 2 | POST | `/order/leader/refund/applyList` | *查询团长退款列表* | Body: **request** (LeaderRefundApplyListRequest, JSON) |
-| 3 | POST | `/order/leader/approve/list` | *查询团长列表* | Body: **request** (LeaderApproveListRequest, JSON) |
-| 4 | POST | `/order/leader/get/refund/count` | *查询团长退款总数* | 无 |
-| 5 | POST | `/order/leader/refund/approve` | *审核（团长退款）* | Body: **approveRequest** (OrderApproveRequest, JSON) |
+| 1 | GET | `/order/leader/refund/count` | 退款订单数量: 订单中存在商品发生过退款(部分退/整单全退, 审核同意)即计入 | **gid** (Long); **pid** (Long) |
+| 2 | POST | `/order/leader/refund/applyList` | ------暂时废弃 批量查询用户退款申请数据(团长端): 把用户申请退的数据按订单+商品行结构化展示, 只查"待审核"… | Body: **request** (LeaderRefundApplyListRequest, JSON) |
+| 3 | POST | `/order/leader/approve/list` | 团长端-批量退款列表: 查询指定团购下"存在待待核销商品申请的订单, 支持按商品名称模糊搜索, 分页返回订单+该笔申请的… | Body: **request** (LeaderApproveListRequest, JSON) |
+| 4 | POST | `/order/leader/get/refund/count` | 团长端-团购订单上面展示售后订单数 | 无 |
+| 5 | POST | `/order/leader/refund/approve` | 售后订单审核（同意/不同意）。status: 1=同意, 2=不同意; 每单一行key=订单号, value.refun… | Body: **approveRequest** (OrderApproveRequest, JSON) |
 
 **OrderRefundNotifyController**（`cn.com.shopgroup.order.controller.leader`）
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | POST | `/order/leader/refund/notify` | *回调（团长退款）* | 无 |
+| 1 | POST | `/order/leader/refund/notify` | 退款结果回调通知: 易宝退款最终结果异步通知(与支付回调一致, 为 RSA2048 数字信封加密的 form 报文) | 无 |
 
 **OrderPaymentController**（`cn.com.shopgroup.order.controller.payment`）
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/order/payment/order/pay` | *支付（支付订单）* | **orderNo** (String); **openid** (String) |
-| 2 | POST | `/order/payment/order/notify` | *回调（支付订单）* | 无 |
+| 1 | GET | `/order/payment/order/pay` | 发起支付 | **orderNo** (String); **openid** (String) |
+| 2 | POST | `/order/payment/order/notify` | 支付回调 | 无 |
 
 #### 8.2.3 gb-group-goods（商品/团购）— 25 个接口
 
@@ -527,23 +527,23 @@ mvn -pl gb-group-task spring-boot:run
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/goods/group/goods/list` | *查询团购商品列表* | **lid** (Long); **groupId** (Long) |
-| 2 | GET | `/goods/group/goods/stock` | *查询团购商品库存* | **gid** (String) |
+| 1 | GET | `/goods/group/goods/list` | 团购商品列表(包装, 规格, sku) | **lid** (Long); **groupId** (Long) |
+| 2 | GET | `/goods/group/goods/stock` | 查询商品库存, 后期增加缓存 | **gid** (String) |
 
 **LeaderGoodsManageController**（`cn.com.shopgroup.goods.controller`）
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/goods/get/goods/cat` | *查询商品分类* | 无 |
-| 2 | GET | `/goods/leader/goods/online` | *查询团长商品上架* | 无 |
-| 3 | GET | `/goods/leader/goods/list` | *查询团长商品列表* | **cat** (Long); **keyword** (String); **page** (int); **pageSize** (int) |
-| 4 | GET | `/goods/leader/goods/count` | *查询团长商品总数* | **cat** (Long); **keyword** (String) |
-| 5 | GET | `/goods/leader/goods/info` | *查询团长商品详情* | **id** (Long) |
-| 6 | POST | `/goods/leader/goods/addGoods` | *新增商品团长商品* | Body: **request** (LeaderAddGoodsRequest, JSON) |
-| 7 | POST | `/goods/leader/goods/edit` | *修改团长商品* | Body: **request** (LeaderGoodsRequest, JSON) |
-| 8 | GET | `/goods/leader/goods/close` | *启用/关闭团长商品* | **id** (Long) |
-| 9 | GET | `/goods/leader/goods/sku/spec` | *查询团长商品SKU规格* | **id** (Long) |
-| 10 | POST | `/goods/leader/goods/sku/save` | *保存团长商品SKU* | Body: **requestList** (List<LeaderSkuRequest>, JSON) |
+| 1 | GET | `/goods/get/goods/cat` | 商品分类列表 | 无 |
+| 2 | GET | `/goods/leader/goods/online` | 查询所有审核通过且未关闭的商品, 添加团购时使用 | 无 |
+| 3 | GET | `/goods/leader/goods/list` | 分页查询团长下的所有商品(团长控制台-商品管理), 支持分类+商品名称关键字筛选 | **cat** (Long); **keyword** (String); **page** (int); **pageSize** (int) |
+| 4 | GET | `/goods/leader/goods/count` | 查询团长下的所有商品数量, 支持分类+商品名称关键字筛选 | **cat** (Long); **keyword** (String) |
+| 5 | GET | `/goods/leader/goods/info` | 商品信息查询: 商品基本信息 + 分类名 + 图片 + 规格(含规格值) + SKU | **id** (Long) |
+| 6 | POST | `/goods/leader/goods/addGoods` | 添加商品 | Body: **request** (LeaderAddGoodsRequest, JSON) |
+| 7 | POST | `/goods/leader/goods/edit` | 修改商品 | Body: **request** (LeaderGoodsRequest, JSON) |
+| 8 | GET | `/goods/leader/goods/close` | 关闭商品(上下架), 如果该商品正在团购中, 则不允许操作 | **id** (Long) |
+| 9 | GET | `/goods/leader/goods/sku/spec` | 根据规格罗列所有SKU, 包括已经存在的sku信息 | **id** (Long) |
+| 10 | POST | `/goods/leader/goods/sku/save` | 批量保存商品SKU(先删除后添加), 如果该商品正在团购中, 则不允许修改 注: 前端不再单独调用此接口, SKU已随添… | Body: **requestList** (List<LeaderSkuRequest>, JSON) |
 | 11 | POST | `/goods/leader/update/sku/stock` | 团长端修改商品库存(按SKU维度修改为指定库存, 商品主表库存按各SKU库存之和同步) | Body: **request** (LeaderUpdateSkuStockRequest, JSON) |
 | 12 | GET | `/goods/leader/activity/goods/close` | 团购活动详情中-商品上下架(按团购商品行自身 is_close 取反切换; 商品表已下架或活动不属于当前团长时抛错) | **goodsId** (Long); **groupId** (Long) |
 
@@ -551,17 +551,17 @@ mvn -pl gb-group-task spring-boot:run
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | POST | `/goods/Leader/get/groupActivity/list` | 团长端-查询所有团购活动列表<br>返回每个团购活动的订单汇总数据 `groupSummaryResponse`（实际收入、退款金额、跟团人数）, 由 LeaderGroupSummaryService 批量聚合 gb_order_info 得出; 已取消订单不计入。 | Body: **request** (LeaderGroupListRequest, JSON) |
-| 2 | GET | `/goods/Leader/get/groupActivity/count` | *查询团长团购活动总数* | **cat** (Long); **name** (String); **status** (Integer) |
-| 3 | GET | `/goods/Leader/groupActivity/tag/list` | *查询团长团购活动标签列表* | 无 |
-| 4 | POST | `/goods/Leader/groupActivity/add` | *新增团长团购活动* | Body: **request** (GroupActRequest, JSON) |
-| 5 | GET | `/goods/Leader/get/groupActivity/info` | *查询团长团购活动详情* | **groupId** (Long) |
-| 6 | POST | `/goods/Leader/groupActivity/edit` | *修改团长团购活动* | Body: **request** (GroupActRequest, JSON) |
-| 7 | POST | `/goods/Leader/groupActivity/close` | *启用/关闭团长团购活动* | **groupId** (Long) |
-| 8 | GET | `/goods/Leader/get/groupActivity/cat` | *查询团长团购活动分类* | 无 |
-| 9 | POST | `/goods/Leader/share/groupActivity/poster` | *提交（团长分享团购活动海报）* | **groupId** (Long) |
-| 10 | POST | `/goods/Leader/share/groupActivity/make/poster` | *提交（团长分享团购活动海报）* | **groupId** (Long) |
-| 11 | POST | `/goods/Leader/share/groupActivity/goods/poster` | *提交（团长分享团购活动商品海报）* | **groupId** (Long); **goodsId** (Long) |
+| 1 | POST | `/goods/Leader/get/groupActivity/list` | 团长端-查询所有团购活动列表<br>返回每个团购活动的订单汇总数据 `groupSummaryResponse`（实际收… | Body: **request** (LeaderGroupListRequest, JSON) |
+| 2 | GET | `/goods/Leader/get/groupActivity/count` | 查询所有团购活动总数(筛选条件与列表接口一致, 保证分页总页数正确) | **cat** (Long); **name** (String); **status** (Integer) |
+| 3 | GET | `/goods/Leader/groupActivity/tag/list` | 团购标签下拉列表(添加/编辑团购活动时选择标签) | 无 |
+| 4 | POST | `/goods/Leader/groupActivity/add` | 添加团购活动 | Body: **request** (GroupActRequest, JSON) |
+| 5 | GET | `/goods/Leader/get/groupActivity/info` | 查询团购信息, 还要查询商品列表(价格以团购商品表冗余的团购价为准) 返回跟团统计genTuanResponse(团员人… | **groupId** (Long) |
+| 6 | POST | `/goods/Leader/groupActivity/edit` | 修改团购活动, 团购进行中, 不允许修改 | Body: **request** (GroupActRequest, JSON) |
+| 7 | POST | `/goods/Leader/groupActivity/close` | 关闭团购活动, 平台审核未通过, 不允许打开上线 打开上线的话, 需要清空Redis缓存, 任何修改团购和商品信息, 都… | **groupId** (Long) |
+| 8 | GET | `/goods/Leader/get/groupActivity/cat` | 团购分类列表 | 无 |
+| 9 | POST | `/goods/Leader/share/groupActivity/poster` | 分享团购海报生成1 | **groupId** (Long) |
+| 10 | POST | `/goods/Leader/share/groupActivity/make/poster` | 分享团购活动海报（带有logo的海报） | **groupId** (Long) |
+| 11 | POST | `/goods/Leader/share/groupActivity/goods/poster` | 团购端-分享团购-商品-海报生成 | **groupId** (Long); **goodsId** (Long) |
 
 #### 8.2.4 gb-group-admin（后台管理）— 29 个接口
 
@@ -569,75 +569,75 @@ mvn -pl gb-group-task spring-boot:run
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/admin/business/list` | *查询收款账户列表* | **id** (Long); **page** (int); **pageSize** (int) |
-| 2 | GET | `/admin/business/count` | *查询收款账户总数* | 无 |
-| 3 | GET | `/admin/business/info` | *查询收款账户详情* | **id** (Long) |
-| 4 | POST | `/admin/business/add` | *新增收款账户* | Body: **request** (LeaderBusinessRequest, JSON) |
+| 1 | GET | `/admin/business/list` | 分页查询团长收款账户列表(含累计额度) | **id** (Long); **page** (int); **pageSize** (int) |
+| 2 | GET | `/admin/business/count` | 查询收款账户总数 | 无 |
+| 3 | GET | `/admin/business/info` | 查询收款账户详情 | **id** (Long) |
+| 4 | POST | `/admin/business/add` | 添加团长收款账户(商户编号需唯一) | Body: **request** (LeaderBusinessRequest, JSON) |
 
 **AdminGoodsController**（`cn.com.shopgroup.controller`）
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/admin/goods/list` | *查询商品列表* | **page** (int); **pageSize** (int) |
-| 2 | GET | `/admin/goods/count` | *查询商品总数* | 无 |
-| 3 | GET | `/admin/goods/info` | *查询商品详情* | **id** (Long) |
-| 4 | GET | `/admin/goods/img` | *查询商品图片* | **id** (Long) |
+| 1 | GET | `/admin/goods/list` | 分页查询商品列表(含规格) | **page** (int); **pageSize** (int) |
+| 2 | GET | `/admin/goods/count` | 查询商品总数 | 无 |
+| 3 | GET | `/admin/goods/info` | 查询商品详情(含规格) | **id** (Long) |
+| 4 | GET | `/admin/goods/img` | 查询商品缩略图列表(最多3张) | **id** (Long) |
 
 **AdminGroupController**（`cn.com.shopgroup.controller`）
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/admin/group/list` | *查询团购列表* | **page** (int); **pageSize** (int) |
-| 2 | GET | `/admin/group/count` | *查询团购总数* | 无 |
-| 3 | GET | `/admin/group/info` | *查询团购详情* | **id** (Long) |
+| 1 | GET | `/admin/group/list` | 分页查询团购活动列表 | **page** (int); **pageSize** (int) |
+| 2 | GET | `/admin/group/count` | 查询团购活动总数 | 无 |
+| 3 | GET | `/admin/group/info` | 查询团购活动详情 | **id** (Long) |
 
 **AdminGroupTagController**（`cn.com.shopgroup.controller`）
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/admin/tag/list` | *查询标签列表* | **keyword** (String); **page** (int); **pageSize** (int) |
-| 2 | GET | `/admin/tag/count` | *查询标签总数* | **keyword** (String) |
-| 3 | GET | `/admin/tag/info` | *查询标签详情* | **tagId** (Long) |
-| 4 | POST | `/admin/tag/add` | *新增标签* | Body: **tag** (GbGroupTag, JSON) |
-| 5 | POST | `/admin/tag/edit` | *修改标签* | Body: **tag** (GbGroupTag, JSON) |
-| 6 | POST | `/admin/tag/delete` | *删除标签* | **tagId** (Long) |
+| 1 | GET | `/admin/tag/list` | 分页查询标签列表(含停用, 名称模糊) | **keyword** (String); **page** (int); **pageSize** (int) |
+| 2 | GET | `/admin/tag/count` | 标签总数(与列表筛选条件一致, 供分页) | **keyword** (String) |
+| 3 | GET | `/admin/tag/info` | 标签详情 | **tagId** (Long) |
+| 4 | POST | `/admin/tag/add` | 新增标签 | Body: **tag** (GbGroupTag, JSON) |
+| 5 | POST | `/admin/tag/edit` | 编辑标签(可修改名称/颜色/排序/状态启停, 未传字段保留原值) | Body: **tag** (GbGroupTag, JSON) |
+| 6 | POST | `/admin/tag/delete` | 删除标签(被团购活动使用中禁止删除, 可改为停用) | **tagId** (Long) |
 
 **AdminLeaderController**（`cn.com.shopgroup.controller`）
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/admin/leader/list` | *查询团长列表* | **mobile** (String); **page** (int); **pageSize** (int) |
-| 2 | GET | `/admin/leader/count` | *查询团长总数* | 无 |
-| 3 | POST | `/admin/leader/add` | *新增团长* | Body: **request** (LeaderRequest, JSON) |
-| 4 | GET | `/admin/leader/select` | *查询团长* | 无 |
+| 1 | GET | `/admin/leader/list` | 分页查询团长列表(可按手机号筛选) | **mobile** (String); **page** (int); **pageSize** (int) |
+| 2 | GET | `/admin/leader/count` | 查询团长总数 | 无 |
+| 3 | POST | `/admin/leader/add` | 添加团长(校验手机号/商户编号, 同步创建员工/店铺/收款账户) | Body: **request** (LeaderRequest, JSON) |
+| 4 | GET | `/admin/leader/select` | 团长下拉选项列表(id/名称) | 无 |
 
 **AdminLoginController**（`cn.com.shopgroup.controller`）
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/admin/login/kaptcha` | *查询验证码* | 无 |
-| 2 | POST | `/admin/login/submit` | *提交* | Body: **request** (LoginRequest, JSON) |
+| 1 | GET | `/admin/login/kaptcha` | 获取后台登录图形验证码(Base64图片, 5分钟有效) | 无 |
+| 2 | POST | `/admin/login/submit` | 后台登录(验证码+账号密码, 返回token) | Body: **request** (LoginRequest, JSON) |
 
 **AdminMemberController**（`cn.com.shopgroup.controller`）
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/admin/member/list` | *查询会员列表* | **page** (int); **pageSize** (int) |
-| 2 | GET | `/admin/member/count` | *查询会员总数* | 无 |
+| 1 | GET | `/admin/member/list` | 分页查询会员列表 | **page** (int); **pageSize** (int) |
+| 2 | GET | `/admin/member/count` | 查询会员总数 | 无 |
 
 **AdminOrderBusinessController**（`cn.com.shopgroup.controller`）
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/admin/orderbusiness/list` | *查询订单收款账户列表* | **page** (int); **pageSize** (int) |
-| 2 | GET | `/admin/orderbusiness/count` | *查询订单收款账户总数* | 无 |
+| 1 | GET | `/admin/orderbusiness/list` | 分页查询订单列表 | **page** (int); **pageSize** (int) |
+| 2 | GET | `/admin/orderbusiness/count` | 查询订单总数 | 无 |
 
 **AdminOrderController**（`cn.com.shopgroup.controller`）
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/admin/order/list` | *查询订单列表* | **page** (int); **pageSize** (int) |
-| 2 | GET | `/admin/order/count` | *查询订单总数* | 无 |
+| 1 | GET | `/admin/order/list` | 分页查询订单列表 | **page** (int); **pageSize** (int) |
+| 2 | GET | `/admin/order/count` | 查询订单总数 | 无 |
 
 #### 8.2.5 gb-group-task（定时任务）— 8 个接口
 
@@ -645,14 +645,14 @@ mvn -pl gb-group-task spring-boot:run
 
 | 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/task/order/send` | *发送（订单）* | **orderNo** (String) |
-| 2 | GET | `/task/order/divide` | *分账（订单）* | **orderNo** (String) |
-| 3 | GET | `/task/order/query` | *查询订单* | **orderNo** (String) |
-| 4 | GET | `/task/order/refund` | *退款（订单）* | **orderNo** (String) |
-| 5 | GET | `/task/order/cash` | *查询订单提现* | **id** (int); **val** (int) |
-| 6 | GET | `/task/order/verify` | *核销（订单）* | 无 |
-| 7 | GET | `/task/order/backstock` | *回库（订单）* | 无 |
-| 8 | GET | `/task/test/user` | *查询测试用户* | **aId** (Long) |
+| 1 | GET | `/task/order/send` | 微信订单发货 | **orderNo** (String) |
+| 2 | GET | `/task/order/divide` | 订单分账 | **orderNo** (String) |
+| 3 | GET | `/task/order/query` | 查询订单 | **orderNo** (String) |
+| 4 | GET | `/task/order/refund` | 分账前部分退款，存在问题，实际到款金额-退款金额-平台服务费=商户分账金额。 分账后部分退款的话，没有问题，子商户本来就… | **orderNo** (String) |
+| 5 | GET | `/task/order/cash` | 提现 | **id** (int); **val** (int) |
+| 6 | GET | `/task/order/verify` | 自动完成收货(手动触发, 与定时任务同一套逻辑): 已分账核销、核销满7天仍未完成收货的订单自动完成 | 无 |
+| 7 | GET | `/task/order/backstock` | 超时未支付订单自动取消并恢复库存(手动触发, 与定时任务同一套逻辑) | 无 |
+| 8 | GET | `/task/test/user` | 查询文章信息(联调测试接口) | **aId** (Long) |
 
 
 ## 附：文件结构

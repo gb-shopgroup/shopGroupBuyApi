@@ -5,6 +5,7 @@ import cn.com.shopgroup.common.cache.RedisHelper;
 import cn.com.shopgroup.common.exception.BusinessException;
 import cn.com.shopgroup.common.utils.JsonResult;
 import cn.com.shopgroup.common.utils.PhoneGeneratorUtils;
+import cn.com.shopgroup.common.utils.TimeUtils;
 import cn.com.shopgroup.common.utils.TokenUtils;
 import cn.com.shopgroup.goods.http.response.group.GroupActGoodsResponse;
 import cn.com.shopgroup.goods.http.response.group.GroupActivityResponse;
@@ -46,7 +47,6 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -245,13 +245,8 @@ public class MemberGroupController {
         int totalOrderNum = this.getOrderNumByGroupId(groupId);
         int viwNum = this.getGroupViewCountQuietly(groupId);
         cacheData.setNum(totalOrderNum);
-        if (viwNum <= totalOrderNum) {
-            // 当前团购查看人数
-            cacheData.setViewCount(totalOrderNum);
-        } else {
-            // 当前团购查看人数
-            cacheData.setViewCount(viwNum);
-        }
+        // 当前团购查看人数: 真实查看人数 >= 跟团人数*1.6 时展示真实查看人数, 否则展示跟团人数的1.6倍
+        cacheData.setViewCount(this.computeDisplayViewCount(viwNum, totalOrderNum));
 
         // 服务端自动埋点: 记录用户"查看"团购(未登录/防抖命中会忽略, 不影响主流程)
         this.recordViewQuietly(groupId);
@@ -347,12 +342,11 @@ public class MemberGroupController {
             // 订单数: 实际支付订单数 + 虚拟订单数(Redis 计数器), 与详情 getOrderNumByGroupId 口径一致,前端已经算了
             int totalOrderNum = this.getRedisOrderTotal(item.getId(), 0);
             item.setOrder(totalOrderNum);
-            // 查看次数(不去重): 不低于订单数时取查看次数, 否则取订单数(与详情口径一致)
+            // 查看次数: 与详情口径一致, 真实查看人数 >= 跟团人数*1.6 时展示真实值, 否则展示跟团人数的1.6倍
             int virtual = item.getVirtual();
             Integer viwNum = viewCountMap.get(item.getId());
             int orderTotal = totalOrderNum + virtual;
-            int viewCount = (viwNum != null && viwNum > orderTotal) ? viwNum : orderTotal;
-            item.setViewCount(viewCount);
+            item.setViewCount(this.computeDisplayViewCount(viwNum, orderTotal));
 
         }
     }
@@ -430,11 +424,15 @@ public class MemberGroupController {
             if (this.isBetween6And20()) {
                 // 白天的数据, 早上6点到晚上8点之间
                 data = this.getDayGroupLogs(total, groupId);
+                // 跟团数大于10且有真实订单时, 虚拟记录与真实订单记录混合随机展示
+                data = this.mergeRealOrderLogs(groupId, orderNum, total, data);
                 // 放入redis缓存中(1个小时)
                 redisHelper.setCacheObject(key, data, RedisConstant.RedisGroupLogsExpired, TimeUnit.SECONDS);
             } else {
                 // 晚上的数据, 早上6点之前, 到晚上8点之后, 共计10个小时
                 data = this.getNightGroupLogs(total, groupId);
+                // 跟团数大于10且有真实订单时, 虚拟记录与真实订单记录混合随机展示
+                data = this.mergeRealOrderLogs(groupId, orderNum, total, data);
                 // 放入redis缓存中(1个小时)
                 long timeout = 1 * 60 * 60;
                 redisHelper.setCacheObject(key, data, timeout, TimeUnit.SECONDS);
@@ -506,8 +504,8 @@ public class MemberGroupController {
         // 生成 total 个脱敏手机号
         List<String> phoneList = PhoneGeneratorUtils.generateDesensitizePhone(total);
 
-        // 生成total个 0 - 60之间的数字, 从大到小排序
-        List<Integer> timeList = this.getSortedNums(total);
+        // 生成total个时间戳(从新到旧, 相邻两条间隔大于30秒)
+        List<Integer> timeList = this.generateRecordTimes(total);
 
         // 循环添加数据
         for (int i = 0; i < total; i++) {
@@ -515,7 +513,7 @@ public class MemberGroupController {
             String avatar = "/static/image/man.png";
             if (ThreadLocalRandom.current().nextInt(1, 6) % 2 == 0) avatar = "/static/image/woman.png";
             String mobile = phoneList.get(i);
-            String time = timeList.get(i) + "分钟前";
+            String time = TimeUtils.getRelativeTime(timeList.get(i));
             int temp = ThreadLocalRandom.current().nextInt(size);
             String name = goodsList.get(temp).getGoodsName();
             String num = String.valueOf(ThreadLocalRandom.current().nextInt(1, 3));
@@ -544,6 +542,9 @@ public class MemberGroupController {
         // 生成 total 个脱敏手机号
         List<String> phoneList = PhoneGeneratorUtils.generateDesensitizePhone(total);
 
+        // 生成total个时间戳(从新到旧, 相邻两条间隔大于30秒)
+        List<Integer> timeList = this.generateRecordTimes(total);
+
         // 循环添加数据
         for (int i = 0; i < total; i++) {
 
@@ -553,7 +554,7 @@ public class MemberGroupController {
             int temp = ThreadLocalRandom.current().nextInt(size);
             String name = goodsList.get(temp).getGoodsName();
             String num = String.valueOf(ThreadLocalRandom.current().nextInt(1, 3));
-            data.add(new GroupLogs(avatar, mobile, "刚刚", name, num));
+            data.add(new GroupLogs(avatar, mobile, TimeUtils.getRelativeTime(timeList.get(i)), name, num));
         }
 
         // 返回
@@ -577,6 +578,9 @@ public class MemberGroupController {
         // 生成 total 个脱敏手机号
         List<String> phoneList = PhoneGeneratorUtils.generateDesensitizePhone(total);
 
+        // 生成total个时间戳(从新到旧, 相邻两条间隔大于30秒)
+        List<Integer> timeList = this.generateRecordTimes(total);
+
         // 循环添加数据
         for (int i = 0; i < total; i++) {
 
@@ -592,7 +596,7 @@ public class MemberGroupController {
                 name = goodsList.get(temp).getGoodsName();
             }
             String num = String.valueOf(ThreadLocalRandom.current().nextInt(1, 3));
-            data.add(new GroupLogs(avatar, mobile, "10分钟前", name, num));
+            data.add(new GroupLogs(avatar, mobile, TimeUtils.getRelativeTime(timeList.get(i)), name, num));
         }
 
         // 返回
@@ -615,17 +619,62 @@ public class MemberGroupController {
         return totalMin >= 6 * 60 && totalMin <= 20 * 60;
     }
 
-    // 生成total个 5 - 50 之间的数字, 从大到小排序
-    private List<Integer> getSortedNums(int total) {
+    // 查看人数展示规则(C端列表与详情统一口径):
+    // 真实查看人数 >= 跟团人数(订单数)*1.6 时, 展示真实查看人数; 否则展示跟团人数的1.6倍
+    private int computeDisplayViewCount(Integer realViewNum, int orderTotal) {
 
-        Set<Integer> set = new HashSet<>();
-        while (set.size() < total) {
-            int num = ThreadLocalRandom.current().nextInt(5, 51);
-            set.add(num);
+        int view = realViewNum == null ? 0 : realViewNum;
+        double baseline = orderTotal * 1.6D;
+        if (view >= baseline) {
+            return view;
         }
-        List<Integer> list = new ArrayList<>(set);
-        Collections.sort(list, Collections.reverseOrder());
-        return list;
+        return (int) Math.floor(baseline);
+    }
+
+    // 生成total个时间戳(秒级, 从新到旧), 相邻两条记录间隔随机31-180秒, 保证每条之间间隔大于30秒
+    private List<Integer> generateRecordTimes(int total) {
+
+        List<Integer> times = new ArrayList<>(Math.max(total, 0));
+        long now = System.currentTimeMillis() / 1000L;
+        long current = now;
+        for (int i = 0; i < total; i++) {
+            times.add((int) current);
+            // 下一条(更旧一条)与当前条间隔: 随机31-180秒
+            current -= ThreadLocalRandom.current().nextInt(31, 181);
+        }
+        return times;
+    }
+
+    // 跟团数(订单数)大于10且有真实订单时, 将真实订单记录转为跟团记录,
+    // 与虚拟记录合并后随机打乱(混着随机展示), 超出total条时截断; 真实记录查询异常时降级为纯虚拟记录
+    private List<GroupLogs> mergeRealOrderLogs(Long groupId, int orderNum, int total, List<GroupLogs> virtualLogs) {
+
+        if (orderNum <= 10 || total < 1) {
+            return virtualLogs;
+        }
+        List<GroupLogs> merged = new ArrayList<>(virtualLogs);
+        try {
+            List<GroupOrderRecordResponse> realRecords = orderInfoService.getGroupOrderRecordList(groupId, total);
+            if (!CollectionUtils.isEmpty(realRecords)) {
+                for (GroupOrderRecordResponse record : realRecords) {
+                    String avatar = record.getAvatar();
+                    if (avatar == null || avatar.trim().length() == 0) {
+                        avatar = "/static/image/man.png";
+                        if (ThreadLocalRandom.current().nextInt(1, 6) % 2 == 0) avatar = "/static/image/woman.png";
+                    }
+                    String goodsNum = record.getGoodsNum() == null ? "1" : String.valueOf(record.getGoodsNum());
+                    merged.add(new GroupLogs(avatar, record.getMobile(), record.getTime(),
+                            record.getGoodsDesc(), goodsNum));
+                }
+                Collections.shuffle(merged);
+            }
+        } catch (Exception e) {
+            log.error("跟团记录混入真实订单记录异常 groupId:{}", groupId, e);
+        }
+        if (merged.size() > total) {
+            return new ArrayList<>(merged.subList(0, total));
+        }
+        return merged;
     }
 
     /**

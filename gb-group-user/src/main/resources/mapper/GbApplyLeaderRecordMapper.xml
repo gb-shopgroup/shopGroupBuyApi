@@ -8,12 +8,14 @@
         <result column="name" property="name"/>
         <result column="mobile" property="mobile"/>
         <result column="apply_status" property="applyStatus"/>
+        <result column="member_id" property="memberId"/>
         <result column="add_time" property="addTime"/>
         <result column="update_time" property="updateTime"/>
     </resultMap>
 
     <sql id="Base_Column_List">
-       id, name, mobile, apply_status, add_time, update_time
+        id
+        , name, mobile, apply_status, member_id,add_time, update_time
     </sql>
 
 </mapper>

@@ -10,6 +10,6 @@ public class LeaderUpdateSkuStockRequest {
     // 商品id
     private Long goodsId;
     //skuId-info
-    List<UpdateSkuStockRequest> skuStockRequestList;
+    private List<UpdateSkuStockRequest> skuStockRequestList;
 
 }

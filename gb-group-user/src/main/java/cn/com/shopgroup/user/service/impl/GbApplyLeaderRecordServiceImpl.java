@@ -26,6 +26,7 @@ public class GbApplyLeaderRecordServiceImpl implements GbApplyLeaderRecordServic
         data.setApplyStatus(info.getApplyStatus() == null ? 0 : info.getApplyStatus());
         data.setAddTime(new Date());
         data.setUpdateTime(new Date());
+        data.setMemberId(info.getMemberId());
         mapper.insert(data);
         return data.getId();
     }

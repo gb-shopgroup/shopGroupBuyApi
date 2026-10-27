@@ -477,8 +477,8 @@ public class LeaderGoodsManageController {
         if (ObjectUtils.isEmpty(goodsInfo)) {
             throw new BusinessException(GoodsErrorCodeEnum.GOODS_NOT_EXIST);
         }
-        // 团购活动内的商品行(商品表已下架时查不到, 需判空, 避免空指针)
-        GbGroupActivityGoods activityGoods = groupActivityInfoService.getGroupActivityOnlineGoods(groupId, goodsId);
+        // 团购活动内的商品行(不过滤上下架状态: 已下架的商品行也要能查到, 否则无法再切换回上架)
+        GbGroupActivityGoods activityGoods = groupActivityInfoService.getGroupActivityGoods(groupId, goodsId);
         if (ObjectUtils.isEmpty(activityGoods)) {
             throw new BusinessException(GoodsErrorCodeEnum.GROUP_GOODS_NOT_EXIST);
         }

@@ -24,6 +24,9 @@ public class GbApplyLeaderRecord {
     // 申请状态 0 申请中 1 申请成功 2 申请失败
     @TableField("apply_status")
     private Integer applyStatus;
+    //操作用户id
+    @TableField("member_id")
+    private Long memberId;
     // 申请时间
     @TableField("add_time")
     private Date addTime;

@@ -2,6 +2,7 @@ package cn.com.shopgroup.user.controller.member;
 
 import cn.com.shopgroup.common.exception.BusinessException;
 import cn.com.shopgroup.common.utils.JsonResult;
+import cn.com.shopgroup.common.utils.TokenUtils;
 import cn.com.shopgroup.user.exception.UserErrorCodeEnum;
 import cn.com.shopgroup.user.http.request.ApplyLeaderRequest;
 import cn.com.shopgroup.user.model.GbApplyLeaderRecord;
@@ -33,6 +34,24 @@ public class ApplyLeaderController {
     @PostMapping("/become/leader")
     public JsonResult applyBecomeLeader(@Validated @RequestBody ApplyLeaderRequest request) {
         log.info("申请团长/user/apply/become/leader,req:{}", JSON.toJSONString(request));
+        // 查询用户信息
+        String token = TokenUtils.getToken();
+        if (token == null || token.length() == 0) {
+            throw new BusinessException(UserErrorCodeEnum.TOKEN_NOT_EXIST);
+        }
+        String userId = TokenUtils.parseToken(token);
+        if (userId == null || StringUtils.isEmpty(userId) || userId.matches("^[0-9]+$") == false) {
+            throw new BusinessException(UserErrorCodeEnum.USER_NOT_EXIST);
+        }
+        Long memberId = 0L;
+        try {
+            memberId = Long.parseLong(userId);
+            if (memberId == 0) {
+                throw new BusinessException(UserErrorCodeEnum.USER_NOT_EXIST);
+            }
+        } catch (NumberFormatException e) {
+            throw new BusinessException(UserErrorCodeEnum.USER_NOT_EXIST);
+        }
 
         String name = request.getName() == null ? "" : request.getName().trim();
         String mobile = request.getMobile() == null ? "" : request.getMobile().trim();
@@ -55,6 +74,7 @@ public class ApplyLeaderController {
         data.setMobile(mobile);
         // 0=申请中
         data.setApplyStatus(0);
+        data.setMemberId(memberId);
 
         Long id = 0L;
         try {

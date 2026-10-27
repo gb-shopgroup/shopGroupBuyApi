@@ -7,6 +7,7 @@ import cn.com.shopgroup.common.utils.TimeUtils;
 import cn.com.shopgroup.goods.model.GbGoodsInfo;
 import cn.com.shopgroup.goods.model.GbGoodsPackageInfo;
 import cn.com.shopgroup.goods.model.GbGoodsSkuInfo;
+import cn.com.shopgroup.goods.model.GbGroupActivityGoods;
 import cn.com.shopgroup.goods.model.GbGroupActivityInfo;
 import cn.com.shopgroup.goods.service.GbGoodsInfoService;
 import cn.com.shopgroup.goods.service.GbGoodsPackageInfoService;
@@ -162,6 +163,17 @@ public class OrderServiceImpl implements OrderService {
         Map<Long, GbGoodsInfo> goodsInfoMap = new HashMap<>();
         // 本次下单涉及到的SKU基础信息缓存(skuId -> GbGoodsSkuInfo), 供后续扣减库存时校验 is_close
         Map<Long, GbGoodsSkuInfo> skuInfoMap = new HashMap<>();
+        // 该团购活动内可购买的商品id集合(商品表在线 + 团购活动内已上架): 一次查询, 循环内复用
+        // 团长在团购活动内下架商品后, 用户端缓存的商品列表可能仍有该商品, 下单时在此拦截
+        Set<Long> onlineGoodsIds = new HashSet<>();
+        List<GbGroupActivityGoods> onlineGoodsList = groupService.getGroupActivityOnlineGoodsList(groupId);
+        if (onlineGoodsList != null) {
+            for (GbGroupActivityGoods item : onlineGoodsList) {
+                if (item.getGoodsId() != null) {
+                    onlineGoodsIds.add(item.getGoodsId());
+                }
+            }
+        }
         for (OrderGoodsRequest item : request.getGoods()) {
             // 去掉商品数量为零的情况
             if (item.getNum() <= 0) continue;
@@ -174,6 +186,11 @@ public class OrderServiceImpl implements OrderService {
             }
             // 商品基础信息校验: 已下架/已关闭的商品不允许下单, 避免前端绕过缓存提交下单
             if (goodsInfo.getIsClose() != null && goodsInfo.getIsClose().intValue() == 1) {
+                result.put("msg", goodsInfo.getGoodsName() + "已下架, 无法购买");
+                return result;
+            }
+            // 团购活动内商品上下架校验: 团长在该团购活动内下架该商品(团购商品行 is_close=1)或该商品不在此团购中, 不允许下单
+            if (!onlineGoodsIds.contains(goodsId)) {
                 result.put("msg", goodsInfo.getGoodsName() + "已下架, 无法购买");
                 return result;
             }

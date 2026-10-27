@@ -220,8 +220,9 @@ public class LeaderGroupManageController {
         if (groupIds.isEmpty()) {
             return;
         }
-        // 批量查询商品并按团购id回填(团长端展示全部状态商品, 含已下线)
-        Map<Long, List<GroupActGoodsResponse>> goodsMap = activityInfoService.getGroupGoodsResponseMap(groupIds, true);
+        // 批量查询商品并按团购id回填(团长端展示全部状态商品, 含团购内已下架/商品表已下线的商品,
+        // 否则团长在团购活动内看不到已下架的商品, 无法重新上架)
+        Map<Long, List<GroupActGoodsResponse>> goodsMap = activityInfoService.getGroupGoodsResponseMap(groupIds, false);
         for (GroupActResponse item : data) {
             List<GroupActGoodsResponse> goodsList = goodsMap.get(item.getId());
             item.setGoods(goodsList == null ? new ArrayList<>() : goodsList);
@@ -532,12 +533,13 @@ public class LeaderGroupManageController {
         if (CollectionUtils.isEmpty(activityGoodsList)) {
             throw new BusinessException(GoodsErrorCodeEnum.GROUP_GOODS_NOT_EXIST);
         }
-        // 商品表数据(补充单位/库存), 一次批量查询(仅在线商品, 与上面的商品列表口径一致)
+        // 商品表数据(补充单位/库存), 一次批量查询(团长端查看全部状态商品: 商品表已下线的商品也要能查到,
+        // 否则其库存/单位为空, 团长无法判断并重新上架)
         List<Long> goodsIds = new ArrayList<>();
         for (GbGroupActivityGoods item : activityGoodsList) {
             goodsIds.add(item.getGoodsId());
         }
-        List<GbGoodsInfo> goodsList = goodsService.getGoodsInfoList(goodsIds);
+        List<GbGoodsInfo> goodsList = goodsService.getGoodsInfoListWithAllStatus(goodsIds);
         Map<Long, GbGoodsInfo> goodsMap = new HashMap<>();
         for (GbGoodsInfo item : goodsList) {
             goodsMap.put(item.getGoodsId(), item);

@@ -127,8 +127,13 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
             }
         }
         // 3. 按团购id分组组装返回
-        //    C端(onlineGoodsOnly=true)时, 已下线/已删除的商品(商品表查不到)不展示
+        //    C端(onlineGoodsOnly=true)时, 以下商品不展示:
+        //    a) 团购内已下架(团购商品行 is_close=1); b) 已下线/已删除的商品(商品表查不到)
         for (GbGroupActivityGoods item : activityGoodsList) {
+            // 团购活动内已下架: 团长在团购详情内下架的商品, C端不展示(重新上架后恢复展示)
+            if (onlineGoodsOnly && item.getIsClose() != null && item.getIsClose().intValue() != 0) {
+                continue;
+            }
             GbGoodsInfo goodsInfo = goodsInfoMap.get(item.getGoodsId());
             if (onlineGoodsOnly && (goodsInfo == null || goodsInfo.getIsClose() == null
                     || goodsInfo.getIsClose().intValue() != 0)) {
@@ -169,6 +174,14 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
     @Override
     public GbGroupActivityGoods getGroupActivityOnlineGoods(Long groupId, Long goodsId) {
         return goodsMapper.getGroupActivityOnlineGoods(groupId,goodsId);
+    }
+
+    @Override
+    public GbGroupActivityGoods getGroupActivityGoods(Long groupId, Long goodsId) {
+        if (groupId == null || goodsId == null) {
+            return null;
+        }
+        return goodsMapper.getGroupActivityGoods(groupId, goodsId);
     }
 
     @Override
