@@ -64,7 +64,19 @@ public enum AdminErrorCodeEnum implements IErrorCode {
     TAG_ID_EMPTY(300515, "标签id不能为空"),
 
     /** 生成验证码图片失败 */
-    CAPTCHA_IMAGE_FAILED(300516, "生成验证码图片失败");
+    CAPTCHA_IMAGE_FAILED(300516, "生成验证码图片失败"),
+
+    /** 建议反馈记录不存在 */
+    ADVISE_NOT_FOUND(300517, "未查询到反馈记录"),
+
+    /** 反馈id不能为空 */
+    ADVISE_ID_EMPTY(300518, "反馈id不能为空"),
+
+    /** 回复内容不能为空 */
+    ADVISE_REPLY_EMPTY(300519, "回复内容不能为空"),
+
+    /** 处理状态非法(仅支持 0-待处理, 1-处理中, 2-已解决, 3-已关闭) */
+    ADVISE_STATUS_ILLEGAL(300520, "处理状态不合法");
 
     /** 返回给前端的业务状态码 */
     private final int code;

@@ -147,6 +147,16 @@ public enum UserErrorCodeEnum implements IErrorCode {
      * 该手机号已提交过团长申请(mobile 唯一键冲突)
      */
     APPLY_LEADER_EXISTED(300128, "该手机号已提交过申请, 请勿重复提交"),
+
+    /**
+     * 建议反馈记录不存在(或不属于当前用户)
+     */
+    ADVISE_FEEDBACK_NOT_EXIST(300129, "反馈记录不存在"),
+
+    /**
+     * 建议反馈已被受理, 不允许再修改
+     */
+    ADVISE_FEEDBACK_NOT_ALLOW_EDIT(300130, "反馈已受理, 不支持修改"),
     ;
 
     /**

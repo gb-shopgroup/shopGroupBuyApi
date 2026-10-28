@@ -127,7 +127,7 @@ Maven 依赖仓库使用阿里云镜像（`https://maven.aliyun.com/repository/p
 
 ### 4.3 gb-group-user — 用户 / 团长 / 员工服务
 
-覆盖：会员登录注册（微信 openid / 手机号）、用户信息、团长店铺管理、自提点管理、员工管理、黑名单、消息、图片上传、文章与轮播图等。**48 个接口**。
+覆盖：会员登录注册（微信 openid / 手机号）、用户信息、团长店铺管理、自提点管理、员工管理、黑名单、消息、图片上传、文章与轮播图等。**53 个接口**。
 
 ### 4.4 gb-group-goods — 商品 / 团购服务
 
@@ -139,7 +139,7 @@ Maven 依赖仓库使用阿里云镜像（`https://maven.aliyun.com/repository/p
 
 ### 4.6 gb-group-admin — 平台管理后台服务
 
-覆盖：后台登录（图形验证码）、团长管理、商品管理、团购管理、订单管理、会员管理、报表管理等。**29 个接口**。
+覆盖：后台登录（图形验证码）、团长管理、商品管理、团购管理、订单管理、会员管理、报表管理等。**33 个接口**。
 
 ### 4.7 gb-group-task — 定时任务 / 运维服务
 
@@ -288,14 +288,14 @@ mvn -pl gb-group-task spring-boot:run
 | `page` / `pageSize` | 页码（从 1 开始）/ 每页条数 |
 | `start` / `end` | 开始时间 / 结束时间（如 yyyy-MM-dd） |
 
-- **接口数量统计**：user 48 个、order 49 个、goods 25 个、admin 29 个、task 8 个，合计 **159 个**。
+- **接口数量统计**：user 53 个、order 49 个、goods 25 个、admin 33 个、task 8 个，合计 **168 个**。
 - **详细版接口文档**（含每个接口的完整入参 / 出参字段说明，参数含义、必填、嵌套字段均已细化）见根目录 **`API接口文档.md`**，可通过 `python3 generate_api_doc.py` 扫描各模块 `*Controller.java` 重新生成。下方为接口总览清单。
 
 ### 8.2 接口清单
 
 > 功能说明取自源码方法注释（Javadoc 或紧邻方法的 `//` 行注释）；*斜体* 为源码无注释时脚本依据路径与出入参自动推断（仅供参考），字段级说明见 [`API接口文档.md`](API接口文档.md)。
 
-#### 8.2.1 gb-group-user（用户/团长/员工）— 48 个接口
+#### 8.2.1 gb-group-user（用户/团长/员工）— 53 个接口
 
 **ImageSourceController**（`cn.com.shopgroup.user.controller`）
 
@@ -401,6 +401,16 @@ mvn -pl gb-group-task spring-boot:run
 | 3 | GET | `/user/login` | openid自动登录 | **openid** (String) |
 | 4 | POST | `/user/reg` | 注册新用户 | Body: **request** (MemberRequest, JSON) |
 | 5 | POST | `/user/logout` | 退出登录(小程序调用): 清除服务端登录态, 小程序端需同步删除本地token | 无 |
+
+**MemberAdviseFeedbackController**（`cn.com.shopgroup.user.controller.member`）
+
+| 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
+| --- | --- | --- | --- | --- |
+| 1 | POST | `/user/member/advise/add` | 提交建议反馈 | Body: **request** (AdviseFeedbackRequest, JSON) |
+| 2 | POST | `/user/member/advise/edit` | 修改建议反馈 | Body: **request** (AdviseFeedbackRequest, JSON) |
+| 3 | POST | `/user/member/advise/del` | 删除建议反馈 | Body: **request** (AdviseFeedbackRequest, JSON) |
+| 4 | GET | `/user/member/advise/info` | 建议反馈详情 | **id** (Long) |
+| 5 | GET | `/user/member/advise/list` | 我的建议反馈列表 | **status** (Integer); **page** (Integer); **pageSize** (Integer) |
 
 **MemberController**（`cn.com.shopgroup.user.controller.member`）
 
@@ -563,7 +573,16 @@ mvn -pl gb-group-task spring-boot:run
 | 10 | POST | `/goods/Leader/share/groupActivity/make/poster` | 分享团购活动海报（带有logo的海报） | **groupId** (Long) |
 | 11 | POST | `/goods/Leader/share/groupActivity/goods/poster` | 团购端-分享团购-商品-海报生成 | **groupId** (Long); **goodsId** (Long) |
 
-#### 8.2.4 gb-group-admin（后台管理）— 29 个接口
+#### 8.2.4 gb-group-admin（后台管理）— 33 个接口
+
+**AdminAdviseFeedbackController**（`cn.com.shopgroup.controller`）
+
+| 序号 | 请求方式 | 路径 | 功能说明 | 参数 |
+| --- | --- | --- | --- | --- |
+| 1 | GET | `/admin/advise/list` | 建议反馈列表 | **status** (Integer); **keyword** (String); **page** (Integer); **pageSize** (Integer) |
+| 2 | GET | `/admin/advise/count` | 建议反馈总数 | **status** (Integer); **keyword** (String) |
+| 3 | GET | `/admin/advise/info` | 建议反馈详情 | **id** (Long) |
+| 4 | POST | `/admin/advise/reply` | 官方回复建议反馈 | Body: **request** (AdviseReplyRequest, JSON) |
 
 **AdminBusinessController**（`cn.com.shopgroup.controller`）
 

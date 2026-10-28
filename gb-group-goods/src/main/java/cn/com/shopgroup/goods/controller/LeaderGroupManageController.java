@@ -621,7 +621,7 @@ public class LeaderGroupManageController {
                 submitGoodsIds.add(item.getGid());
             }
         }
-        List<String> missingGoodsNames = new ArrayList<>();
+        /*List<String> missingGoodsNames = new ArrayList<>();
         for (GbGroupActivityGoods originGoods : originGoodsList) {
             if (!submitGoodsIds.contains(originGoods.getGoodsId())) {
                 missingGoodsNames.add(originGoods.getGoodsName());
@@ -631,7 +631,7 @@ public class LeaderGroupManageController {
             throw new BusinessException(GoodsErrorCodeEnum.GROUP_GOODS_MISSING.getCode(),
                     GoodsErrorCodeEnum.GROUP_GOODS_MISSING.getMessage() + ": " + String.join("、", missingGoodsNames));
         }
-
+*/
         // 团购商品在线校验: 编辑时新增的商品必须为在线(is_close=0)商品, 原团购已有的下线商品允许保留(不允许删除)
         Set<Long> originGoodsIds = new HashSet<>();
         for (GbGroupActivityGoods originGoods : originGoodsList) {
