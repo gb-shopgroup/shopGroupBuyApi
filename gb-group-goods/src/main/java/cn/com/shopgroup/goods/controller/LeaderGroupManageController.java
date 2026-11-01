@@ -63,6 +63,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
+import java.math.BigDecimal;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -1097,20 +1098,34 @@ public class LeaderGroupManageController {
         if (ObjectUtils.isEmpty(goodsInfo)) {
             throw new BusinessException(GoodsErrorCodeEnum.GROUP_GOODS_NOT_EXIST);
         }
-        // 构建分享海报信息
+        // 构建分享海报信息(新版竖版朋友圈海报样式)
         PosterDTO dto = new PosterDTO();
         dto.setGoodsName(goodsInfo.getGoodsName()); // 商品名称
         dto.setSaleText("已售" + (groupInfo.getVirtualOrder() + groupInfo.getOrderTotal()) + "单");
-        dto.setPriceText("￥" + goodsInfo.getGroupPrice());
-        dto.setBtnText("立即跟团");
         dto.setImgUrl(goodsInfo.getGroupImg());
-        // 团长店铺二维码: 一起合成到海报右下角(获取失败不阻断海报生成)
+        // 团长店铺二维码: 一起合成到海报右侧(获取失败不阻断海报生成)
         dto.setQrCodeImage(getLeaderShopQrCodeImage(leaderId));
+
+        // 顶部店铺条: 店铺logo/名称(未设置时使用默认值)
+        GbOrgShopInfo shopInfo = shopService.getMiniLeaderShop(leaderId);
+        String shopName = (shopInfo != null && shopInfo.getShopName() != null && shopInfo.getShopName().length() > 0)
+                ? shopInfo.getShopName() : "店小团";
+        String shopLogo = (shopInfo != null && shopInfo.getShopLogo() != null && shopInfo.getShopLogo().length() > 0)
+                ? shopInfo.getShopLogo() : "https://shopgroup.obs.cn-north-9.myhuaweicloud.com/logo.png";
+        dto.setShopName(shopName);
+        dto.setShopLogoUrl(shopLogo);
+        // 红色公告条文案
+        dto.setNoticeText("部分商品图片及价格如有偏差，请以实际到货为准");
+        // 价格: 红色大字数字 + 灰色单位(元/商品单位)
+        dto.setPriceValue(formatPosterPrice(goodsInfo.getGroupPrice()));
+        dto.setPriceUnit("元" + getGoodsUnitSuffix(goodsId));
+        // 底部提示语
+        dto.setFooterText("长按保存手机相册");
 
         // 生成海报
         ByteArrayInputStream bis = null;
         try {
-            bis = PosterUtils.generatePosterStream(dto);
+            bis = PosterUtils.generateGoodsPosterStream(dto);
         } catch (IOException e) {
             log.error("团购端-分享团购-商品-海报生成图片流失败,groupId:{},goodsName:{}", groupId, goodsInfo.getGoodsName(), e);
         }
@@ -1150,6 +1165,33 @@ public class LeaderGroupManageController {
         // 返回访问路径
         log.info("团购端-分享团购-商品-海报生成,leaderId:{},groupId:{},goodsId:{},uploadType:{},url:{}", leaderId, groupId, goodsId, type, url);
         return JsonResult.success("查询成功", url);
+    }
+
+    /**
+     * 海报价格数字格式化: 去除多余小数位(1.80 -> 1.8, 2.0 -> 2)
+     */
+    private String formatPosterPrice(Double price) {
+
+        if (price == null || price <= 0) {
+            return "0";
+        }
+        return BigDecimal.valueOf(price).stripTrailingZeros().toPlainString();
+    }
+
+    /**
+     * 海报价格单位后缀(商品单位): 查不到商品或单位为空时返回空串
+     */
+    private String getGoodsUnitSuffix(Long goodsId) {
+
+        try {
+            GbGoodsInfo goods = goodsService.getGoodsInfo(goodsId);
+            if (goods != null && goods.getGoodsUnit() != null && goods.getGoodsUnit().trim().length() > 0) {
+                return "/" + goods.getGoodsUnit().trim();
+            }
+        } catch (Exception e) {
+            log.warn("海报获取商品单位失败,goodsId:{}", goodsId, e);
+        }
+        return "";
     }
 
     /**

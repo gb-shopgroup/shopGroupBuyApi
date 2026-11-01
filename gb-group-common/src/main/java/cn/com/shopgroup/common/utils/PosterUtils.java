@@ -1,5 +1,8 @@
 package cn.com.shopgroup.common.utils;
 
+import net.coobird.thumbnailator.Thumbnails;
+import net.coobird.thumbnailator.geometry.Positions;
+
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.geom.RoundRectangle2D;
@@ -24,6 +27,267 @@ public class PosterUtils {
     private static final int QR_CODE_GAP = 8;
     private static final int QR_TIP_FONT_SIZE = 14;
     private static final String QR_TIP_TEXT = "长按识别进店";
+
+    // ==================== 新版竖版商品海报(朋友圈分享样式)常量 ====================
+    // 版式自上而下: 深绿店铺条 / 红色公告条 / 商品大图 / 商品名 / 价格+二维码 / 深绿保存提示条
+    private static final int GOODS_POSTER_W = 500;
+    private static final int GOODS_HEADER_H = 70;
+    private static final int GOODS_NOTICE_H = 40;
+    private static final int GOODS_IMG_H = 500;
+    private static final int GOODS_NAME_H = 60;
+    private static final int GOODS_PRICE_H = 150;
+    private static final int GOODS_FOOTER_H = 54;
+    private static final int GOODS_POSTER_H = GOODS_HEADER_H + GOODS_NOTICE_H + GOODS_IMG_H
+            + GOODS_NAME_H + GOODS_PRICE_H + GOODS_FOOTER_H;
+    private static final Color GOODS_HEADER_BG = Color.decode("#0A5B34");
+    private static final Color GOODS_NOTICE_BG = Color.decode("#E93323");
+    private static final Color GOODS_DARK_TEXT = Color.decode("#272727");
+    private static final Color GOODS_GRAY_TEXT = Color.decode("#9b9b9b");
+    private static final int GOODS_SIDE_PADDING = 20;
+    private static final int GOODS_LOGO_SIZE = 46;
+    private static final int GOODS_QR_SIZE = 130;
+    private static final String DEFAULT_NOTICE_TEXT = "部分商品图片及价格如有偏差，请以实际到货为准";
+    private static final String DEFAULT_FOOTER_TEXT = "长按保存手机相册";
+
+
+    /**
+     * 生成新版竖版商品海报(朋友圈分享样式)，返回 ByteArrayInputStream
+     * 版式自上而下: 深绿店铺条(logo+店铺名) / 红色公告条 / 商品大图(500*500居中裁剪)
+     * / 商品名 / 价格(红色大字)+销量+右侧小程序码 / 深绿底部提示条(长按保存手机相册)
+     */
+    public static ByteArrayInputStream generateGoodsPosterStream(PosterDTO dto) throws IOException {
+
+        // 商品大图: 居中裁剪为 500*500 正方形(不会拉伸)
+        BufferedImage goodsImg = centerCropNetImage(dto.getImgUrl(), GOODS_POSTER_W, GOODS_IMG_H);
+
+        // 创建画布
+        BufferedImage posterImg = new BufferedImage(GOODS_POSTER_W, GOODS_POSTER_H, BufferedImage.TYPE_3BYTE_BGR);
+        Graphics2D g2d = posterImg.createGraphics();
+
+        // 抗锯齿
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+
+        // 白色底
+        g2d.setColor(Color.WHITE);
+        g2d.fillRect(0, 0, GOODS_POSTER_W, GOODS_POSTER_H);
+
+        // 1. 顶部深绿店铺条(logo + 店铺名)
+        drawGoodsPosterHeader(g2d, dto, 0, GOODS_HEADER_H);
+
+        // 2. 红色公告条
+        int noticeTop = GOODS_HEADER_H;
+        drawGoodsPosterNotice(g2d, dto.getNoticeText(), noticeTop, GOODS_NOTICE_H);
+
+        // 3. 商品大图
+        int goodsTop = noticeTop + GOODS_NOTICE_H;
+        g2d.drawImage(goodsImg, 0, goodsTop, null);
+
+        // 4. 商品名称
+        int nameTop = goodsTop + GOODS_IMG_H;
+        drawGoodsPosterName(g2d, dto.getGoodsName(), nameTop, GOODS_NAME_H);
+
+        // 5. 价格 + 销量 + 右侧二维码
+        int priceTop = nameTop + GOODS_NAME_H;
+        drawGoodsPosterPriceArea(g2d, dto, priceTop, GOODS_PRICE_H);
+
+        // 6. 底部深绿提示条
+        int footerTop = GOODS_POSTER_H - GOODS_FOOTER_H;
+        drawGoodsPosterFooter(g2d, dto.getFooterText(), footerTop, GOODS_FOOTER_H);
+
+        // 销毁GD
+        g2d.dispose();
+
+        // 图片转字节流返回
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        ImageIO.write(posterImg, "png", bos);
+        return new ByteArrayInputStream(bos.toByteArray());
+    }
+
+    // 顶部深绿店铺条: 左侧圆角logo(获取失败自动跳过), 右侧店铺名白色粗体, 垂直居中
+    private static void drawGoodsPosterHeader(Graphics2D g2d, PosterDTO dto, int top, int height) {
+
+        g2d.setColor(GOODS_HEADER_BG);
+        g2d.fillRect(0, top, GOODS_POSTER_W, height);
+
+        // 店铺logo: 居中裁剪为正方形 + 圆角, 下载失败不阻断海报生成
+        int logoX = 16;
+        int logoY = top + (height - GOODS_LOGO_SIZE) / 2;
+        int nameX = logoX;
+        try {
+            String logoUrl = dto.getShopLogoUrl() == null ? "" : dto.getShopLogoUrl().trim();
+            if (logoUrl.length() > 0) {
+                BufferedImage logo = Thumbnails.of(new URL(logoUrl))
+                        .size(GOODS_LOGO_SIZE, GOODS_LOGO_SIZE).crop(Positions.CENTER).asBufferedImage();
+                g2d.drawImage(roundCornerImage(logo, 10), logoX, logoY, null);
+                nameX = logoX + GOODS_LOGO_SIZE + 12;
+            }
+        } catch (Exception e) {
+            // logo 获取失败仅跳过绘制
+        }
+
+        // 店铺名称(白色粗体, 垂直居中, 超宽省略)
+        String shopName = ellipsize(dto.getShopName(), Font.BOLD, 26, GOODS_POSTER_W - nameX - 16);
+        g2d.setFont(getOsAutoFont(Font.BOLD, 26));
+        g2d.setColor(Color.WHITE);
+        FontMetrics fm = g2d.getFontMetrics();
+        int baseline = top + (height - fm.getHeight()) / 2 + fm.getAscent();
+        g2d.drawString(shopName, nameX, baseline);
+    }
+
+    // 红色公告条: 红底白字, 左对齐, 垂直居中, 超宽省略
+    private static void drawGoodsPosterNotice(Graphics2D g2d, String noticeText, int top, int height) {
+
+        String text = noticeText == null || noticeText.trim().length() == 0
+                ? DEFAULT_NOTICE_TEXT : noticeText.trim();
+        g2d.setColor(GOODS_NOTICE_BG);
+        g2d.fillRect(0, top, GOODS_POSTER_W, height);
+
+        g2d.setFont(getOsAutoFont(Font.PLAIN, 18));
+        g2d.setColor(Color.WHITE);
+        FontMetrics fm = g2d.getFontMetrics();
+        String showText = ellipsize(text, Font.PLAIN, 18, GOODS_POSTER_W - 2 * 16);
+        int baseline = top + (height - fm.getHeight()) / 2 + fm.getAscent();
+        g2d.drawString(showText, 16, baseline);
+    }
+
+    // 商品名称: 深色粗体左对齐, 垂直居中, 超宽省略
+    private static void drawGoodsPosterName(Graphics2D g2d, String goodsName, int top, int height) {
+
+        String name = ellipsize(goodsName, Font.BOLD, 30, GOODS_POSTER_W - 2 * GOODS_SIDE_PADDING);
+        g2d.setFont(getOsAutoFont(Font.BOLD, 30));
+        g2d.setColor(GOODS_DARK_TEXT);
+        FontMetrics fm = g2d.getFontMetrics();
+        int baseline = top + (height - fm.getHeight()) / 2 + fm.getAscent();
+        g2d.drawString(name, GOODS_SIDE_PADDING, baseline);
+    }
+
+    /**
+     * 价格区域: 左侧 红色¥ + 价格大字 + 灰色单位, 下方灰色销量;
+     * 右侧小程序码(白底打底保证识别率); 价格超宽时自动缩小数字字号
+     */
+    private static void drawGoodsPosterPriceArea(Graphics2D g2d, PosterDTO dto, int top, int height) {
+
+        // 右侧小程序码(白底打底保证识别率)
+        BufferedImage qrImg = dto.getQrCodeImage();
+        int qrX = GOODS_POSTER_W - GOODS_SIDE_PADDING - GOODS_QR_SIZE;
+        int qrY = top + (height - GOODS_QR_SIZE) / 2;
+        int textRightLimit = GOODS_POSTER_W - GOODS_SIDE_PADDING;
+        if (qrImg != null) {
+            g2d.setColor(Color.WHITE);
+            g2d.fillRect(qrX - 4, qrY - 4, GOODS_QR_SIZE + 8, GOODS_QR_SIZE + 8);
+            g2d.drawImage(scaleQrCodeImage(qrImg, GOODS_QR_SIZE), qrX, qrY, null);
+            textRightLimit = qrX - 16;
+        }
+
+        // 价格行: ¥(30粗) + 价格数字(56粗) + 单位(22灰), 底部对齐
+        String priceValue = dto.getPriceValue() == null || dto.getPriceValue().trim().length() == 0
+                ? "0" : dto.getPriceValue().trim();
+        String unit = dto.getPriceUnit() == null ? "" : dto.getPriceUnit().trim();
+        int priceFontSize = 56;
+        Font symbolFont = getOsAutoFont(Font.BOLD, 30);
+        FontMetrics symbolFm = g2d.getFontMetrics(symbolFont);
+        Font unitFont = getOsAutoFont(Font.PLAIN, 22);
+        FontMetrics unitFm = g2d.getFontMetrics(unitFont);
+        int maxTextW = textRightLimit - GOODS_SIDE_PADDING;
+        // 价格数字过大时逐级缩小字号, 保证一行放下
+        Font priceFont = getOsAutoFont(Font.BOLD, priceFontSize);
+        FontMetrics priceFm = g2d.getFontMetrics(priceFont);
+        int rowW = symbolFm.stringWidth("¥") + priceFm.stringWidth(priceValue)
+                + (unit.length() > 0 ? unitFm.stringWidth(unit) + 4 : 0);
+        while (rowW > maxTextW && priceFontSize > 30) {
+            priceFontSize -= 4;
+            priceFont = getOsAutoFont(Font.BOLD, priceFontSize);
+            priceFm = g2d.getFontMetrics(priceFont);
+            rowW = symbolFm.stringWidth("¥") + priceFm.stringWidth(priceValue)
+                    + (unit.length() > 0 ? unitFm.stringWidth(unit) + 4 : 0);
+        }
+
+        int priceBaseline = top + 84;
+        int x = GOODS_SIDE_PADDING;
+        g2d.setFont(symbolFont);
+        g2d.setColor(Color.RED);
+        g2d.drawString("¥", x, priceBaseline);
+        x += symbolFm.stringWidth("¥");
+
+        g2d.setFont(priceFont);
+        g2d.drawString(priceValue, x, priceBaseline);
+        x += priceFm.stringWidth(priceValue);
+
+        if (unit.length() > 0) {
+            g2d.setFont(unitFont);
+            g2d.setColor(GOODS_GRAY_TEXT);
+            g2d.drawString(unit, x + 4, priceBaseline);
+        }
+
+        // 销量(灰色小字, 价格下方)
+        String sales = dto.getSaleText() == null ? "" : dto.getSaleText().trim();
+        if (sales.length() > 0) {
+            g2d.setFont(getOsAutoFont(Font.PLAIN, 22));
+            g2d.setColor(GOODS_GRAY_TEXT);
+            String showSales = ellipsize(sales, Font.PLAIN, 22, maxTextW);
+            g2d.drawString(showSales, GOODS_SIDE_PADDING, top + 126);
+        }
+    }
+
+    // 底部深绿提示条: 白字水平垂直居中
+    private static void drawGoodsPosterFooter(Graphics2D g2d, String footerText, int top, int height) {
+
+        String text = footerText == null || footerText.trim().length() == 0
+                ? DEFAULT_FOOTER_TEXT : footerText.trim();
+        g2d.setColor(GOODS_HEADER_BG);
+        g2d.fillRect(0, top, GOODS_POSTER_W, height);
+
+        g2d.setFont(getOsAutoFont(Font.PLAIN, 24));
+        g2d.setColor(Color.WHITE);
+        FontMetrics fm = g2d.getFontMetrics();
+        int textW = fm.stringWidth(text);
+        int baseline = top + (height - fm.getHeight()) / 2 + fm.getAscent();
+        g2d.drawString(text, (GOODS_POSTER_W - textW) / 2, baseline);
+    }
+
+    // 网络图片居中裁剪为指定尺寸正方形区域(不会拉伸变形)
+    private static BufferedImage centerCropNetImage(String imageUrl, int targetW, int targetH) throws IOException {
+
+        return Thumbnails.of(new URL(imageUrl.trim()))
+                .size(targetW, targetH).crop(Positions.CENTER).asBufferedImage();
+    }
+
+    // 正方形图片转圆角图片(保留透明通道, 用于店铺logo)
+    private static BufferedImage roundCornerImage(BufferedImage source, int radius) {
+
+        int w = source.getWidth();
+        int h = source.getHeight();
+        BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = out.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g.setClip(new RoundRectangle2D.Double(0, 0, w, h, radius, radius));
+        g.drawImage(source, 0, 0, null);
+        g.dispose();
+        return out;
+    }
+
+    // 文本超宽省略: 超出最大宽度时从尾部截断并追加"…"
+    private static String ellipsize(String text, int style, int size, int maxWidth) {
+
+        String t = text == null ? "" : text.trim();
+        if (t.length() == 0 || maxWidth <= 0) {
+            return t;
+        }
+        Font font = getOsAutoFont(style, size);
+        BufferedImage tmp = new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = tmp.createGraphics();
+        FontMetrics fm = g.getFontMetrics(font);
+        g.dispose();
+        if (fm.stringWidth(t) <= maxWidth) {
+            return t;
+        }
+        StringBuilder sb = new StringBuilder(t);
+        while (sb.length() > 0 && fm.stringWidth(sb + "…") > maxWidth) {
+            sb.deleteCharAt(sb.length() - 1);
+        }
+        return sb + "…";
+    }
 
 
     // 生成海报，返回 ByteArrayInputStream

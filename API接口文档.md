@@ -1,6 +1,6 @@
 # ShopGroupBuyApi 接口文档（详细版）
 
-> 自动生成时间：2026-10-29 00:13:09
+> 自动生成时间：2026-11-01 14:32:44
 
 > 生成方式：扫描各模块 `*Controller.java` 源码（`python3 generate_api_doc.py` 可重新生成）
 
@@ -52,14 +52,16 @@
 | 2026-10-29 | `/order/group/groupActivity/info` | GET | 同上：团购详情 viewCount 与列表接口统一为「≥ 跟团人数×1.6 展示真实值，否则展示 1.6 倍」 |
 | 2026-10-29 | `/order/group/groupActivity/logs` | GET | 跟团记录调整：① 相邻两条记录时间间隔保证大于 30 秒（虚拟记录按 31~180 秒随机生成时间）；② 跟团数 > 10 且存在真实订单时，真实订单记录与虚拟记录合并后随机打乱展示 |
 | 2026-10-29 | `/order/group/groupActivity/logs2` | GET | 滚动跟团记录的时间由固定「刚刚」改为按时间戳生成（相邻间隔随机 31~180 秒，保证 >30 秒） |
+| 2026-11-01 | `/goods/Leader/share/groupActivity/goods/poster` | POST | 商品分享海报样式改版：由横版(500×400)改为竖版(500×874)朋友圈样式——顶部深绿店铺条(logo+店铺名)、红色公告条、商品大图(500×500)、商品名、红色价格+单位+销量、右侧店铺小程序码、底部「长按保存手机相册」提示条 |
 
 ## 近期变更
 
-> 以下为最近 2 条与接口定义相关的提交（来源 `git log`, 由 `generate_api_doc.py` 自动生成）；
+> 以下为最近 3 条与接口定义相关的提交（来源 `git log`, 由 `generate_api_doc.py` 自动生成）；
 > 完整变更请查阅 git 提交记录。
 
 | 日期 | 提交 | 摘要 | 涉及文件 |
 | --- | --- | --- | --- |
+| 2026-10-29 | `a621dd4` | 二期开发 | AdminAdviseFeedbackController.java, AdviseFeedbackRequest.java, AdviseFeedbackResponse.java, AdviseReplyRequest.java, LeaderGroupManageController.java 等 |
 | 2026-10-28 | `c3228c0` | 二期开发 | ApplyLeaderController.java, LeaderGoodsManageController.java, LeaderGroupManageController.java, LeaderUpdateSkuStockRequest.java, MemberGroupController.java |
 | 2026-10-27 | `620883e` | 二期开发 | ApplyLeaderController.java, ApplyLeaderRequest.java, GroupActGoodsResponse.java, LeaderGoodsManageController.java, LeaderGroupManageController.java 等 |
 
