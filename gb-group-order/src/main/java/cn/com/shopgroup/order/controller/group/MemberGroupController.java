@@ -130,7 +130,8 @@ public class MemberGroupController {
             return;
         }
         for (MemberHomeGroupActResponse item : data) {
-            List<GroupLogs> logList = getGroupList(item.getId(), item.getOrder() + item.getVirtual());
+            // 列表项滚动日志与详情滚动日志(/logs2)共用同一逻辑与缓存, 保证两端展示一致
+            List<GroupLogs> logList = this.getRollingGroupLogs(item.getId());
             if (!CollectionUtils.isEmpty(logList)) {
                 item.setGroupLogs(logList);
             }
@@ -406,9 +407,10 @@ public class MemberGroupController {
         if (redisHelper.hasKey(key) == false) {
             int total = 0;
             if (12 >= orderNum) {
+                // 跟团数较小时按跟团数生成, 保证少量跟团(如2次跟团)也展示滚动日志;
                 // orderNum 为 0 时(如缓存异常兜底返回0), total 钳位为 0, 避免负数传入 ArrayList 构造抛 Illegal Capacity
-                total = Math.max(orderNum - 2, 0);
-            } else if (12 > orderNum && 20 > orderNum) {
+                total = Math.max(orderNum, 0);
+            } else if (20 > orderNum) {
                 total = Math.max(orderNum - 5, 0);
             } else {
                 // 随机 [10,20] 之间的数字
@@ -424,15 +426,15 @@ public class MemberGroupController {
             if (this.isBetween6And20()) {
                 // 白天的数据, 早上6点到晚上8点之间
                 data = this.getDayGroupLogs(total, groupId);
-                // 跟团数大于10且有真实订单时, 虚拟记录与真实订单记录混合随机展示
-                data = this.mergeRealOrderLogs(groupId, orderNum, total, data);
+                // 存在真实订单时, 虚拟记录与真实订单记录随机组合展示
+                data = this.mergeRealOrderLogs(groupId, total, data);
                 // 放入redis缓存中(1个小时)
                 redisHelper.setCacheObject(key, data, RedisConstant.RedisGroupLogsExpired, TimeUnit.SECONDS);
             } else {
                 // 晚上的数据, 早上6点之前, 到晚上8点之后, 共计10个小时
                 data = this.getNightGroupLogs(total, groupId);
-                // 跟团数大于10且有真实订单时, 虚拟记录与真实订单记录混合随机展示
-                data = this.mergeRealOrderLogs(groupId, orderNum, total, data);
+                // 存在真实订单时, 虚拟记录与真实订单记录随机组合展示
+                data = this.mergeRealOrderLogs(groupId, total, data);
                 // 放入redis缓存中(1个小时)
                 long timeout = 1 * 60 * 60;
                 redisHelper.setCacheObject(key, data, timeout, TimeUnit.SECONDS);
@@ -449,14 +451,23 @@ public class MemberGroupController {
     @GetMapping("/group/groupActivity/logs2")
     public JsonResult groupLogs2(@RequestParam("id") Long groupId) {
         log.info("【团购滚动跟团记录:/order/group/groupActivity/logs2】params->groupId:{}", groupId);
-        // 放入缓存
+        List<GroupLogs> data = this.getRollingGroupLogs(groupId);
+        log.info("【团购滚动跟团记录返回】size:{},data:{}", data == null ? 0 : data.size(), JSON.toJSONString(data));
+        return JsonResult.success(data);
+    }
+
+    // 滚动跟团记录(列表项groupLogs与详情滚动日志/logs2共用同一逻辑与同一份Redis缓存, 保证两端展示一致):
+    // 按跟团数(真实+虚拟)生成条数, 存在真实订单时与虚拟记录随机组合, 合计大于20时随机展示其中一部分
+    private List<GroupLogs> getRollingGroupLogs(Long groupId) {
+
         String key = RedisConstant.RedisGroupLogsKey2 + groupId;
         if (redisHelper.hasKey(key) == false) {
             int total = 0;
             int orderTotal = getOrderNumByGroupId(groupId);
             if (12 >= orderTotal) {
-                total = Math.max(orderTotal - 2, 0);
-            } else if (12 > orderTotal && 20 > orderTotal) {
+                // 跟团数较小时按跟团数生成, 保证少量跟团(如2次跟团)也展示滚动日志
+                total = Math.max(orderTotal, 0);
+            } else if (20 > orderTotal) {
                 total = Math.max(orderTotal - 5, 0);
             } else {
                 // 随机 [10,20] 之间的数字
@@ -465,15 +476,15 @@ public class MemberGroupController {
 
             // 生成记录
             List<GroupLogs> data = this.getDayGroupLogs2(total, groupId);
+            // 存在真实订单时, 滚动日志由真实订单记录与虚拟记录随机组合展示
+            data = this.mergeRealOrderLogs(groupId, total, data);
 
             // 放入redis缓存中(1个小时)
             redisHelper.setCacheObject(key, data, RedisConstant.RedisGroupLogsExpired, TimeUnit.SECONDS);
         }
 
         // 读取缓存
-        List<GroupLogs> data = redisHelper.getCacheObject(key);
-        log.info("【团购滚动跟团记录返回】size:{},data:{}", data == null ? 0 : data.size(), JSON.toJSONString(data));
-        return JsonResult.success(data);
+        return redisHelper.getCacheObject(key);
     }
 
 
@@ -645,11 +656,12 @@ public class MemberGroupController {
         return times;
     }
 
-    // 跟团数(订单数)大于10且有真实订单时, 将真实订单记录转为跟团记录,
-    // 与虚拟记录合并后随机打乱(混着随机展示), 超出total条时截断; 真实记录查询异常时降级为纯虚拟记录
-    private List<GroupLogs> mergeRealOrderLogs(Long groupId, int orderNum, int total, List<GroupLogs> virtualLogs) {
+    // 滚动跟团记录组装: 存在真实订单时, 将真实订单记录转为跟团记录, 与虚拟记录合并后随机打乱
+    // (真实+虚拟随机组合展示); 合并后超出total条时随机截取(已打乱, 取前total条即随机抽样),
+    // total上限20, 即真实+虚拟合计大于20时随机展示其中一部分; 真实记录查询异常时降级为纯虚拟记录
+    private List<GroupLogs> mergeRealOrderLogs(Long groupId, int total, List<GroupLogs> virtualLogs) {
 
-        if (orderNum <= 10 || total < 1) {
+        if (total < 1) {
             return virtualLogs;
         }
         List<GroupLogs> merged = new ArrayList<>(virtualLogs);

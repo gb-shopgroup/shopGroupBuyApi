@@ -3,6 +3,7 @@ package cn.com.shopgroup.common.utils;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import javax.servlet.http.HttpServletRequest;
@@ -10,6 +11,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 // 令牌工具类
+@Slf4j
 public class TokenUtils {
 
     // 令牌密钥
@@ -32,10 +34,12 @@ public class TokenUtils {
 
     // 解析Token令牌，获取用 userId 信息
     public static String parseToken(String token) {
-
+        log.info("解析Token调用parseToken时，token:{}",token);
         try {
             Claims userInfo = Jwts.parser().setSigningKey(secret).parseClaimsJws(token).getBody();
-            return userInfo.get(userkey).toString();
+            log.info("解析Token调用parseToken时，解析结果userInfo:{}",userInfo);
+            String result = userInfo.get(userkey).toString();
+            return result;
         } catch (Exception e){
             //e.printStackTrace();
             return "";
@@ -48,6 +52,7 @@ public class TokenUtils {
         // 从Header中获取token
         HttpServletRequest request = ((ServletRequestAttributes) (RequestContextHolder.currentRequestAttributes())).getRequest();
         String token = request.getHeader(header);
+        log.info("从request调用getToken时，token:{}",token);
         if (null == token || "".equals(token.trim())) return "";
         return token;
     }
