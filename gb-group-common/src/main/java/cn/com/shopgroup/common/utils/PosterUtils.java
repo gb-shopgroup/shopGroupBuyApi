@@ -29,31 +29,29 @@ public class PosterUtils {
     private static final String QR_TIP_TEXT = "长按识别进店";
 
     // ==================== 新版竖版商品海报(朋友圈分享样式)常量 ====================
-    // 版式自上而下: 深绿店铺条 / 红色公告条 / 商品大图 / 商品名 / 价格+二维码 / 深绿保存提示条
+    // 版式自上而下: 深绿店铺条 / 商品大图 / 团购活动名 / 商品名 / 价格+二维码 / 深绿保存提示条
     private static final int GOODS_POSTER_W = 500;
     private static final int GOODS_HEADER_H = 70;
-    private static final int GOODS_NOTICE_H = 40;
     private static final int GOODS_IMG_H = 500;
+    private static final int GOODS_GROUP_NAME_H = 60;
     private static final int GOODS_NAME_H = 60;
     private static final int GOODS_PRICE_H = 150;
     private static final int GOODS_FOOTER_H = 54;
-    private static final int GOODS_POSTER_H = GOODS_HEADER_H + GOODS_NOTICE_H + GOODS_IMG_H
-            + GOODS_NAME_H + GOODS_PRICE_H + GOODS_FOOTER_H;
+    private static final int GOODS_POSTER_H = GOODS_HEADER_H + GOODS_IMG_H
+            + GOODS_GROUP_NAME_H + GOODS_NAME_H + GOODS_PRICE_H + GOODS_FOOTER_H;
     private static final Color GOODS_HEADER_BG = Color.decode("#0A5B34");
-    private static final Color GOODS_NOTICE_BG = Color.decode("#E93323");
     private static final Color GOODS_DARK_TEXT = Color.decode("#272727");
     private static final Color GOODS_GRAY_TEXT = Color.decode("#9b9b9b");
     private static final int GOODS_SIDE_PADDING = 20;
     private static final int GOODS_LOGO_SIZE = 46;
     private static final int GOODS_QR_SIZE = 130;
-    private static final String DEFAULT_NOTICE_TEXT = "部分商品图片及价格如有偏差，请以实际到货为准";
     private static final String DEFAULT_FOOTER_TEXT = "长按保存手机相册";
 
 
     /**
      * 生成新版竖版商品海报(朋友圈分享样式)，返回 ByteArrayInputStream
-     * 版式自上而下: 深绿店铺条(logo+店铺名) / 红色公告条 / 商品大图(500*500居中裁剪)
-     * / 商品名 / 价格(红色大字)+销量+右侧小程序码 / 深绿底部提示条(长按保存手机相册)
+     * 版式自上而下: 深绿店铺条(logo+店铺名) / 商品大图(500*500居中裁剪)
+     * / 团购活动名 / 商品名 / 价格(红色大字)+销量+右侧小程序码 / 深绿底部提示条(长按保存手机相册)
      */
     public static ByteArrayInputStream generateGoodsPosterStream(PosterDTO dto) throws IOException {
 
@@ -75,16 +73,18 @@ public class PosterUtils {
         // 1. 顶部深绿店铺条(logo + 店铺名)
         drawGoodsPosterHeader(g2d, dto, 0, GOODS_HEADER_H);
 
-        // 2. 红色公告条
-        int noticeTop = GOODS_HEADER_H;
-        drawGoodsPosterNotice(g2d, dto.getNoticeText(), noticeTop, GOODS_NOTICE_H);
-
-        // 3. 商品大图
-        int goodsTop = noticeTop + GOODS_NOTICE_H;
+        // 2. 商品大图
+        int goodsTop = GOODS_HEADER_H;
         g2d.drawImage(goodsImg, 0, goodsTop, null);
 
+        // 3. 团购活动名(商品名上方, 为空时跳过该行)
+        int groupNameTop = goodsTop + GOODS_IMG_H;
+        if (dto.getGroupName() != null && dto.getGroupName().trim().length() > 0) {
+            drawGoodsPosterGroupName(g2d, dto.getGroupName(), groupNameTop, GOODS_GROUP_NAME_H);
+        }
+
         // 4. 商品名称
-        int nameTop = goodsTop + GOODS_IMG_H;
+        int nameTop = groupNameTop + GOODS_GROUP_NAME_H;
         drawGoodsPosterName(g2d, dto.getGoodsName(), nameTop, GOODS_NAME_H);
 
         // 5. 价格 + 销量 + 右侧二维码
@@ -135,20 +135,15 @@ public class PosterUtils {
         g2d.drawString(shopName, nameX, baseline);
     }
 
-    // 红色公告条: 红底白字, 左对齐, 垂直居中, 超宽省略
-    private static void drawGoodsPosterNotice(Graphics2D g2d, String noticeText, int top, int height) {
+    // 团购活动名: 深色粗体左对齐, 垂直居中, 超宽省略(位于商品名上方)
+    private static void drawGoodsPosterGroupName(Graphics2D g2d, String groupName, int top, int height) {
 
-        String text = noticeText == null || noticeText.trim().length() == 0
-                ? DEFAULT_NOTICE_TEXT : noticeText.trim();
-        g2d.setColor(GOODS_NOTICE_BG);
-        g2d.fillRect(0, top, GOODS_POSTER_W, height);
-
-        g2d.setFont(getOsAutoFont(Font.PLAIN, 18));
-        g2d.setColor(Color.WHITE);
+        String name = ellipsize(groupName, Font.BOLD, 28, GOODS_POSTER_W - 2 * GOODS_SIDE_PADDING);
+        g2d.setFont(getOsAutoFont(Font.BOLD, 28));
+        g2d.setColor(GOODS_DARK_TEXT);
         FontMetrics fm = g2d.getFontMetrics();
-        String showText = ellipsize(text, Font.PLAIN, 18, GOODS_POSTER_W - 2 * 16);
         int baseline = top + (height - fm.getHeight()) / 2 + fm.getAscent();
-        g2d.drawString(showText, 16, baseline);
+        g2d.drawString(name, GOODS_SIDE_PADDING, baseline);
     }
 
     // 商品名称: 深色粗体左对齐, 垂直居中, 超宽省略
@@ -489,8 +484,9 @@ public class PosterUtils {
      * 根据系统自动选择字体
      * Windows：微软雅黑
      * Linux：WenQuanyi Micro Hei 文泉驿微米黑
+     *
      * @param style 字体样式 Font.PLAIN / Font.BOLD
-     * @param size 字号
+     * @param size  字号
      */
     private static Font getOsAutoFont(int style, int size) {
 

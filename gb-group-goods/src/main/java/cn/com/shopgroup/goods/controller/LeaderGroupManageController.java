@@ -68,6 +68,7 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -920,53 +921,83 @@ public class LeaderGroupManageController {
             throw new BusinessException(GoodsErrorCodeEnum.GROUP_NOT_EXIST);
         }
 
-        // 第一个团购商品(仅在线is_close=0商品, 已关闭商品不用于海报展示)
-        List<GbGroupActivityGoods> goodsList = activityInfoService.getGroupActivityOnlineGoodsList(groupId);
-        if (CollectionUtils.isEmpty(goodsList)) {
-            throw new BusinessException(GoodsErrorCodeEnum.GROUP_GOODS_NOT_EXIST);
+        // 海报主图: 优先取团购活动图片的第一张(group_img → group_img2 → group_img3),
+        // 团购活动没有图片时, 从团购商品中取第一个有图片的商品图
+        String mainImgUrl = firstNotBlank(groupInfo.getGroupImg(), groupInfo.getGroupImg2(), groupInfo.getGroupImg3());
+        GbGroupActivityGoods mainGoods = null;
+        if (mainImgUrl.length() == 0) {
+            // 仅在线is_close=0商品, 已关闭商品不用于海报展示
+            List<GbGroupActivityGoods> goodsList = activityInfoService.getGroupActivityOnlineGoodsList(groupId);
+            if (!CollectionUtils.isEmpty(goodsList)) {
+                for (GbGroupActivityGoods goods : goodsList) {
+                    if (goods.getGroupImg() != null && goods.getGroupImg().trim().length() > 0) {
+                        mainGoods = goods;
+                        break;
+                    }
+                }
+            }
+            if (mainGoods == null) {
+                // 团购活动与团购商品都没有图片, 无法生成海报
+                throw new BusinessException(GoodsErrorCodeEnum.GROUP_GOODS_NOT_EXIST);
+            }
+            mainImgUrl = mainGoods.getGroupImg().trim();
         }
-        GbGroupActivityGoods goodsInfo = goodsList.get(0);
 
-        // 店铺logo
+        // 店铺logo(店铺信息缺失或字段为空时使用默认值)
         String shopName = "店小团";
         String shopLogo = "https://shopgroup.obs.cn-north-9.myhuaweicloud.com/logo.png";
         GbOrgShopInfo shopInfo = shopService.getMiniLeaderShop(leaderId);
-        if (shopInfo != null && shopInfo.getShopName().length() > 0) shopName = shopInfo.getShopName();
-        if (shopInfo != null && shopInfo.getShopLogo().length() > 0) shopLogo = shopInfo.getShopLogo();
+        if (shopInfo != null) {
+            if (shopInfo.getShopName() != null && shopInfo.getShopName().trim().length() > 0) {
+                shopName = shopInfo.getShopName().trim();
+            }
+            if (shopInfo.getShopLogo() != null && shopInfo.getShopLogo().trim().length() > 0) {
+                shopLogo = shopInfo.getShopLogo().trim();
+            }
+        }
 
         // 开始生成海报
         try {
 
-            // 本地爆款推荐图片
-            Resource resource = (Resource) resourceLoader.getResource("classpath:static/poster.png");
+            // 本地爆款推荐图片(资源缺失时该图片不绘制, 不影响海报生成)
+            Resource resource = resourceLoader.getResource("classpath:static/poster.png");
+            InputStream hotImgStream = resource.exists() ? resource.getInputStream() : null;
 
-            // 统一获取AccessToken
-            String accessToken = helper.getAccessToken(false);
-            if (accessToken == null || accessToken.length() == 0)
-                throw new BusinessException(GoodsErrorCodeEnum.ACCESS_TOKEN_FAILED);
-
-            // 获取二维码
+            // 获取二维码: 走带重试的封装, access_token失效(40001/42001)时自动强刷token后重试一次
             String page = "pages/group/index";
             String scene = "id=" + groupInfo.getGroupId() + "&lid=" + groupInfo.getLeaderId();
             int wh = 280; // 280像素大小, 跟海报生成的 二维码尺寸 保持一致哦
-
-            // 直接获取二维码文件流即可
-            BufferedImage ercodeImage = WxMiniProgramHelper.getMiniProgramPageERcodeBufferedImage(accessToken, page, scene, wh);
+            byte[] qrBytes = helper.getWxaCodeUnlimitWithRetry(page, scene, wh);
+            BufferedImage ercodeImage = null;
+            if (qrBytes != null && qrBytes.length > 0) {
+                try {
+                    ercodeImage = ImageIO.read(new ByteArrayInputStream(qrBytes));
+                } catch (IOException e) {
+                    log.error("团长端-海报:解析小程序码图片失败,groupId:{},scene:{}", groupId, scene, e);
+                }
+            }
+            if (ercodeImage == null) {
+                // 小程序码获取失败直接提示生成失败, 避免后续绘制空指针
+                throw new BusinessException(GoodsErrorCodeEnum.POSTER_GEN_FAILED);
+            }
             log.info("团长端-海报二维码获取成功,groupId:{},scene:{}", groupId, scene);
-            //File outFile = new File("E:/idea_workspace/GroupBuyApi/image/public/ercode.png");
-            //ImageIO.write(ercodeImage, "png", outFile);
-            //BufferedImage ercodeImage = ImageIO.read(outFile);
 
             // 构架海报参数
             PosterParam param = new PosterParam();
             param.shopLogoUrl = shopLogo;
             param.shopName = shopName;
             param.showTime = TimeUtils.getNowTime();
-            param.hotImgLocalPath = resource.getInputStream(); //本地爆款推荐图片
-            param.goodsImgUrl = goodsInfo.getGroupImg(); //商品网络图片
-            param.goodsName = goodsInfo.getGoodsName();
-            param.price = "￥" + goodsInfo.getGroupPrice() + "元";
-            param.sales = "已售" + (groupInfo.getVirtualOrder() + groupInfo.getOrderTotal()) + "件";
+            param.hotImgLocalPath = hotImgStream; //本地爆款推荐图片(可为空)
+            param.goodsImgUrl = mainImgUrl; //海报主图: 团购活动图优先, 无活动图时取第一个商品图
+            // 商品维度海报取商品名/商品价; 使用团购活动图时取团购活动名/团购价
+            param.goodsName = (mainGoods != null && mainGoods.getGoodsName() != null
+                    && mainGoods.getGoodsName().trim().length() > 0)
+                    ? mainGoods.getGoodsName().trim() : groupInfo.getGroupName();
+            Double posterPrice = (mainGoods != null && mainGoods.getGroupPrice() != null)
+                    ? mainGoods.getGroupPrice() : groupInfo.getGroupPrice();
+            param.price = "￥" + formatPosterPrice(posterPrice) + "元";
+            param.sales = "已售" + ((groupInfo.getVirtualOrder() == null ? 0 : groupInfo.getVirtualOrder())
+                    + (groupInfo.getOrderTotal() == null ? 0 : groupInfo.getOrderTotal())) + "件";
             param.ercodeImage = ercodeImage; //本地二维码图片
             param.tipText = "长按识别,跟团购买";
 
@@ -999,7 +1030,10 @@ public class LeaderGroupManageController {
             log.info("团长端-生成带logo团购海报完成,leaderId:{},groupId:{},uploadType:{},url:{}", leaderId, groupId, type, url);
             return JsonResult.success("生成海报成功", url);
 
-        } catch (IOException e) {
+        } catch (BusinessException e) {
+            // 业务异常(如二维码获取失败)直接抛出, 保留错误码
+            throw e;
+        } catch (Exception e) {
             log.error("团长端-生成带logo团购海报失败,leaderId:{},groupId:{}", leaderId, groupId, e);
         }
 
@@ -1100,6 +1134,7 @@ public class LeaderGroupManageController {
         }
         // 构建分享海报信息(新版竖版朋友圈海报样式)
         PosterDTO dto = new PosterDTO();
+        dto.setGroupName(groupInfo.getGroupName()); // 团购活动名(商品名上方展示)
         dto.setGoodsName(goodsInfo.getGoodsName()); // 商品名称
         dto.setSaleText("已售" + (groupInfo.getVirtualOrder() + groupInfo.getOrderTotal()) + "单");
         dto.setImgUrl(goodsInfo.getGroupImg());
@@ -1114,8 +1149,6 @@ public class LeaderGroupManageController {
                 ? shopInfo.getShopLogo() : "https://shopgroup.obs.cn-north-9.myhuaweicloud.com/logo.png";
         dto.setShopName(shopName);
         dto.setShopLogoUrl(shopLogo);
-        // 红色公告条文案
-        dto.setNoticeText("部分商品图片及价格如有偏差，请以实际到货为准");
         // 价格: 红色大字数字 + 灰色单位(元/商品单位)
         dto.setPriceValue(formatPosterPrice(goodsInfo.getGroupPrice()));
         dto.setPriceUnit("元" + getGoodsUnitSuffix(goodsId));
@@ -1176,6 +1209,21 @@ public class LeaderGroupManageController {
             return "0";
         }
         return BigDecimal.valueOf(price).stripTrailingZeros().toPlainString();
+    }
+
+    /**
+     * 依次取第一个非空(去空格)字符串, 全部为空时返回 ""
+     */
+    private String firstNotBlank(String... urls) {
+
+        if (urls != null) {
+            for (String url : urls) {
+                if (url != null && url.trim().length() > 0) {
+                    return url.trim();
+                }
+            }
+        }
+        return "";
     }
 
     /**

@@ -20,8 +20,8 @@ public class PosterDTO {
     private String shopLogoUrl;
     // 店铺名称(顶部深绿色条展示)
     private String shopName;
-    // 公告文案(红色公告条展示, 为空时使用默认文案)
-    private String noticeText;
+    // 团购活动名(商品名上方展示, 为空时不绘制该行)
+    private String groupName;
     // 价格数字(如 1.8, 与 priceUnit 拆开便于差异化字号渲染)
     private String priceValue;
     // 价格单位(如 元/袋)

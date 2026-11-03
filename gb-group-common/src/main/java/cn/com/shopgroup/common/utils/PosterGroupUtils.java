@@ -52,7 +52,9 @@ public class PosterGroupUtils {
         g2d.setFont(shopNameFont);
         Color color = Color.decode("#272727");
         g2d.setColor(color);
-        g2d.drawString(param.shopName, textAreaX, midY - 12);
+        // 店铺名超宽省略, 避免超出海报右边界
+        String showShopName = ellipsize(param.shopName, Font.BOLD, 22, POSTER_WIDTH - textAreaX - PADDING);
+        g2d.drawString(showShopName, textAreaX, midY - 12);
 
         // 绘制时间
         Font timeFont = getOsAutoFont(Font.PLAIN, 16);
@@ -62,10 +64,13 @@ public class PosterGroupUtils {
         g2d.drawString(param.showTime, textAreaX, midY + 18);
         currentY += 100;
 
-        //====================第二部分：爆款推荐图片 ====================
-        BufferedImage hotImage = Thumbnails.of(param.hotImgLocalPath).width(POSTER_WIDTH).asBufferedImage();
-        g2d.drawImage(hotImage, contentStartX, currentY, null);
-        currentY += 70;
+        //====================第二部分：爆款推荐图片(资源缺失时跳过) ====================
+        if (param.hotImgLocalPath != null) {
+            int contentWidth = POSTER_WIDTH - 2 * PADDING;
+            BufferedImage hotImage = Thumbnails.of(param.hotImgLocalPath).width(contentWidth).asBufferedImage();
+            g2d.drawImage(hotImage, contentStartX, currentY, null);
+            currentY += 70;
+        }
 
         //====================第三部分：商品图片400*400====================
         BufferedImage goodsImage = resizeNetImage(param.goodsImgUrl, 400, 400);
@@ -76,7 +81,9 @@ public class PosterGroupUtils {
         Font goodsNameFont = getOsAutoFont(Font.BOLD, 26);
         g2d.setFont(goodsNameFont);
         g2d.setColor(Color.BLACK);
-        g2d.drawString(param.goodsName, contentStartX, currentY + 40);
+        // 名称超宽省略, 避免团购活动名/商品名过长超出海报宽度
+        String showGoodsName = ellipsize(param.goodsName, Font.BOLD, 26, POSTER_WIDTH - 2 * PADDING);
+        g2d.drawString(showGoodsName, contentStartX, currentY + 40);
         currentY += 80;
 
         //====================第五部分：左侧价格销量、右侧二维码垂直对齐====================
@@ -121,6 +128,29 @@ public class PosterGroupUtils {
     private static BufferedImage resizeNetImage(String imageUrl, int targetW, int targetH) throws IOException {
 
         return Thumbnails.of(new URL(imageUrl)).size(targetW, targetH).crop(Positions.CENTER).asBufferedImage();
+    }
+
+    // 文本超宽按字符截断并追加省略号, 空值返回空串
+    private static String ellipsize(String text, int style, int size, int maxWidth) {
+
+        String t = text == null ? "" : text.trim();
+        if (t.length() == 0 || maxWidth <= 0) {
+            return t;
+        }
+        Font font = getOsAutoFont(style, size);
+        BufferedImage tmp = new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = tmp.createGraphics();
+        FontMetrics fm = g.getFontMetrics(font);
+        g.dispose();
+        if (fm.stringWidth(t) <= maxWidth) {
+            return t;
+        }
+        String ellipsis = "...";
+        int end = t.length();
+        while (end > 0 && fm.stringWidth(t.substring(0, end) + ellipsis) > maxWidth) {
+            end--;
+        }
+        return end <= 0 ? "" : t.substring(0, end) + ellipsis;
     }
 
     // 将正方形BufferedImage转为圆形图片
