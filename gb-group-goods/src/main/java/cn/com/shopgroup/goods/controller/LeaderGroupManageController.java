@@ -1138,8 +1138,8 @@ public class LeaderGroupManageController {
         dto.setGoodsName(goodsInfo.getGoodsName()); // 商品名称
         dto.setSaleText("已售" + (groupInfo.getVirtualOrder() + groupInfo.getOrderTotal()) + "单");
         dto.setImgUrl(goodsInfo.getGroupImg());
-        // 团长店铺二维码: 一起合成到海报右侧(获取失败不阻断海报生成)
-        dto.setQrCodeImage(getLeaderShopQrCodeImage(leaderId));
+        // 二维码: 落地页为该团购活动详情页(扫码直接进入该活动跟团), 合成到海报右侧(获取失败不阻断海报生成)
+        dto.setQrCodeImage(getGroupDetailQrCodeImage(groupId, leaderId));
 
         // 顶部店铺条: 店铺logo/名称(未设置时使用默认值)
         GbOrgShopInfo shopInfo = shopService.getMiniLeaderShop(leaderId);
@@ -1250,38 +1250,25 @@ public class LeaderGroupManageController {
      * @param leaderId 团长id
      * @return 店铺小程序码图片, 获取失败返回 null(不阻断海报生成)
      */
-    private BufferedImage getLeaderShopQrCodeImage(Long leaderId) {
+    /**
+     * 商品海报二维码: 落地页为该团购活动详情页(pages/group/index, scene: id=团购id&lid=团长id),
+     * 与 /share/groupActivity/make/poster 海报的扫码落地页一致, 用户扫码直接进入该活动跟团;
+     * access_token失效自动强刷重试一次, 生成失败返回null(海报右侧不绘制二维码, 不阻断海报生成)
+     */
+    private BufferedImage getGroupDetailQrCodeImage(Long groupId, Long leaderId) {
 
-        GbOrgShopInfo shopInfo = shopService.getMiniLeaderShop(leaderId);
-        if (ObjectUtils.isEmpty(shopInfo)) {
-            log.warn("团购端-分享团购-商品-海报:未查询到团长店铺信息,leaderId:{}", leaderId);
-            return null;
-        }
-        // 已生成过店铺码: 直接复用图片URL
-        String shopCodeUrl = shopInfo.getShopCodeUrl();
-        if (shopCodeUrl != null && shopCodeUrl.length() > 0) {
-            try {
-                BufferedImage qrImg = ImageIO.read(new URL(shopCodeUrl));
-                if (qrImg != null) {
-                    return qrImg;
-                }
-            } catch (Exception e) {
-                log.warn("团购端-分享团购-商品-海报:读取店铺码图片失败,leaderId:{},shopCodeUrl:{}", leaderId, shopCodeUrl, e);
-            }
-        }
-        // 兜底: 现场生成店铺小程序码(access_token失效自动强刷重试一次)
-        String page = "pages/order/verify";
-        String scene = "shopId=" + shopInfo.getId();
+        String page = "pages/group/index";
+        String scene = "id=" + groupId + "&lid=" + leaderId;
         int wh = 280; // 图片像素(最高1280像素)
         byte[] qrBytes = helper.getWxaCodeUnlimitWithRetry(page, scene, wh);
         if (qrBytes == null || qrBytes.length == 0) {
-            log.warn("团购端-分享团购-商品-海报:生成店铺小程序码失败,leaderId:{},shopId:{}", leaderId, shopInfo.getId());
+            log.warn("团购端-分享团购-商品-海报:生成活动详情小程序码失败,groupId:{},leaderId:{}", groupId, leaderId);
             return null;
         }
         try {
             return ImageIO.read(new ByteArrayInputStream(qrBytes));
         } catch (IOException e) {
-            log.warn("团购端-分享团购-商品-海报:解析店铺小程序码失败,leaderId:{}", leaderId, e);
+            log.warn("团购端-分享团购-商品-海报:解析活动详情小程序码失败,groupId:{}", groupId, e);
             return null;
         }
     }
