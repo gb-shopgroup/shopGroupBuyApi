@@ -86,5 +86,12 @@ public class GbOrderBusinessInfo {
     @TableField("add_time")
     private Integer addTime;
 
+    // 订单状态(非表字段, 定时任务判断微信发货时机使用): 0待支付,1待收货,2部分收货,3已提货,4已退款,5售后,6已取消
+    @TableField(exist = false)
+    private Integer orderStatus;
+    // 团长结算到账方式(非表字段): 0=支付时延迟到账型, 1=核销时延迟到账型
+    @TableField(exist = false)
+    private Integer cashType;
+
 
 }

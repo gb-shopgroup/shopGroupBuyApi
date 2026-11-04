@@ -6,16 +6,22 @@ import cn.com.shopgroup.order.mapper.GbOrderInfoMapper;
 import cn.com.shopgroup.order.model.GbOrderBusinessInfo;
 import cn.com.shopgroup.order.model.GbOrderInfo;
 import cn.com.shopgroup.service.BusinessOrderService;
+import cn.com.shopgroup.user.mapper.GbOrgLeaderInfoMapper;
+import cn.com.shopgroup.user.model.GbOrgLeaderInfo;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class BusinessOrderServiceImpl implements BusinessOrderService {
 
@@ -24,6 +30,9 @@ public class BusinessOrderServiceImpl implements BusinessOrderService {
 
     @Resource
     private GbOrderInfoMapper orderInfoMapper;
+
+    @Resource
+    private GbOrgLeaderInfoMapper leaderInfoMapper;
 
     // 根据id查询商户订单
     @Override
@@ -216,7 +225,75 @@ public class BusinessOrderServiceImpl implements BusinessOrderService {
         LambdaQueryWrapper<GbOrderBusinessInfo> queryWrapper = Wrappers.lambdaQuery();
         queryWrapper.in(GbOrderBusinessInfo::getOrderNo, orderNos);
         List<GbOrderBusinessInfo> result = mapper.selectList(queryWrapper);
-        return result == null ? new ArrayList<>() : result;
+        if (result == null || result.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // 3. 回填订单状态、团长结算到账方式(cash_type), 供定时任务判断可发货时机
+        fillOrderStatusAndCashType(result);
+        return result;
+    }
+
+    /**
+     * 批量回填订单状态与团长结算到账方式:
+     * 订单状态取自 gb_order_info.status, cash_type 取自 gb_org_leader_info.cash_type;
+     * 查询异常/查不到时保持为空, 由调用方按原有逻辑处理
+     */
+    private void fillOrderStatusAndCashType(List<GbOrderBusinessInfo> list) {
+
+        if (list == null || list.isEmpty()) {
+            return;
+        }
+        // 订单号去重
+        List<String> orderNos = list.stream()
+                .map(GbOrderBusinessInfo::getOrderNo)
+                .filter(orderNo -> orderNo != null && orderNo.length() > 0)
+                .distinct()
+                .collect(Collectors.toList());
+        // 团长id去重
+        List<Long> leaderIds = list.stream()
+                .map(GbOrderBusinessInfo::getLeaderId)
+                .filter(leaderId -> leaderId != null && leaderId > 0)
+                .distinct()
+                .collect(Collectors.toList());
+
+        // 订单状态
+        Map<String, Integer> statusMap = new HashMap<>();
+        if (!orderNos.isEmpty()) {
+            LambdaQueryWrapper<GbOrderInfo> orderWrapper = Wrappers.lambdaQuery();
+            orderWrapper.select(GbOrderInfo::getOrderNo, GbOrderInfo::getStatus);
+            orderWrapper.in(GbOrderInfo::getOrderNo, orderNos);
+            List<GbOrderInfo> orderList = orderInfoMapper.selectList(orderWrapper);
+            if (orderList != null) {
+                for (GbOrderInfo order : orderList) {
+                    statusMap.put(order.getOrderNo(), order.getStatus());
+                }
+            }
+        }
+
+        // 团长结算到账方式
+        Map<Long, Integer> cashTypeMap = new HashMap<>();
+        if (!leaderIds.isEmpty()) {
+            try {
+                LambdaQueryWrapper<GbOrgLeaderInfo> leaderWrapper = Wrappers.lambdaQuery();
+                leaderWrapper.select(GbOrgLeaderInfo::getLeaderId, GbOrgLeaderInfo::getCashType);
+                leaderWrapper.in(GbOrgLeaderInfo::getLeaderId, leaderIds);
+                List<GbOrgLeaderInfo> leaderList = leaderInfoMapper.selectList(leaderWrapper);
+                if (leaderList != null) {
+                    for (GbOrgLeaderInfo leader : leaderList) {
+                        cashTypeMap.put(leader.getLeaderId(), leader.getCashType());
+                    }
+                }
+            } catch (Exception e) {
+                // 团长信息查询异常不影响主流程, 按原逻辑(支付即发货)处理
+                log.error("补偿微信发货-查询团长结算到账方式异常, leaderIds:{}", leaderIds, e);
+            }
+        }
+
+        for (GbOrderBusinessInfo item : list) {
+            item.setOrderStatus(statusMap.get(item.getOrderNo()));
+            item.setCashType(item.getLeaderId() == null ? null : cashTypeMap.get(item.getLeaderId()));
+        }
     }
 
 

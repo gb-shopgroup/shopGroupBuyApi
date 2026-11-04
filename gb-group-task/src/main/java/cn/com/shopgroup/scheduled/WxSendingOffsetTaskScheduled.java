@@ -72,6 +72,18 @@ public class WxSendingOffsetTaskScheduled {
             int addTime = item.getAddTime();
             if (nowTime - addTime <= cha) continue;
 
+            // 团长结算方式为"核销时延迟到账"(cash_type=1)时, 仅订单状态为2(部分收货)/3(已提货)才调用微信发货,
+            // 避免用户尚未核销提货就向微信上报发货; 其他结算方式(0=支付时延迟到账)保持原逻辑
+            Integer cashType = item.getCashType();
+            if (cashType != null && cashType == 1) {
+                Integer status = item.getOrderStatus();
+                if (status == null || (status != 2 && status != 3)) {
+                    log.info("自动微信发货跳过(团长核销时到账, 订单未核销): orderId = " + item.getOrderNo()
+                            + ", status = " + status);
+                    continue;
+                }
+            }
+
             // 订单发货
             String transactionId = item.getTransactionId();
             String goodsName = goodsNamesMap.getOrDefault(item.getOrderNo(), item.getGroupName());
