@@ -721,6 +721,12 @@ public class LeaderGroupManageController {
         fillGroupTagData(data, request.getTagId());
 
         // 重新构建商品列表
+        // 原团购内商品的上下架状态(is_close, 0=上线1=下线): 编辑保存后保持原状态,
+        // 已关闭(下线)的商品保存后仍为关闭, 不会被编辑操作重新上线; 新增商品默认上线
+        Map<Long, Byte> originCloseMap = new HashMap<>();
+        for (GbGroupActivityGoods originGoods : originGoodsList) {
+            originCloseMap.put(originGoods.getGoodsId(), originGoods.getIsClose());
+        }
         List<GbGroupActivityGoods> lists = new ArrayList<>();
         for (GroupActGoodsRequest item : request.getGoods()) {
 
@@ -739,6 +745,9 @@ public class LeaderGroupManageController {
             goods.setGroupPrice(item.getPrice());
             // 市场价格
             goods.setMarketPrice(item.getPrice2());
+            // 团购内上下架状态: 原商品保持原状态(关闭的保存后仍关闭), 新增商品默认上线
+            Byte originClose = originCloseMap.get(item.getGid());
+            goods.setIsClose(originClose == null ? Byte.valueOf((byte) 0) : originClose);
             lists.add(goods);
         }
         data.setLists(lists);
@@ -747,6 +756,16 @@ public class LeaderGroupManageController {
         boolean flag = activityInfoService.editMiniLeaderGroupInfo(leaderId, data);
         if (flag) {
             log.info("团长端-修改团购活动完成,leaderId:{},groupId:{},goodsNum:{}", leaderId, request.getId(), lists.size());
+
+            // 编辑成功后清空团购相关缓存, 保证C端/团长端展示编辑后的数据(与closeGroup的跨库清理模式一致):
+            // 1. 团购详情缓存(订单模块db4, 含活动名/图片/价格/虚拟数快照)
+            redisHelper.deleteObjectInDb(RedisConstant.RedisGroupInfoKey + request.getId(), RedisDbConstant.DB_ORDER);
+            // 2. 团购商品列表缓存(本商品模块)
+            redisHelper.deleteObject(RedisConstant.RedisGroupGoodsListKey + request.getId());
+            // 3. 滚动跟团记录缓存(订单模块db4, 固定部分与滚动部分均含活动名/商品名/价格/跟团数, 编辑后重新生成)
+            redisHelper.deleteObjectInDb(RedisConstant.RedisGroupLogsKey + request.getId(), RedisDbConstant.DB_ORDER);
+            redisHelper.deleteObjectInDb(RedisConstant.RedisGroupLogsKey2 + request.getId(), RedisDbConstant.DB_ORDER);
+
             return JsonResult.success("修改成功");
         } else {
             log.warn("团长端-修改团购活动失败,leaderId:{},groupId:{}", leaderId, request.getId());
