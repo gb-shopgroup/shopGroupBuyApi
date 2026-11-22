@@ -268,6 +268,16 @@ public interface GbOrderInfoService {
     List<GroupOrderRecordResponse> getGroupOrderRecordList(Long groupId, Integer limit);
 
     /**
+     * 查询团购活动中指定商品的真实跟团记录(仅该商品的订单商品行)
+     *
+     * @param groupId 团购活动id
+     * @param goodsId 商品id, null 或 <=0 时退化为活动维度查询
+     * @param limit   返回条数，默认20，最大50
+     * @return 跟团记录列表
+     */
+    List<GroupOrderRecordResponse> getGroupOrderRecordList(Long groupId, Long goodsId, Integer limit);
+
+    /**
      * 团长端-我的团员列表
      */
     List<LeaderMemberListResponse> getLeaderMemberList(Long leaderId, String keyword, Integer page, Integer pageSize);

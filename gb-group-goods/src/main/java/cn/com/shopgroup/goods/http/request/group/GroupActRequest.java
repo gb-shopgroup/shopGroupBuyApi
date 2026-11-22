@@ -21,8 +21,6 @@ public class GroupActRequest {
     private String name;
     // 团购介绍
     private String info;
-    // 虚拟订单数量
-    private Integer virtual;
     // 团购标签id,0=未选择
     private Long tagId;
     // 自提点id,0未选择

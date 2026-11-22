@@ -36,6 +36,10 @@ public class GroupGoodsResponse {
     // 限购数量
     private Integer quantity;
 
+    // 已团数 = 该商品在本团购活动中的真实订单数 + 该商品虚拟订单数(gb_goods_info.virtual_order)
+    // 动态值: 每次请求实时计算并覆盖, 不写入 30 天的团购商品列表缓存
+    private Integer groupNum;
+
     // 商品包装列表
     private List<GroupPackageResponse> packs;
 

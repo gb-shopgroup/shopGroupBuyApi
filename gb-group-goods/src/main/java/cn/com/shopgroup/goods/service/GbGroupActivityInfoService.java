@@ -61,8 +61,12 @@ public interface GbGroupActivityInfoService {
      */
     List<GbGroupActivityInfo> listAllByLeaderId(Long leaderId);
 
+    /**
+     * C端首页团购活动列表查询(仅查库与SQL层过滤/分页; 商品名 goodsName 的模糊匹配由调用方在
+     * 查询结果+商品回填完成后于内存中过滤, 不再作为SQL层条件)
+     */
     List<GbGroupActivityInfo> getMemberGroupActivityList(Long leaderId, Double longitude, Double latitude,
-                                                         String groupName,Long catId,int page, int pageSize);
+                                                         Long catId, int page, int pageSize);
 
     /**
      * 批量查询多个团购活动的商品列表(价格取团购商品表冗余的团购价, 库存/单位取自商品表), 按团购id分组返回,
@@ -94,4 +98,27 @@ public interface GbGroupActivityInfoService {
     GbGroupActivityGoods getGroupActivityGoods(Long groupId, Long goodsId);
 
     int closeLeaderActivityGoodsInfo(Long leaderId, Long groupId, Long goodsId, int status);
+
+    /**
+     * 查询团购活动下每个商品的"已团数" = 该商品在本团购活动中的真实订单数 + 该商品虚拟订单数。
+     * 真实订单数按订单号去重(一单多商品行/多SKU行只算1单), 仅统计已支付且未取消的有效订单;
+     * 虚拟订单数取自商品表 gb_goods_info.virtual_order。
+     *
+     * @param groupId 团购活动id
+     * @return key=商品id, value=已团数(无订单且无虚拟数的在线商品返回0)
+     */
+    Map<Long, Integer> getGroupGoodsGroupNum(Long groupId);
+
+    /**
+     * 批量查询团购活动的虚拟订单数(商品级口径): 活动下在线商品 virtual_order 之和。
+     * 一次查询完成, 避免活动列表 N+1。
+     *
+     * @return key=团购活动id, value=该活动下在线商品虚拟订单数之和(无在线商品的活动返回0)
+     */
+    Map<Long, Integer> getGroupVirtualOrderMap(List<Long> groupIds);
+
+    /**
+     * 查询单个团购活动的虚拟订单数(商品级口径)
+     */
+    Integer getGroupVirtualOrder(Long groupId);
 }

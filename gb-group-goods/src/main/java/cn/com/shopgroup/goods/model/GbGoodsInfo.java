@@ -71,5 +71,9 @@ public class GbGoodsInfo {
     // 添加时间
     @TableField("add_time")
     private Integer addTime;
+    // 商品虚拟订单数量: 已团数 = 该商品在本团购活动中的真实订单数 + 本值
+    // 虚拟订单口径为商品级(不再是团购活动级), 团长在新增/编辑商品时配置
+    @TableField("virtual_order")
+    private Integer virtualOrder;
 
 }

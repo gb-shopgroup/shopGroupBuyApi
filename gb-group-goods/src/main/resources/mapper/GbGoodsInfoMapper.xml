@@ -23,10 +23,11 @@
         <result column="is_check" property="isCheck"/>
         <result column="check_remark" property="checkRemark"/>
         <result column="add_time" property="addTime"/>
+        <result column="virtual_order" property="virtualOrder"/>
     </resultMap>
 
     <sql id="Base_Column_List">
-        goods_id, cat_id, leader_id, goods_type, goods_name, goods_img, cost_price, sales_price, market_price, is_stock, goods_num, is_limit, limit_num, goods_unit, goods_info, is_close, is_check, check_remark, add_time
+        goods_id, cat_id, leader_id, goods_type, goods_name, goods_img, cost_price, sales_price, market_price, is_stock, goods_num, is_limit, limit_num, goods_unit, goods_info, is_close, is_check, check_remark, add_time, virtual_order
     </sql>
 
 </mapper>

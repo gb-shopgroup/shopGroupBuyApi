@@ -88,8 +88,22 @@ public class GroupGoodsController {
             redisHelper.setCacheObject(key, responsesList, RedisConstant.RedisGroupGoodsListExpired, TimeUnit.SECONDS);
         }
 
-        // 从缓存里面读取
-        List<GroupGoodsResponse> responsesList = redisHelper.getCacheObject(key);
+        // 从缓存里面读取(缓存只存商品静态信息/包装/规格/sku, 不含已团数)
+        // FastJson2 对 List 存在泛型擦除, 历史缓存反序列化后元素可能是 JSONObject 而非
+        // GroupGoodsResponse, 直接 for-each 强转会 ClassCastException; 统一转成目标类型后再填充动态字段
+        List<?> cachedList = redisHelper.getCacheObject(key);
+        List<GroupGoodsResponse> responsesList = cachedList == null
+                ? new ArrayList<>()
+                : JSON.parseArray(JSON.toJSONString(cachedList), GroupGoodsResponse.class);
+        // 已团数 = 该商品在本团购活动中的真实订单数 + 该商品虚拟订单数。
+        // 真实订单数随下单实时变化, 虚拟订单数团长可随时修改, 因此每次请求实时计算并覆盖,
+        // 绝不写回 30 天的团购商品列表缓存(否则数字长期不变)。
+        if (!responsesList.isEmpty()) {
+            Map<Long, Integer> groupNumMap = groupService.getGroupGoodsGroupNum(groupId);
+            for (GroupGoodsResponse item : responsesList) {
+                item.setGroupNum(groupNumMap.getOrDefault(item.getId(), 0));
+            }
+        }
         log.info("goods/group/goods/list responsesList:{}", JSON.toJSONString(responsesList));
         // 返回数据
         return JsonResult.success(responsesList);

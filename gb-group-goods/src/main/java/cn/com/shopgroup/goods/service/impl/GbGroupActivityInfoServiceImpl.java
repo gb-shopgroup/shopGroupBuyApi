@@ -7,6 +7,7 @@ import cn.com.shopgroup.goods.mapper.GbGroupActivityInfoMapper;
 import cn.com.shopgroup.goods.model.GbGoodsInfo;
 import cn.com.shopgroup.goods.model.GbGroupActivityGoods;
 import cn.com.shopgroup.goods.model.GbGroupActivityInfo;
+import cn.com.shopgroup.goods.model.GroupGoodsOrderNum;
 import cn.com.shopgroup.goods.service.GbGoodsInfoService;
 import cn.com.shopgroup.goods.service.GbGroupActivityInfoService;
 import cn.com.shopgroup.user.model.GbOrgPointInfo;
@@ -52,6 +53,8 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
         queryWrapper.orderByDesc(GbGroupActivityInfo::getGroupId).orderByAsc(GbGroupActivityInfo::getIsClose);
         queryWrapper.last("limit " + (page - 1) * pageSize + "," + pageSize);
         List<GbGroupActivityInfo> result = mapper.selectList(queryWrapper);
+        // 虚拟订单数统一改用商品级口径(活动下在线商品 virtual_order 之和)
+        fillVirtualOrderFromGoods(result);
         return result == null ? new ArrayList<>() : result;
     }
 
@@ -65,7 +68,10 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
 
     public GbGroupActivityInfo getGroupInfo(Long groupId) {
 
-        return mapper.selectById(groupId);
+        GbGroupActivityInfo info = mapper.selectById(groupId);
+        // 海报/团长端活动详情里展示的虚拟订单数改用商品级口径
+        fillVirtualOrderFromGoods(info);
+        return info;
     }
 
 
@@ -189,6 +195,112 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
         return goodsMapper.closeLeaderActivityGoodsInfo(leaderId,groupId,goodsId,status);
     }
 
+    @Override
+    public Map<Long, Integer> getGroupGoodsGroupNum(Long groupId) {
+        Map<Long, Integer> result = new HashMap<>();
+        if (groupId == null || groupId <= 0) {
+            return result;
+        }
+        List<Long> groupIds = new ArrayList<>();
+        groupIds.add(groupId);
+        // 1. 在线商品虚拟订单数(同时作为结果全集: C 端商品列表只展示在线商品)
+        //    商品级虚拟订单数已随商品表查出, 此处单独聚合避免依赖 30 天商品列表缓存
+        List<GroupGoodsOrderNum> virtualList = goodsMapper.listGroupGoodsVirtualOrder(groupIds);
+        if (virtualList != null) {
+            for (GroupGoodsOrderNum item : virtualList) {
+                if (item.getGoodsId() == null) {
+                    continue;
+                }
+                result.put(item.getGoodsId(), numToInt(item.getVirtualOrder()));
+            }
+        }
+        // 2. 真实订单数累加(按订单号去重, 有效订单口径见 Mapper 注释)
+        //    历史订单里可能含活动内已下架的商品, 这些商品 C 端不展示, 不在结果全集内直接跳过
+        List<GroupGoodsOrderNum> realList = goodsMapper.listGroupGoodsRealOrderNum(groupIds);
+        if (realList != null) {
+            for (GroupGoodsOrderNum item : realList) {
+                if (item.getGoodsId() == null || !result.containsKey(item.getGoodsId())) {
+                    continue;
+                }
+                result.merge(item.getGoodsId(), numToInt(item.getRealOrderNum()), Integer::sum);
+            }
+        }
+        return result;
+    }
+
+    @Override
+    public Map<Long, Integer> getGroupVirtualOrderMap(List<Long> groupIds) {
+        Map<Long, Integer> result = new HashMap<>();
+        if (groupIds == null || groupIds.isEmpty()) {
+            return result;
+        }
+        // 无在线商品的活动也要有 0 值, 避免调用方拿到 null
+        for (Long groupId : groupIds) {
+            if (groupId != null) {
+                result.put(groupId, 0);
+            }
+        }
+        List<GroupGoodsOrderNum> list = goodsMapper.listGroupGoodsVirtualOrder(groupIds);
+        if (list != null) {
+            for (GroupGoodsOrderNum item : list) {
+                if (item.getGroupId() == null) {
+                    continue;
+                }
+                result.merge(item.getGroupId(), numToInt(item.getVirtualOrder()), Integer::sum);
+            }
+        }
+        return result;
+    }
+
+    @Override
+    public Integer getGroupVirtualOrder(Long groupId) {
+        if (groupId == null || groupId <= 0) {
+            return 0;
+        }
+        List<Long> groupIds = new ArrayList<>();
+        groupIds.add(groupId);
+        return getGroupVirtualOrderMap(groupIds).getOrDefault(groupId, 0);
+    }
+
+    // SQL 聚合值统一按 Number 取值, 兼容不同 JDBC 驱动返回的 Integer/Long/BigDecimal
+    private int numToInt(Number value) {
+        return value == null ? 0 : value.intValue();
+    }
+
+    /**
+     * 把活动实体的虚拟订单数覆盖为"商品级"口径: 活动下在线商品 gb_goods_info.virtual_order 之和。
+     *
+     * <p>虚拟订单数原先配置在团购活动表(gb_group_activity_info.virtual_order), 现统一配置在商品表。
+     * 活动表字段仅保留兼容, 不再作为数据源; 首页活动列表/详情/跟团人次/海报/团长端VO
+     * 全部通过本方法拿到商品级汇总值, 无需逐个改造调用点。
+     */
+    private void fillVirtualOrderFromGoods(List<GbGroupActivityInfo> list) {
+        if (list == null || list.isEmpty()) {
+            return;
+        }
+        List<Long> groupIds = new ArrayList<>();
+        for (GbGroupActivityInfo item : list) {
+            if (item != null && item.getGroupId() != null) {
+                groupIds.add(item.getGroupId());
+            }
+        }
+        if (groupIds.isEmpty()) {
+            return;
+        }
+        Map<Long, Integer> virtualMap = getGroupVirtualOrderMap(groupIds);
+        for (GbGroupActivityInfo item : list) {
+            if (item != null) {
+                item.setVirtualOrder(virtualMap.getOrDefault(item.getGroupId(), 0));
+            }
+        }
+    }
+
+    private void fillVirtualOrderFromGoods(GbGroupActivityInfo item) {
+        if (item != null) {
+            item.setVirtualOrder(getGroupVirtualOrder(item.getGroupId()));
+        }
+    }
+
 
     public List<GbGroupActivityInfo> getMiniGroupActivityList(Long leaderId, Long catId, int page, int pageSize) {
 
@@ -213,6 +325,8 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
         queryWrapper.orderByDesc(GbGroupActivityInfo::getGroupId);
         queryWrapper.last("limit " + (page - 1) * pageSize + "," + pageSize);
         List<GbGroupActivityInfo> result = mapper.selectList(queryWrapper);
+        // 虚拟订单数统一改用商品级口径(活动下在线商品 virtual_order 之和)
+        fillVirtualOrderFromGoods(result);
         return result == null ? new ArrayList<>() : result;
     }
 
@@ -252,7 +366,10 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
         queryWrapper.eq(GbGroupActivityInfo::getIsCheck, 1);
         queryWrapper.eq(GbGroupActivityInfo::getGroupId, groupId);
         queryWrapper.last("limit 0,1");
-        return mapper.selectOne(queryWrapper);
+        GbGroupActivityInfo info = mapper.selectOne(queryWrapper);
+        // C端团购详情/跟团人次基数使用的虚拟订单数改用商品级口径
+        fillVirtualOrderFromGoods(info);
+        return info;
     }
 
 
@@ -314,6 +431,8 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
         queryWrapper.orderByAsc(GbGroupActivityInfo::getIsClose).orderByDesc(GbGroupActivityInfo::getGroupId);
         queryWrapper.last("limit " + (page - 1) * pageSize + "," + pageSize);
         List<GbGroupActivityInfo> result = mapper.selectList(queryWrapper);
+        // 虚拟订单数统一改用商品级口径(活动下在线商品 virtual_order 之和)
+        fillVirtualOrderFromGoods(result);
         return result == null ? new ArrayList<>() : result;
     }
 
@@ -367,7 +486,9 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
         data.setEndTime(Optional.ofNullable(info.getEndTime()).orElse(0));
         data.setGroupInfo(info.getGroupInfo());
         data.setOrderTotal(0);
-        data.setVirtualOrder(info.getVirtualOrder());
+        // 活动表 virtual_order 仅保留兼容(历史字段), 虚拟订单数已改为商品级 gb_goods_info.virtual_order,
+        // 新活动统一写0, 展示时按活动下商品 virtual_order 之和实时聚合
+        data.setVirtualOrder(0);
         data.setIsClose(info.getIsClose());
         data.setSortOrder(65535);
         data.setStaffId(info.getStaffId());
@@ -407,7 +528,9 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
         updateWrapper.set(GbGroupActivityInfo::getGroupPrice2, info.getGroupPrice2());
         updateWrapper.set(GbGroupActivityInfo::getMarketPrice, info.getMarketPrice());
         updateWrapper.set(GbGroupActivityInfo::getGroupInfo, info.getGroupInfo());
-        updateWrapper.set(GbGroupActivityInfo::getVirtualOrder, info.getVirtualOrder());
+        // 活动表 virtual_order 仅保留兼容(历史字段), 不再由团长配置;
+        // 虚拟订单数统一取商品表 gb_goods_info.virtual_order, 编辑活动时清0避免旧值干扰
+        updateWrapper.set(GbGroupActivityInfo::getVirtualOrder, 0);
         // 提货方式/开团结束时间同步更新
         updateWrapper.set(GbGroupActivityInfo::getPickupStyle, info.getPickupStyle());
         updateWrapper.set(GbGroupActivityInfo::getStartTime, info.getStartTime());
@@ -467,14 +590,17 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
             return new ArrayList<>();
         }
         // 仅按团长 id 过滤, 不附加 is_close / 时间区间等业务状态, 用于团长端活动下拉/选择场景
-        return mapper.selectList(Wrappers.<GbGroupActivityInfo>lambdaQuery()
+        List<GbGroupActivityInfo> result = mapper.selectList(Wrappers.<GbGroupActivityInfo>lambdaQuery()
                 .eq(GbGroupActivityInfo::getLeaderId, leaderId)
                 .orderByDesc(GbGroupActivityInfo::getAddTime, GbGroupActivityInfo::getGroupId));
+        // 虚拟订单数统一改用商品级口径
+        fillVirtualOrderFromGoods(result);
+        return result == null ? new ArrayList<>() : result;
     }
 
     @Override
     public List<GbGroupActivityInfo> getMemberGroupActivityList(Long leaderId, Double longitude, Double latitude,
-                                                                String groupName, Long catId, int page, int pageSize) {
+                                                                Long catId, int page, int pageSize) {
 
         // 请求参数归一
         if (page < 1) page = 1;
@@ -485,11 +611,13 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
         if (leaderId != null && leaderId > 0) {
             LambdaQueryWrapper<GbGroupActivityInfo> queryWrapper = onlineWrapper();
             queryWrapper.eq(GbGroupActivityInfo::getLeaderId, leaderId);
-            // 团购名称模糊搜索(groupName) + 团购分类过滤(catId)
-            applyNameAndCatFilter(queryWrapper, groupName, catId);
+            // 团购分类过滤(catId); 商品名 goodsName 过滤由调用方在结果中内存完成
+            applyCatFilter(queryWrapper, catId);
             queryWrapper.orderByAsc(GbGroupActivityInfo::getSortOrder);
             queryWrapper.orderByDesc(GbGroupActivityInfo::getGroupId);
             List<GbGroupActivityInfo> result = mapper.selectList(queryWrapper.last("limit " + (page - 1) * pageSize + "," + pageSize));
+            // 虚拟订单数统一改用商品级口径(活动下在线商品 virtual_order 之和)
+            fillVirtualOrderFromGoods(result);
             return result == null ? new ArrayList<>() : result;
         }
 
@@ -502,8 +630,8 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
         //     避免把全量在线活动的大字段(图片/详情等)加载进内存
         LambdaQueryWrapper<GbGroupActivityInfo> lightWrapper = onlineWrapper();
         lightWrapper.select(GbGroupActivityInfo::getGroupId, GbGroupActivityInfo::getLeaderId);
-        // 名称/分类过滤下推到 SQL, 先缩小候选活动集再做距离过滤, 避免全量在线活动都参与球面距离计算
-        applyNameAndCatFilter(lightWrapper, groupName, catId);
+        // 分类过滤下推到 SQL, 先缩小候选活动集再做距离过滤, 避免全量在线活动都参与球面距离计算
+        applyCatFilter(lightWrapper, catId);
         lightWrapper.orderByDesc(GbGroupActivityInfo::getGroupId).orderByAsc(GbGroupActivityInfo::getIsClose);
         List<GbGroupActivityInfo> lightList = mapper.selectList(lightWrapper);
         if (lightList == null || lightList.isEmpty()) {
@@ -554,6 +682,8 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
         fullWrapper.in(GbGroupActivityInfo::getGroupId, pageIds);
         fullWrapper.orderByDesc(GbGroupActivityInfo::getGroupId);
         List<GbGroupActivityInfo> result = mapper.selectList(fullWrapper);
+        // 虚拟订单数统一改用商品级口径(活动下在线商品 virtual_order 之和)
+        fillVirtualOrderFromGoods(result);
         return result == null ? new ArrayList<>() : result;
     }
 
@@ -579,12 +709,10 @@ public class GbGroupActivityInfoServiceImpl implements GbGroupActivityInfoServic
         return false;
     }
 
-    // 团购名称模糊搜索 + 团购分类过滤(两个查询分支共用): groupName 非空时按名称模糊匹配, catId 非空且大于0时按分类精确匹配
-    private void applyNameAndCatFilter(LambdaQueryWrapper<GbGroupActivityInfo> queryWrapper, String groupName, Long catId) {
+    // 团购分类过滤: catId 非空且大于0时按分类精确匹配
+    // (商品名 goodsName 的模糊匹配已改为调用方在查询结果+商品回填后于内存中过滤, 不再下推 SQL)
+    private void applyCatFilter(LambdaQueryWrapper<GbGroupActivityInfo> queryWrapper, Long catId) {
 
-        if (StringUtil.isNotEmpty(groupName)) {
-            queryWrapper.like(GbGroupActivityInfo::getGroupName, groupName);
-        }
         if (catId != null && catId > 0) {
             queryWrapper.eq(GbGroupActivityInfo::getCatId, catId);
         }

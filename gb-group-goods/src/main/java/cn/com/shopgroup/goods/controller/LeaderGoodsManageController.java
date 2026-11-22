@@ -206,6 +206,8 @@ public class LeaderGoodsManageController {
         data.setGoodsUnit("份");
         // 商品介绍
         data.setGoodsInfo(request.getGoodsInfo());
+        // 商品虚拟订单数: C端"已团数" = 该商品在团购活动中的真实订单数 + 本值
+        data.setVirtualOrder(Optional.ofNullable(request.getVirtual()).orElse(0));
 
         // 2. 商品图片 -> gb_goods_image_info(过滤空图片, 主图必填)
         List<String> imgList = new ArrayList<>();
@@ -258,7 +260,9 @@ public class LeaderGoodsManageController {
         data.setGoodsUnit(Optional.ofNullable(request.getUnit()).orElse("份"));
         // 商品介绍
         data.setGoodsInfo(request.getGoodsInfo());
-
+        // 商品虚拟订单数(原代码 data.setv 残缺, 导致商品编辑接口无法编译)
+        // 未传(null)时透传 null, 由 Service 保留库中原值, 避免老前端编辑商品时把虚拟数误清零
+        data.setVirtualOrder(request.getVirtual());
         // 2. 商品图片 -> gb_goods_image_info(过滤空图片, 主图必填)
         List<String> imgList = new ArrayList<>();
         if (request.getImg() != null && request.getImg().trim().length() > 0) imgList.add(request.getImg());

@@ -51,6 +51,8 @@ public class LeaderGoodsResponse {
     private Byte isCheck;
     // 审核备注
     private String checkRemark;
+    // 商品虚拟订单数量(C端"已团数" = 该商品在团购活动中的真实订单数 + 本值)
+    private Integer virtual;
 
     // 商品规格列表(包含规格值)
     private List<LeaderSpecResponse> specList = new ArrayList<>();
@@ -98,6 +100,8 @@ public class LeaderGoodsResponse {
         this.isCheck = info.getIsCheck();
         // 审核备注
         this.checkRemark = info.getCheckRemark();
+        // 商品虚拟订单数量(旧数据为 null 时按0回显)
+        this.virtual = info.getVirtualOrder() == null ? 0 : info.getVirtualOrder();
     }
 
     // 列表转换

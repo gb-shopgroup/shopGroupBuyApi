@@ -47,4 +47,6 @@ public class LeaderGoodsRequest {
     private List<LeaderAddSpecRequest> addSpecList;
     // SKU列表(修改商品时随商品信息一并重建gb_goods_sku_info)
     private List<LeaderSkuRequest> skuList;
+    // 虚拟订单数量
+    private Integer virtual;
 }

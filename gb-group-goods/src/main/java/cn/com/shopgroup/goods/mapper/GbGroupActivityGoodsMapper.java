@@ -2,6 +2,7 @@ package cn.com.shopgroup.goods.mapper;
 
 import cn.com.shopgroup.goods.model.GbGoodsInfo;
 import cn.com.shopgroup.goods.model.GbGroupActivityGoods;
+import cn.com.shopgroup.goods.model.GroupGoodsOrderNum;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Mapper;
@@ -72,4 +73,42 @@ public interface GbGroupActivityGoodsMapper extends BaseMapper<GbGroupActivityGo
     })
     int closeLeaderActivityGoodsInfo(@Param("leaderId") Long leaderId, @Param("groupId") Long groupId,
                                      @Param("goodsId") Long goodsId, @Param("status") int status);
+
+    /**
+     * 批量查询团购活动下在线商品的"虚拟订单数"(商品级)。
+     * 仅统计活动内已上架(a.is_close=0)且商品表在线(g.is_close=0)的商品, 与 C 端商品列表口径一致。
+     *
+     * @return 每行 = 活动id + 商品id + 该商品虚拟订单数
+     */
+    @Select({
+            "<script>",
+            "SELECT a.`group_id` AS group_id, a.`goods_id` AS goods_id, IFNULL(g.`virtual_order`, 0) AS virtual_order",
+            "FROM `gb_group_activity_goods` AS a",
+            "JOIN `gb_goods_info` AS g ON g.`goods_id` = a.`goods_id`",
+            "WHERE a.`is_close` = 0 AND g.`is_close` = 0",
+            "AND a.`group_id` IN",
+            "<foreach collection='groupIds' item='gid' open='(' separator=',' close=')'>#{gid}</foreach>",
+            "</script>"
+    })
+    List<GroupGoodsOrderNum> listGroupGoodsVirtualOrder(@Param("groupIds") List<Long> groupIds);
+
+    /**
+     * 批量统计团购活动下各商品的"真实订单数": 按订单号去重(一单多商品行/多SKU行只算1单),
+     * 有效订单口径与 GbOrderInfoService.getMiniOrderSalesCount 保持一致: status &gt; 0 且 status &lt; 6
+     * (已支付、未取消; 排除待支付0与已取消6)。订单明细表按 order_no 关联订单表取 group_id。
+     *
+     * @return 每行 = 活动id + 商品id + 该商品在本活动中的真实订单数
+     */
+    @Select({
+            "<script>",
+            "SELECT o.`group_id` AS group_id, og.`goods_id` AS goods_id, COUNT(DISTINCT o.`order_no`) AS real_order_num",
+            "FROM `gb_order_info` AS o",
+            "JOIN `gb_order_goods_info` AS og ON og.`order_no` = o.`order_no`",
+            "WHERE o.`status` &gt; 0 AND o.`status` &lt; 6",
+            "AND o.`group_id` IN",
+            "<foreach collection='groupIds' item='gid' open='(' separator=',' close=')'>#{gid}</foreach>",
+            "GROUP BY o.`group_id`, og.`goods_id`",
+            "</script>"
+    })
+    List<GroupGoodsOrderNum> listGroupGoodsRealOrderNum(@Param("groupIds") List<Long> groupIds);
 }

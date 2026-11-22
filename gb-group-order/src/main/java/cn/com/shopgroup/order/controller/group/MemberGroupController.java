@@ -94,7 +94,7 @@ public class MemberGroupController {
     }
 
 
-    // 用户查询所有在线的团购活动列表[新用户未绑定团长时leaderId=0]: 仅返回未下线(isClose=0)且当前时间处于开团时间窗内(已开团未结束)的在线活动; 支持团购名称模糊搜索(groupName, 非空时生效)与团购分类过滤(catId, 非空且大于0时生效); leaderId>0按团长过滤(排序值sortOrder升序置顶优先, 同级按活动id倒序, 分页在SQL层完成); leaderId=0时需传经纬度(longitude/latitude, 缺失返回空列表), 按活动所属团长过滤: 团长的所有未禁用自提点中, 只要有任意一个自提点到用户的距离小于等于该自提点设置的自提范围(point_scope, 单位公里), 该团长下的所有团购活动均对用户可见, 按活动id倒序(先按名称/分类过滤, 再距离过滤, 最后分页); page默认1, pageSize默认10最大20; 每个团购活动一并返回其商品列表(goods: 团购价取团购商品表冗余价, 库存/单位取自商品表, 批量查询, 无商品的团购返回空数组)
+    // 用户查询所有在线的团购活动列表[新用户未绑定团长时leaderId=0]: 仅返回未下线(isClose=0)且当前时间处于开团时间窗内(已开团未结束)的在线活动; goodsName 为商品名搜索: 先按条件查出活动并回填商品, 再在结果中按商品名模糊过滤(活动下任一商品名包含关键字则保留该活动), 再输出结果; 分类过滤(catId, 非空且大于0时生效)在SQL层完成; leaderId>0按团长过滤(排序值sortOrder升序置顶优先, 同级按活动id倒序, 分页在SQL层完成); leaderId=0时需传经纬度(longitude/latitude, 缺失返回空列表), 按活动所属团长过滤: 团长的所有未禁用自提点中, 只要有任意一个自提点到用户的距离小于等于该自提点设置的自提范围(point_scope, 单位公里), 该团长下的所有团购活动均对用户可见, 按活动id倒序(先按分类过滤, 再距离过滤, 最后分页); page默认1, pageSize默认10最大20; 每个团购活动一并返回其商品列表(goods: 团购价取团购商品表冗余价, 库存/单位取自商品表, 批量查询, 无商品的团购返回空数组)
     @PostMapping("/member/groupActivity/list")
     public JsonResult getGroupActiveList(@Validated @RequestBody MemberGroupActListRequest request) {
         log.info("用户首页-查询所有在线的团购活动列表,request:{}", JSON.toJSONString(request));
@@ -102,17 +102,20 @@ public class MemberGroupController {
         Long leaderId = request.getLeaderId();
         Double longitude = request.getLongitude();
         Double latitude = request.getLatitude();
-        String groupName = request.getGroupName();
+        String goodsName = request.getGoodsName();
         Long catId = request.getCatId();
         // 请求参数矫正
         int page = Optional.ofNullable(request.getPage()).orElse(1);
         int pageSize = Optional.ofNullable(request.getPageSize())
                 .map(size -> Math.min(size, 20))
                 .orElse(10);
-        List<GbGroupActivityInfo> result = groupActivityInfoService.getMemberGroupActivityList(leaderId, longitude, latitude, groupName, catId, page, pageSize);
+        List<GbGroupActivityInfo> result = groupActivityInfoService.getMemberGroupActivityList(leaderId, longitude, latitude, catId, page, pageSize);
         List<MemberHomeGroupActResponse> data = MemberHomeGroupActResponse.getGroupActResponseList(result);
         // 填充每个团购活动的商品列表(列表页需要展示团购里的商品)
         fillGroupGoodsList(data);
+        // goodsName 非空时在查询结果中按商品名模糊过滤: 活动的商品列表中任一商品名包含关键字则保留该活动,
+        // 否则剔除(过滤放在商品回填之后, 被剔除的活动不再做规格/浏览数/跟团记录填充)
+        data = this.filterActivityByGoodsName(data, goodsName);
         // 填充每个团购活动中商品的规格(含规格值), 一次批量查询避免 N+1
         fillGoodsSpecList(extractAllGoods(data));
         // 填充每个团购活动的查看次数(不去重, 总浏览人次, 与团购详情 viewCount 口径一致), 一次批量查询避免 N+1
@@ -131,7 +134,7 @@ public class MemberGroupController {
         }
         for (MemberHomeGroupActResponse item : data) {
             // 列表项滚动日志与详情滚动日志(/logs2)共用同一逻辑与缓存, 保证两端展示一致
-            List<GroupLogs> logList = this.getRollingGroupLogs(item.getId());
+            List<GroupLogs> logList = this.getRollingGroupLogs(item.getId(),null);
             if (!CollectionUtils.isEmpty(logList)) {
                 item.setGroupLogs(logList);
             }
@@ -162,6 +165,42 @@ public class MemberGroupController {
             List<GroupActGoodsResponse> goodsList = goodsMap.get(item.getId());
             item.setGoods(goodsList == null ? new ArrayList<>() : goodsList);
         }
+    }
+
+    /**
+     * goodsName 非空时在查询结果中按商品名模糊过滤(先查出信息, 再在结果中模糊查询, 再输出结果):
+     * 活动的商品列表(goods)中任一商品名包含关键字则保留该活动, 否则从结果中剔除;
+     * 关键字为空白时不做过滤, 原样返回
+     */
+    private List<MemberHomeGroupActResponse> filterActivityByGoodsName(List<MemberHomeGroupActResponse> data, String goodsName) {
+        String keyword = goodsName == null ? "" : goodsName.trim();
+        if (keyword.isEmpty() || CollectionUtils.isEmpty(data)) {
+            return data;
+        }
+        List<MemberHomeGroupActResponse> result = new ArrayList<>();
+        for (MemberHomeGroupActResponse item : data) {
+            if (this.hasGoodsNameMatch(item.getGoods(), keyword)) {
+                result.add(item);
+            }
+        }
+        return result;
+    }
+
+    // 判断商品列表中是否存在商品名包含关键字的商品(商品列表为空视为不匹配)
+    private boolean hasGoodsNameMatch(List<GroupActGoodsResponse> goodsList, String keyword) {
+        if (CollectionUtils.isEmpty(goodsList)) {
+            return false;
+        }
+        for (GroupActGoodsResponse goods : goodsList) {
+            if (goods == null) {
+                continue;
+            }
+            String name = goods.getGname();
+            if (name != null && name.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -246,6 +285,9 @@ public class MemberGroupController {
         int totalOrderNum = this.getOrderNumByGroupId(groupId);
         int viwNum = this.getGroupViewCountQuietly(groupId);
         cacheData.setNum(totalOrderNum);
+        // num2(虚拟数量)是 30 天详情缓存里的旧快照, 实时覆盖为商品级口径:
+        // 活动下在线商品 gb_goods_info.virtual_order 之和, 与列表/海报保持一致
+        cacheData.setNum2(groupActivityInfoService.getGroupVirtualOrder(groupId));
         // 当前团购查看人数: 真实查看人数 >= 跟团人数*1.6 时展示真实查看人数, 否则展示跟团人数的1.6倍
         cacheData.setViewCount(this.computeDisplayViewCount(viwNum, totalOrderNum));
 
@@ -435,8 +477,8 @@ public class MemberGroupController {
                 data = this.getNightGroupLogs(total, groupId);
                 // 存在真实订单时, 虚拟记录与真实订单记录随机组合展示
                 data = this.mergeRealOrderLogs(groupId, total, data);
-                // 放入redis缓存中(1个小时)
-                long timeout = 1 * 60 * 60;
+                // 放入redis缓存中(0.5个小时)
+                long timeout = 1 * 30 * 60;
                 redisHelper.setCacheObject(key, data, timeout, TimeUnit.SECONDS);
             }
             return data;
@@ -449,35 +491,36 @@ public class MemberGroupController {
 
     // 团购记录(跟团记录), 滚动部分
     @GetMapping("/group/groupActivity/logs2")
-    public JsonResult groupLogs2(@RequestParam("id") Long groupId) {
-        log.info("【团购滚动跟团记录:/order/group/groupActivity/logs2】params->groupId:{}", groupId);
-        List<GroupLogs> data = this.getRollingGroupLogs(groupId);
+    public JsonResult groupLogs2(@RequestParam("id") Long groupId,Long goodsId) {
+        log.info("【团购滚动跟团记录:/order/group/groupActivity/logs2】params->groupId:{},goodsId:{}", groupId,goodsId);
+        List<GroupLogs> data = this.getRollingGroupLogs(groupId,goodsId);
         log.info("【团购滚动跟团记录返回】size:{},data:{}", data == null ? 0 : data.size(), JSON.toJSONString(data));
         return JsonResult.success(data);
     }
 
     // 滚动跟团记录(列表项groupLogs与详情滚动日志/logs2共用同一逻辑与同一份Redis缓存, 保证两端展示一致):
-    // 按跟团数(真实+虚拟)生成条数, 存在真实订单时与虚拟记录随机组合, 合计大于20时随机展示其中一部分
-    private List<GroupLogs> getRollingGroupLogs(Long groupId) {
+    // 条数按已团数(真实+虚拟)生成: 已团数<=15时条数=已团数, 否则15条; 存在真实订单时与虚拟记录随机组合;
+    // goodsId>0 时切换为商品维度: 条数按该商品已团数生成(上限15), 全部为该商品的跟团记录
+    private List<GroupLogs> getRollingGroupLogs(Long groupId,Long goodsId) {
+
+        // 商品维度: 独立缓存与生成逻辑(商品详情页按商品查看跟团记录)
+        if (goodsId != null && goodsId > 0) {
+            return this.getGoodsRollingGroupLogs(groupId, goodsId);
+        }
 
         String key = RedisConstant.RedisGroupLogsKey2 + groupId;
         if (redisHelper.hasKey(key) == false) {
-            int total = 0;
             int orderTotal = getOrderNumByGroupId(groupId);
-            if (12 >= orderTotal) {
-                // 跟团数较小时按跟团数生成, 保证少量跟团(如2次跟团)也展示滚动日志
-                total = Math.max(orderTotal, 0);
-            } else if (20 > orderTotal) {
-                total = Math.max(orderTotal - 5, 0);
-            } else {
-                // 随机 [10,20] 之间的数字
-                total = ThreadLocalRandom.current().nextInt(10, 21);
-            }
+            // 条数 = 活动已团数(真实订单+虚拟订单), 上限15: 已团数<=15时条数=已团数, 否则15条
+            int total = Math.min(Math.max(orderTotal, 0), 15);
 
             // 生成记录
             List<GroupLogs> data = this.getDayGroupLogs2(total, groupId);
             // 存在真实订单时, 滚动日志由真实订单记录与虚拟记录随机组合展示
             data = this.mergeRealOrderLogs(groupId, total, data);
+            // 滚动跟团记录的展示时间统一重置到最近10分钟内
+            // (真实订单记录的历史下单时间同样重置; 打乱已在上一步完成, 此处按列表顺序从新到旧赋值)
+            this.resetLogsTimeInWindow(data, 10 * 60);
 
             // 放入redis缓存中(1个小时)
             redisHelper.setCacheObject(key, data, RedisConstant.RedisGroupLogsExpired, TimeUnit.SECONDS);
@@ -656,9 +699,124 @@ public class MemberGroupController {
         return times;
     }
 
+    // 生成total个时间戳(秒级, 从新到旧), 全部落在最近windowSeconds秒内(商品维度跟团记录用):
+    // 以窗口等分值为基准间隔, 每条间隔随机小幅缩短(只缩短不拉伸), 合计必然不超过窗口
+    private List<Integer> generateRecordTimesInWindow(int total, int windowSeconds) {
+
+        List<Integer> times = new ArrayList<>(Math.max(total, 0));
+        if (total < 1) {
+            return times;
+        }
+        long now = System.currentTimeMillis() / 1000L;
+        int baseGap = Math.max(1, windowSeconds / total);
+        long current = now;
+        for (int i = 0; i < total; i++) {
+            times.add((int) current);
+            int step = baseGap;
+            if (baseGap > 4) {
+                // 最多缩短基准间隔的1/4, 保持时间分布自然
+                step = baseGap - ThreadLocalRandom.current().nextInt(0, baseGap / 4 + 1);
+            }
+            if (step < 1) {
+                step = 1;
+            }
+            current -= step;
+        }
+        return times;
+    }
+
+    // 把跟团记录的展示时间统一重置到最近windowSeconds秒内(从新到旧):
+    // 商品维度要求20条记录时间全部落在10分钟内, 虚拟记录与真实订单记录统一按窗口时间展示
+    private void resetLogsTimeInWindow(List<GroupLogs> logs, int windowSeconds) {
+        if (CollectionUtils.isEmpty(logs)) {
+            return;
+        }
+        List<Integer> times = this.generateRecordTimesInWindow(logs.size(), windowSeconds);
+        for (int i = 0; i < logs.size(); i++) {
+            logs.get(i).setUserTime(TimeUtils.getRelativeTime(times.get(i)));
+        }
+    }
+
+    // 商品维度滚动跟团记录(goodsId>0, 独立于活动维度缓存):
+    // 条数按该商品已团数(真实订单数+虚拟订单数)生成: 已团数<=15时条数=已团数, 否则15条;
+    // 全部为该商品的跟团记录, 存在该商品的真实订单时混入(头像/手机号/数量取真实值),
+    // 全部打乱后展示时间统一重置到最近10分钟内
+    private List<GroupLogs> getGoodsRollingGroupLogs(Long groupId, Long goodsId) {
+
+        String key = RedisConstant.buildGroupLogsGoodsKey(groupId, goodsId);
+        if (redisHelper.hasKey(key) == false) {
+            List<GroupLogs> data = new ArrayList<>();
+
+            // 商品必须属于该团购活动且在线, 已下架/不属于本活动的商品不生成跟团记录
+            GbGroupActivityGoods targetGoods = null;
+            List<GbGroupActivityGoods> goodsList = groupActivityInfoService.getGroupActivityOnlineGoodsList(groupId);
+            for (GbGroupActivityGoods goods : goodsList) {
+                if (goodsId.equals(goods.getGoodsId())) {
+                    targetGoods = goods;
+                    break;
+                }
+            }
+
+            if (targetGoods != null) {
+                // 条数 = 该商品已团数(真实订单数+虚拟订单数), 上限15; 已团数为0时返回空列表
+                int groupNum = groupActivityInfoService.getGroupGoodsGroupNum(groupId).getOrDefault(goodsId, 0);
+                int total = Math.min(Math.max(groupNum, 0), 15);
+                if (total > 0) {
+                    // 生成该商品的虚拟跟团记录(商品名固定为该商品, 时间先留空, 打乱后统一重置)
+                    List<String> phoneList = PhoneGeneratorUtils.generateDesensitizePhone(total);
+                    for (int i = 0; i < total; i++) {
+                        String avatar = "/static/image/man.png";
+                        if (ThreadLocalRandom.current().nextInt(1, 6) % 2 == 0) avatar = "/static/image/woman.png";
+                        String num = String.valueOf(ThreadLocalRandom.current().nextInt(1, 3));
+                        data.add(new GroupLogs(avatar, phoneList.get(i), "", targetGoods.getGoodsName(), num));
+                    }
+                    // 混入该商品的真实订单记录(仅该商品的订单商品行)
+                    data = this.mergeGoodsRealOrderLogs(groupId, goodsId, total, data);
+                    // 随机打乱(真实+虚拟随机组合), 超出条数时随机展示其中一部分
+                    Collections.shuffle(data);
+                    if (data.size() > total) {
+                        data = new ArrayList<>(data.subList(0, total));
+                    }
+                    // 展示时间统一重置到最近10分钟内
+                    this.resetLogsTimeInWindow(data, 10 * 60);
+                }
+            }
+
+            // 放入redis缓存中(0.5个小时, 与活动维度滚动日志一致; 空结果也缓存避免反复查库)
+            redisHelper.setCacheObject(key, data, RedisConstant.RedisGroupLogsExpired, TimeUnit.SECONDS);
+        }
+
+        // 读取缓存
+        return redisHelper.getCacheObject(key);
+    }
+
+    // 商品维度滚动跟团记录组装: 混入该商品的真实订单记录(时间留空, 由调用方统一重置到10分钟窗口内);
+    // 真实记录查询异常时降级为纯虚拟记录
+    private List<GroupLogs> mergeGoodsRealOrderLogs(Long groupId, Long goodsId, int total, List<GroupLogs> virtualLogs) {
+
+        List<GroupLogs> merged = new ArrayList<>(virtualLogs);
+        try {
+            List<GroupOrderRecordResponse> realRecords = orderInfoService.getGroupOrderRecordList(groupId, goodsId, total);
+            if (!CollectionUtils.isEmpty(realRecords)) {
+                for (GroupOrderRecordResponse record : realRecords) {
+                    String avatar = record.getAvatar();
+                    if (avatar == null || avatar.trim().length() == 0) {
+                        avatar = "/static/image/man.png";
+                        if (ThreadLocalRandom.current().nextInt(1, 6) % 2 == 0) avatar = "/static/image/woman.png";
+                    }
+                    String goodsNum = record.getGoodsNum() == null ? "1" : String.valueOf(record.getGoodsNum());
+                    merged.add(new GroupLogs(avatar, record.getMobile(), "", record.getGoodsDesc(), goodsNum));
+                }
+            }
+        } catch (Exception e) {
+            log.error("商品维度跟团记录混入真实订单记录异常 groupId:{}, goodsId:{}", groupId, goodsId, e);
+        }
+        return merged;
+    }
+
     // 滚动跟团记录组装: 存在真实订单时, 将真实订单记录转为跟团记录, 与虚拟记录合并后随机打乱
     // (真实+虚拟随机组合展示); 合并后超出total条时随机截取(已打乱, 取前total条即随机抽样),
-    // total上限20, 即真实+虚拟合计大于20时随机展示其中一部分; 真实记录查询异常时降级为纯虚拟记录
+    // 调用方 total 上限15; 真实记录查询异常时降级为纯虚拟记录
     private List<GroupLogs> mergeRealOrderLogs(Long groupId, int total, List<GroupLogs> virtualLogs) {
 
         if (total < 1) {

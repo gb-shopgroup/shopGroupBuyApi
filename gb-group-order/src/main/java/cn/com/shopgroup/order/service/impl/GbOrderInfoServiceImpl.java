@@ -1857,6 +1857,19 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
      */
     @Override
     public List<GroupOrderRecordResponse> getGroupOrderRecordList(Long groupId, Integer limit) {
+        return getGroupOrderRecordList(groupId, null, limit);
+    }
+
+    /**
+     * 查询团购活动的真实跟团记录(可按商品过滤)
+     *
+     * @param groupId 团购活动id
+     * @param goodsId 商品id, 非空且>0时仅返回该商品的订单商品行
+     * @param limit   返回条数，默认20，最大50
+     * @return 跟团记录列表
+     */
+    @Override
+    public List<GroupOrderRecordResponse> getGroupOrderRecordList(Long groupId, Long goodsId, Integer limit) {
 
         List<GroupOrderRecordResponse> result = new ArrayList<>();
         if (groupId == null || groupId <= 0) {
@@ -1867,12 +1880,15 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
         }
         limit = Math.min(limit, 50);
 
+        boolean filterByGoods = goodsId != null && goodsId > 0;
         // 已支付/待收货/部分收货/已提货 视为有效订单
         LambdaQueryWrapper<GbOrderInfo> orderWrapper = Wrappers.lambdaQuery();
         orderWrapper.eq(GbOrderInfo::getGroupId, groupId);
         orderWrapper.in(GbOrderInfo::getStatus, Arrays.asList(1, 2, 3));
         orderWrapper.orderByDesc(GbOrderInfo::getId);
-        orderWrapper.last("limit 0," + limit);
+        // 商品维度过滤在订单商品行阶段进行, 先按倍数放大订单批次, 保证过滤后仍有足够记录
+        int orderLimit = filterByGoods ? Math.min(limit * 5, 200) : limit;
+        orderWrapper.last("limit 0," + orderLimit);
         List<GbOrderInfo> orderList = mapper.selectList(orderWrapper);
         if (CollectionUtils.isEmpty(orderList)) {
             return result;
@@ -1887,6 +1903,9 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
 
         LambdaQueryWrapper<GbOrderGoodsInfo> goodsWrapper = Wrappers.lambdaQuery();
         goodsWrapper.in(GbOrderGoodsInfo::getOrderNo, orderNos);
+        if (filterByGoods) {
+            goodsWrapper.eq(GbOrderGoodsInfo::getGoodsId, goodsId);
+        }
         goodsWrapper.orderByAsc(GbOrderGoodsInfo::getId);
         List<GbOrderGoodsInfo> goodsList = goodsMapper.selectList(goodsWrapper);
         if (CollectionUtils.isEmpty(goodsList)) {
@@ -1908,6 +1927,9 @@ public class GbOrderInfoServiceImpl implements GbOrderInfoService {
                     buildGroupRecordGoodsDesc(goods),
                     goods.getGoodsNum()
             ));
+            if (result.size() >= limit) {
+                break;
+            }
         }
         return result;
     }

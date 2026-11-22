@@ -37,9 +37,15 @@ public class RedisConstant {
     public final static String RedisGroupGoodsListKey = "GroupGoodsList:";
 
 
-    public final static long RedisGroupLogsExpired = 1*60*60;
+    public final static long RedisGroupLogsExpired = 1*30*60;
     public final static String RedisGroupLogsKey = "GroupLogs:";
     public final static String RedisGroupLogsKey2 = "GroupLogs2:";
+
+    // 商品维度滚动跟团记录缓存key(GroupLogs2:{groupId}:goods:{goodsId}):
+    // goodsId>0 时 /logs2 的独立缓存, 与活动维度缓存分开存放; 生成(滚动日志)与失效(支付回调)共用本方法拼接
+    public static String buildGroupLogsGoodsKey(Long groupId, Long goodsId) {
+        return RedisGroupLogsKey2 + groupId + ":goods:" + goodsId;
+    }
 
 
 

@@ -53,6 +53,12 @@
 | 2026-10-29 | `/order/group/groupActivity/logs` | GET | 跟团记录调整：① 相邻两条记录时间间隔保证大于 30 秒（虚拟记录按 31~180 秒随机生成时间）；② 跟团数 > 10 且存在真实订单时，真实订单记录与虚拟记录合并后随机打乱展示 |
 | 2026-10-29 | `/order/group/groupActivity/logs2` | GET | 滚动跟团记录的时间由固定「刚刚」改为按时间戳生成（相邻间隔随机 31~180 秒，保证 >30 秒） |
 | 2026-11-01 | `/goods/Leader/share/groupActivity/goods/poster` | POST | 商品分享海报样式改版：由横版(500×400)改为竖版(500×874)朋友圈样式——顶部深绿店铺条(logo+店铺名)、红色公告条、商品大图(500×500)、商品名、红色价格+单位+销量、右侧店铺小程序码、底部「长按保存手机相册」提示条 |
+| 2026-11-21 | `/goods/group/goods/list` | GET | 新增 `groupNum`（已团数）= 该商品在本团购活动中的真实订单数 + 该商品虚拟订单数；真实订单数按订单号去重、仅统计已支付且未取消订单，与跟团人次口径一致；已团数每次请求实时计算，不写入 30 天商品列表缓存 |
+| 2026-11-21 | `/goods/leader/goods/addGoods`、`/goods/leader/goods/edit` | POST | 虚拟订单数改为商品级配置，落库到 `gb_goods_info.virtual_order`；编辑不传该字段时保留原值；`gb_goods_info` 表需执行增量 DDL |
+| 2026-11-21 | 全项目（活动列表/详情/跟团人次/海报/团长端活动 VO） | — | 虚拟订单数口径由团购活动级（`gb_group_activity_info.virtual_order`）改为商品级：活动级取值 = 活动下在线商品 `virtual_order` 之和；活动表字段仅保留兼容，新增/编辑活动统一写 0 |
+| 2026-11-21 | `/order/group/groupActivity/logs2` | GET | 滚动跟团记录条数规则统一：已团数≤15 时条数=已团数，>15 时固定 15 条（活动维度按活动已团数、商品维度按该商品已团数）；展示时间统一落在最近 10 分钟内（真实订单记录的历史时间同步重置）。另新增商品维度：goodsId>0 时返回该商品的跟团记录（虚拟记录商品名固定为该商品，混入该商品真实订单记录）；独立缓存 `GroupLogs2:{groupId}:goods:{goodsId}`，该商品有新支付订单时支付回调同步失效 |
+| 2026-11-21 | `/order/member/groupActivity/list` | POST | goodsName 搜索语义由「团购名称 SQL 模糊匹配」改为「商品名结果过滤」：先按条件查出活动并回填商品，再在结果中按商品名模糊过滤（活动下任一商品名包含关键字则保留该活动），输出过滤后的活动；SQL 层不再按名称过滤，仅保留 catId 分类过滤 |
+| 2026-11-21 | `/goods/Leader/share/groupActivity/poster`、`make/poster`、`goods/poster` | POST | 海报「已售N单/N件」由活动级（活动虚拟订单数 + 活动真实订单数）改为商品级：= 该商品虚拟订单数 + 该商品在本次团购活动中的真实订单数（与 C 端商品已团数同口径）；make/poster 无展示商品时保留活动级退化 |
 
 ## 近期变更
 
@@ -143,7 +149,7 @@
 | [60](#60-post-ordergroupgroupactivityview) | order | POST | `/order/group/groupActivity/view` | 用户查看团购详情-显式埋点上报(分享等场景前端调用; 首页进入详情会自动埋点, 可不上报) |
 | [61](#61-get-ordergroupgroupactivityshop) | order | GET | `/order/group/groupActivity/shop` | 团长店铺详情 |
 | [62](#62-get-ordergroupgroupactivitylogs) | order | GET | `/order/group/groupActivity/logs` | 团购记录(跟团记录) 早上6点到晚上8点之间，每个小时生成一批跟团记录（固定部分+滚动部分）， 固定部分打开页面就显示，… |
-| [63](#63-get-ordergroupgroupactivitylogs2) | order | GET | `/order/group/groupActivity/logs2` | 团购记录(跟团记录), 滚动部分 |
+| [63](#63-get-ordergroupgroupactivitylogs2) | order | GET | `/order/group/groupActivity/logs2` | 团购记录(跟团记录), 滚动部分；goodsId>0 时返回该商品的跟团记录(20条, 时间在10分钟内) |
 | [64](#64-get-ordergrouporderrecords) | order | GET | `/order/group/order/records` | 真实跟团记录：基于支付成功订单数据 |
 | [65](#65-post-ordergrouporderlist) | order | POST | `/order/group/order/list` | 用户订单列表（按订单状态/商品名称筛选, 分页查询） |
 | [66](#66-post-ordergrouporderapplyrefundlist) | order | POST | `/order/group/order/applyRefundList` | 用户售后订单列表(支持按商品名称/售后审核状态筛选; 同一订单的商品可能处于不同售后状态, 按(订单,审核状态)拆分为多… |
@@ -1980,7 +1986,7 @@ data 类型：`List<GroupCategoryResponse>`（数组，元素类型 `GroupCatego
 
 #### 2. POST `/order/member/groupActivity/list`
 
-**功能说明**：用户查询所有在线的团购活动列表[新用户未绑定团长时leaderId=0]: 仅返回未下线(isClose=0)且当前时间处于开团时间窗内(已开团未结束)的在线活动; 支持团购名称模糊搜索(groupName, 非空时生效)与团购分类过滤(catId, 非空且大于0时生效); leaderId>0按团长过滤(排序值sortOrder升序置顶优先, 同级按活动id倒序, 分页在SQL层完成); leaderId=0时需传经纬度(longitude/latitude, 缺失返回空列表), 按活动所属团长过滤: 团长的所有未禁用自提点中, 只要有任意一个自提点到用户的距离小于等于该自提点设置的自提范围(point_scope, 单位公里), 该团长下的所有团购活动均对用户可见, 按活动id倒序(先按名称/分类过滤, 再距离过滤, 最后分页); page默认1, pageSize默认10最大20; 每个团购活动一并返回其商品列表(goods: 团购价取团购商品表冗余价, 库存/单位取自商品表, 批量查询, 无商品的团购返回空数组)
+**功能说明**：用户查询所有在线的团购活动列表[新用户未绑定团长时leaderId=0]: 仅返回未下线(isClose=0)且当前时间处于开团时间窗内(已开团未结束)的在线活动; **goodsName 为商品名搜索**: 先按条件查出活动并回填商品, 再在结果中按商品名模糊过滤——活动的商品列表中任一商品名包含关键字则保留该活动, 否则剔除后输出(过滤在内存中完成, 分页仍按SQL层条数计算, 过滤后单页条数可能少于 pageSize); 分类过滤(catId, 非空且大于0时生效)在SQL层完成; leaderId>0按团长过滤(排序值sortOrder升序置顶优先, 同级按活动id倒序, 分页在SQL层完成); leaderId=0时需传经纬度(longitude/latitude, 缺失返回空列表), 按活动所属团长过滤: 团长的所有未禁用自提点中, 只要有任意一个自提点到用户的距离小于等于该自提点设置的自提范围(point_scope, 单位公里), 该团长下的所有团购活动均对用户可见, 按活动id倒序(先按分类过滤, 再距离过滤, 最后分页); page默认1, pageSize默认10最大20; 每个团购活动一并返回其商品列表(goods: 团购价取团购商品表冗余价, 库存/单位取自商品表, 批量查询, 无商品的团购返回空数组)
 
 **入参**
 
@@ -1996,7 +2002,7 @@ data 类型：`List<GroupCategoryResponse>`（数组，元素类型 `GroupCatego
 | leaderId | `Long` | 否 | 团长id(0=新用户未绑定团长, 此时必须传经纬度) |
 | longitude | `Double` | 否 | 经度, 精度为10米级(leaderId=0时必填) |
 | latitude | `Double` | 否 | 纬度, 精度为10米级(leaderId=0时必填) |
-| groupName | `String` | 否 | 团购名称 |
+| goodsName | `String` | 否 | 商品名称(模糊搜索): 查询后在结果中按商品名过滤, 活动下任一商品名包含关键字则保留该活动 |
 | catId | `Long` | 否 | 分类id |
 | page | `Integer` | 否 | 页码, 默认1 |
 | pageSize | `Integer` | 否 | 每页条数, 默认10, 最大20 |
@@ -2219,13 +2225,17 @@ data 类型：`List<GroupLogs>`（数组，元素类型 `GroupLogs`，字段说�
 
 #### 7. GET `/order/group/groupActivity/logs2`
 
-**功能说明**：团购记录(跟团记录), 滚动部分
+**功能说明**：团购记录(跟团记录), 滚动部分。两种维度：
+
+- **活动维度**（不传 goodsId 或 goodsId<=0）：条数按**活动已团数**(真实订单+虚拟订单)生成——已团数≤15时条数=已团数，已团数>15时固定15条；存在真实订单时与虚拟记录随机组合，**展示时间统一落在最近10分钟内**(真实订单记录的历史时间同样重置)，结果缓存1小时。
+- **商品维度**（goodsId>0）：条数按**该商品的已团数**(真实订单数+虚拟订单数)生成——已团数≤15时条数=已团数，已团数>15时固定15条，已团数为0返回空列表。记录全部为**该商品**的跟团记录：虚拟记录的商品名固定为该商品，混入该商品的真实订单记录(头像/手机号/购买数量取真实值，仅统计该商品的订单商品行)后随机打乱；**展示时间统一落在最近10分钟内**。商品已下架或不属于该团购活动时返回空列表。独立缓存 `GroupLogs2:{groupId}:goods:{goodsId}`，1小时过期；该商品有新支付订单时支付回调会同步失效。
 
 **入参**
 
 | 参数 | 类型 | 位置 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
-| id | `Long` | Query 参数 | 是 | 业务主键 ID（变量名 groupId） |
+| id | `Long` | Query 参数 | 是 | 团购活动 ID（变量名 groupId） |
+| goodsId | `Long` | Query 参数 | 否 | 商品 ID；>0 时返回该商品维度的跟团记录(20条, 时间在10分钟内)，不传或<=0 时返回活动维度 |
 
 **出参（JsonResult 统一返回体）**
 
@@ -4133,7 +4143,7 @@ data 类型：`Object`（未能静态推断，源码返回表达式：`JSONObjec
 
 #### 1. GET `/goods/group/goods/list`
 
-**功能说明**：团购商品列表(包装, 规格, sku)
+**功能说明**：团购商品列表(包装, 规格, sku)。每个商品返回 `groupNum`（已团数）= 该商品在本团购活动中的真实订单数 + 该商品虚拟订单数（`gb_goods_info.virtual_order`）。真实订单数按订单号去重、仅统计已支付且未取消的有效订单（`status > 0 且 status < 6`），与 C 端跟团人次口径一致；已团数为动态值，每次请求实时计算并覆盖，不写入 30 天商品列表缓存。
 
 **入参**
 
@@ -4167,6 +4177,7 @@ data 类型：`List<GroupGoodsResponse>`（数组，元素类型 `GroupGoodsResp
 | unit | `String` | 否 | 商品单位 |
 | limit | `Byte` | 否 | 是否限购 |
 | quantity | `Integer` | 否 | 限购数量 |
+| groupNum | `Integer` | 否 | 已团数 = 该商品在本团购活动中的真实订单数 + 该商品虚拟订单数（动态实时计算） |
 | packs | `List<GroupPackageResponse>` | 否 | 商品包装列表 |
 | specs | `List<GroupSpecResponse>` | 否 | 商品规格列表 |
 | skus | `List<GroupSkuResponse>` | 否 | 商品sku价格和库存 |
@@ -4300,6 +4311,7 @@ data 类型：`List<LeaderGoodsResponse>`（数组，元素类型 `LeaderGoodsRe
 | isClose | `Byte` | 否 | 是否禁用 |
 | isCheck | `Byte` | 否 | 平台审核 |
 | checkRemark | `String` | 否 | 审核备注 |
+| virtual | `Integer` | 否 | 商品虚拟订单数量（C端"已团数"的虚拟部分；旧数据为0） |
 | specList | `List<LeaderSpecResponse>` | 否 | 商品规格列表(包含规格值) |
 
 
@@ -4367,6 +4379,7 @@ data 类型：`List<LeaderGoodsResponse>`（数组，元素类型 `LeaderGoodsRe
 | isClose | `Byte` | 否 | 是否禁用 |
 | isCheck | `Byte` | 否 | 平台审核 |
 | checkRemark | `String` | 否 | 审核备注 |
+| virtual | `Integer` | 否 | 商品虚拟订单数量（C端"已团数"的虚拟部分；旧数据为0） |
 | specList | `List<LeaderSpecResponse>` | 否 | 商品规格列表(包含规格值) |
 
 
@@ -4461,6 +4474,7 @@ data 类型：`GoodsDetailResponse`（字段说明见下）
 | isClose | `Byte` | 否 | 是否禁用 |
 | isCheck | `Byte` | 否 | 平台审核 |
 | checkRemark | `String` | 否 | 审核备注 |
+| virtual | `Integer` | 否 | 商品虚拟订单数量（C端"已团数"的虚拟部分；旧数据为0） |
 | specList | `List<LeaderSpecResponse>` | 否 | 商品规格列表(包含规格值) |
 
 
@@ -4528,6 +4542,7 @@ data 类型：`GoodsDetailResponse`（字段说明见下）
 | img3 | `String` | 否 | — |
 | addSpecList | `List<LeaderAddSpecRequest>` | 否 | 规格 |
 | skuList | `List<LeaderSkuRequest>` | 否 | SKU列表(添加商品时随商品一并写入gb_goods_sku_info) |
+| virtual | `Integer` | 否 | 商品虚拟订单数量, 默认0; C端"已团数" = 该商品真实订单数 + 本值 |
 
 
 **→LeaderAddSpecRequest 字段**（字段 `addSpecList`（List<LeaderAddSpecRequest>））
@@ -4606,6 +4621,7 @@ data 类型：`Long`（基本类型，无子字段）
 | img3 | `String` | 否 | — |
 | addSpecList | `List<LeaderAddSpecRequest>` | 否 | 规格 |
 | skuList | `List<LeaderSkuRequest>` | 否 | SKU列表(修改商品时随商品信息一并重建gb_goods_sku_info) |
+| virtual | `Integer` | 否 | 商品虚拟订单数量; 不传则保留库中原值, 传0可清零 |
 
 
 **→LeaderAddSpecRequest 字段**（字段 `addSpecList`（List<LeaderAddSpecRequest>））
@@ -5183,7 +5199,7 @@ data 类型：`List<GroupCatResponse>`（数组，元素类型 `GroupCatResponse
 
 #### 9. POST `/goods/Leader/share/groupActivity/poster`
 
-**功能说明**：分享团购海报生成1
+**功能说明**：分享团购海报生成1。海报「已售N单」= 海报展示商品(活动下第一个在线商品)的虚拟订单数 + 该商品在本次团购活动中的真实订单数（商品级口径，与 C 端商品已团数一致）
 
 **入参**
 
@@ -5203,7 +5219,7 @@ data 类型：`String`（基本类型，无子字段）
 
 #### 10. POST `/goods/Leader/share/groupActivity/make/poster`
 
-**功能说明**：分享团购活动海报（带有logo的海报）
+**功能说明**：分享团购活动海报（带有logo的海报）。海报「已售N件」：有展示商品时 = 该商品虚拟订单数 + 该商品在本次团购活动中的真实订单数；无展示商品(主图取活动图)时退化为活动级(活动虚拟数=商品级汇总 + 活动真实订单数)
 
 **入参**
 
@@ -5223,7 +5239,7 @@ data 类型：`String`（基本类型，无子字段）
 
 #### 11. POST `/goods/Leader/share/groupActivity/goods/poster`
 
-**功能说明**：团购端-分享团购-商品-海报生成
+**功能说明**：团购端-分享团购-商品-海报生成。海报「已售N单」= 该商品(goodsId)的虚拟订单数 + 该商品在本次团购活动中的真实订单数（商品级口径，与 C 端商品已团数一致）
 
 **入参**
 

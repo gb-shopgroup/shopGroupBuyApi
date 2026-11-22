@@ -63,13 +63,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
-import java.math.BigDecimal;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URL;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -480,8 +479,9 @@ public class LeaderGroupManageController {
 
         // 团购介绍
         data.setGroupInfo(request.getInfo());
-        // 虚拟订单数量
-        Integer virOrder = Optional.ofNullable(request.getVirtual()).orElse(0);
+        // 虚拟订单数量已改为商品级(gb_goods_info.virtual_order), 团长在新增/编辑商品时配置;
+        // 活动表 virtual_order 仅保留兼容(历史字段), 新活动统一写0, 展示时按活动下商品虚拟订单数之和聚合
+        Integer virOrder = 0;
         data.setVirtualOrder(virOrder);
         data.setStartTime(request.getStartTime());
         data.setEndTime(request.getEndTime());
@@ -711,10 +711,6 @@ public class LeaderGroupManageController {
 
         // 团购介绍
         data.setGroupInfo(request.getInfo());
-        // 虚拟订单数量
-        if (request.getVirtual() != null) {
-            data.setVirtualOrder(request.getVirtual());
-        }
         data.setStartTime(request.getStartTime());
         data.setEndTime(request.getEndTime());
         // 团购标签
@@ -876,7 +872,8 @@ public class LeaderGroupManageController {
         // 构建分享海报信息
         PosterDTO dto = new PosterDTO();
         dto.setGoodsName(goodsInfo.getGoodsName()); // 团长名称还是商品名称
-        dto.setSaleText("已售" + (groupInfo.getVirtualOrder() + groupInfo.getOrderTotal()) + "单");
+        // 已售 = 该商品的虚拟订单数 + 该商品在本次团购活动中的真实订单数(商品级口径, 与C端商品已团数一致)
+        dto.setSaleText("已售" + this.goodsSaleCount(groupId, goodsInfo.getGoodsId()) + "单");
         dto.setPriceText("￥" + goodsInfo.getGroupPrice());
         dto.setBtnText("立即跟团");
         dto.setImgUrl(goodsInfo.getGroupImg());
@@ -1015,8 +1012,12 @@ public class LeaderGroupManageController {
             Double posterPrice = (mainGoods != null && mainGoods.getGroupPrice() != null)
                     ? mainGoods.getGroupPrice() : groupInfo.getGroupPrice();
             param.price = "￥" + formatPosterPrice(posterPrice) + "元";
-            param.sales = "已售" + ((groupInfo.getVirtualOrder() == null ? 0 : groupInfo.getVirtualOrder())
-                    + (groupInfo.getOrderTotal() == null ? 0 : groupInfo.getOrderTotal())) + "件";
+            // 已售: 有展示商品时取该商品级口径(虚拟+该商品真实订单数);
+            // 无展示商品(使用活动名/活动价时)退化为活动级(活动虚拟数为商品级汇总, 与商品口径一致)
+            param.sales = (mainGoods != null)
+                    ? "已售" + this.goodsSaleCount(groupId, mainGoods.getGoodsId()) + "件"
+                    : "已售" + ((groupInfo.getVirtualOrder() == null ? 0 : groupInfo.getVirtualOrder())
+                            + (groupInfo.getOrderTotal() == null ? 0 : groupInfo.getOrderTotal())) + "件";
             param.ercodeImage = ercodeImage; //本地二维码图片
             param.tipText = "长按识别,跟团购买";
 
@@ -1155,7 +1156,8 @@ public class LeaderGroupManageController {
         PosterDTO dto = new PosterDTO();
         dto.setGroupName(groupInfo.getGroupName()); // 团购活动名(商品名上方展示)
         dto.setGoodsName(goodsInfo.getGoodsName()); // 商品名称
-        dto.setSaleText("已售" + (groupInfo.getVirtualOrder() + groupInfo.getOrderTotal()) + "单");
+        // 已售 = 该商品的虚拟订单数 + 该商品在本次团购活动中的真实订单数(商品级口径, 与C端商品已团数一致)
+        dto.setSaleText("已售" + this.goodsSaleCount(groupId, goodsId) + "单");
         dto.setImgUrl(goodsInfo.getGroupImg());
         // 二维码: 落地页为该团购活动详情页(扫码直接进入该活动跟团), 合成到海报右侧(获取失败不阻断海报生成)
         dto.setQrCodeImage(getGroupDetailQrCodeImage(groupId, leaderId));
@@ -1228,6 +1230,17 @@ public class LeaderGroupManageController {
             return "0";
         }
         return BigDecimal.valueOf(price).stripTrailingZeros().toPlainString();
+    }
+
+    /**
+     * 海报"已售"单数 = 该商品的虚拟订单数 + 该商品在本次团购活动中的真实订单数(商品级口径):
+     * 与C端商品列表 groupNum(已团数)同一数据源 getGroupGoodsGroupNum, 真实订单数按订单号去重、
+     * 仅统计已支付未取消订单(status > 0 且 status < 6); 商品已下架或无订单时返回0
+     */
+    private int goodsSaleCount(Long groupId, Long goodsId) {
+
+        Map<Long, Integer> groupNumMap = activityInfoService.getGroupGoodsGroupNum(groupId);
+        return groupNumMap == null ? 0 : groupNumMap.getOrDefault(goodsId, 0);
     }
 
     /**

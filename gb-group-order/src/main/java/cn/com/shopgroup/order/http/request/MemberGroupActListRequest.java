@@ -11,8 +11,8 @@ public class MemberGroupActListRequest {
     private Double longitude;
     // 纬度, 精度为10米级(leaderId=0时必填)
     private Double latitude;
-    // 团购名称
-    private String groupName;
+    // 商品名称
+    private String goodsName;
     //分类id
     private Long catId;
     // 页码, 默认1

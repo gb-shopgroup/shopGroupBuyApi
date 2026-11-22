@@ -211,6 +211,8 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
         data.setIsCheck((byte) 1);
         data.setCheckRemark("");
         data.setAddTime(TimeUtils.getTimeStamp());
+        // 商品虚拟订单数(默认0): C端"已团数"的虚拟部分
+        data.setVirtualOrder(Optional.ofNullable(info.getVirtualOrder()).orElse(0));
         mapper.insert(data);
         Long goodsId = data.getGoodsId();
         List<GbGoodsImageInfo> imageInfoList = new ArrayList<>();
@@ -242,6 +244,10 @@ public class GbGoodsInfoServiceImpl implements GbGoodsInfoService {
         updateWrapper.set(GbGoodsInfo::getGoodsInfo, Optional.ofNullable(info.getGoodsInfo()).orElse(""));
         updateWrapper.set(GbGoodsInfo::getIsCheck, 1);
         updateWrapper.set(GbGoodsInfo::getIsClose, (byte) 0);
+        // 商品虚拟订单数: 传了才更新; 未传(null)保留库中原值, 兼容未带该字段的旧前端请求
+        if (info.getVirtualOrder() != null) {
+            updateWrapper.set(GbGoodsInfo::getVirtualOrder, info.getVirtualOrder());
+        }
         updateWrapper.eq(GbGoodsInfo::getGoodsId, info.getGoodsId());
         updateWrapper.eq(GbGoodsInfo::getLeaderId, leaderId);
         int flag = mapper.update(updateWrapper);

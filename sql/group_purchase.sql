@@ -70,6 +70,7 @@ CREATE TABLE `gb_goods_info` (
   `is_check` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '平台审核',
   `check_remark` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '审核备注',
   `add_time` int unsigned NOT NULL DEFAULT '0' COMMENT '添加时间',
+  `virtual_order` int unsigned NOT NULL DEFAULT '0' COMMENT '商品虚拟订单数量(已团数=该商品在团购活动中的真实订单数+本值)',
   PRIMARY KEY (`goods_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='商品信息表';
 
@@ -659,6 +660,13 @@ ALTER TABLE `gb_group_activity_info`
   ADD COLUMN `tag_id` int unsigned NOT NULL DEFAULT '0' COMMENT '团购标签id,0=未选择',
   ADD COLUMN `tag_name` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '团购标签名称,冗余展示';
 
+
+-- 商品表新增虚拟订单数: 虚拟订单口径由"团购活动级"改为"商品级"。
+-- C端商品列表的"已团数" = 该商品在本团购活动中的真实订单数 + 该商品的 virtual_order;
+-- 团购活动级别的虚拟订单数不再单独配置, 取活动下在线商品 virtual_order 之和。
+-- (gb_group_activity_info.virtual_order 为历史字段, 保留兼容, 新活动统一写入0)
+ALTER TABLE `gb_goods_info`
+  ADD COLUMN `virtual_order` int unsigned NOT NULL DEFAULT '0' COMMENT '商品虚拟订单数量(已团数=该商品在团购活动中的真实订单数+本值)' AFTER `add_time`;
 
 -- 退款记录表新增易宝退款单号字段: 审核同意发起退款时记录易宝返回的 uniqueRefundNo,
 -- 用于与易宝退款单逐笔对账, 并作为退款回调幂等判重基准(支持一单多次部分退款)

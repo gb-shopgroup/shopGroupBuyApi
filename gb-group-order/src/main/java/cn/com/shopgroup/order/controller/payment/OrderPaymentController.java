@@ -14,8 +14,10 @@ import cn.com.shopgroup.goods.service.GbGroupActivityInfoService;
 import cn.com.shopgroup.order.constants.OrderStatusEnum;
 import cn.com.shopgroup.order.constants.PaymentStatusEnum;
 import cn.com.shopgroup.order.exception.OrderErrorCodeEnum;
+import cn.com.shopgroup.order.mapper.GbOrderGoodsInfoMapper;
 import cn.com.shopgroup.order.model.GbLeaderMerchantMonthlyAmount;
 import cn.com.shopgroup.order.model.GbOrderBusinessInfo;
+import cn.com.shopgroup.order.model.GbOrderGoodsInfo;
 import cn.com.shopgroup.order.model.GbOrderInfo;
 import cn.com.shopgroup.order.model.OrderTransactionLog;
 import cn.com.shopgroup.order.service.GbLeaderMerchantMonthlyAmountService;
@@ -29,6 +31,7 @@ import cn.com.shopgroup.user.service.GbOrgLeaderInfoService;
 import cn.com.shopgroup.yeepay.YeePayUtils;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.yeepay.yop.sdk.utils.DigitalEnvelopeUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -60,6 +63,9 @@ public class OrderPaymentController {
 
     @Resource
     private GbOrderInfoService orderInfoService;
+
+    @Resource
+    private GbOrderGoodsInfoMapper orderGoodsMapper;
 
     @Resource
     private GbOrderBusinessInfoService orderBusinessService;
@@ -362,7 +368,7 @@ public class OrderPaymentController {
         saveMerchantMonthlyAmount(orderInfo, merchantMoney);
         // 累加团购订单数量
         groupService.addGroupOrderNumber(orderInfo.getGroupId());
-        delRedisKey(orderInfo.getGroupId());
+        delRedisKey(orderInfo.getGroupId(), orderInfo.getOrderNo());
         //订单对应的团长的cashType[结算到账方式,0=支付时延迟到账型,1=核销时延迟到账型]
         handleWxUploadShippingInfo(orderInfo, channelTrxId);
         // 返回
@@ -393,11 +399,27 @@ public class OrderPaymentController {
         }
     }
 
-    private void delRedisKey(Long groupId) {
+    private void delRedisKey(Long groupId, String orderNo) {
         String key1 = RedisConstant.RedisGroupLogsKey2 + groupId;
         redisHelper.releaseLock(key1);
         String key = RedisConstant.RedisGroupLogsKey + groupId;
         redisHelper.releaseLock(key);
+        // 商品维度滚动跟团记录缓存(GroupLogs2:{groupId}:goods:{goodsId})同步失效:
+        // 让本单涉及的商品尽快出现在对应商品的跟团记录中(与活动维度缓存失效时机一致)
+        try {
+            List<GbOrderGoodsInfo> orderGoodsList = orderGoodsMapper.selectList(
+                    Wrappers.<GbOrderGoodsInfo>lambdaQuery().eq(GbOrderGoodsInfo::getOrderNo, orderNo));
+            if (!CollectionUtils.isEmpty(orderGoodsList)) {
+                for (GbOrderGoodsInfo goods : orderGoodsList) {
+                    if (goods.getGoodsId() != null) {
+                        redisHelper.releaseLock(RedisConstant.buildGroupLogsGoodsKey(groupId, goods.getGoodsId()));
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // 缓存失效失败不影响支付主流程, 商品维度缓存1小时后自动过期
+            log.error("失效商品维度滚动跟团记录缓存异常 groupId:{}, orderNo:{}", groupId, orderNo, e);
+        }
     }
 
     public void handleWxUploadShippingInfo(GbOrderInfo orderInfo, String transactionId) {
